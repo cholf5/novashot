@@ -1,3 +1,4 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
@@ -31,4 +32,20 @@ public abstract class AnnotationBase
     /// 让描边细的标注也易点中。
     /// </summary>
     public abstract bool HitTest(SKPoint point, float slop);
+
+    /// <summary>
+    /// Select 工具专用的宽松 body 命中：<b>闭合形状</b>（Rect/Ellipse/Spotlight/Text/Number）
+    /// 应把整个 body 内部都算命中，用户不必去精确点描边；开放形状（Line/Arrow）沿用
+    /// <see cref="HitTest"/> 的描边命中。默认走 <see cref="HitTest"/>。
+    /// </summary>
+    public virtual bool HitTestBody(SKPoint point, float slop) => HitTest(point, slop);
+
+    /// <summary>选中态可拖手柄集合，坐标为像素空间；顺序建议与视觉迭代顺序一致。</summary>
+    public abstract IReadOnlyList<AnnotationHandle> GetHandles();
+
+    /// <summary>把指定 <paramref name="kind"/> 手柄移动到 <paramref name="newImagePos"/>。未知 kind 不动。</summary>
+    public abstract void MoveHandle(HandleKind kind, SKPoint newImagePos);
+
+    /// <summary>整体平移。<paramref name="delta"/> 单位是像素空间。</summary>
+    public abstract void MoveBy(SKPoint delta);
 }

@@ -1,3 +1,4 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
@@ -73,5 +74,25 @@ public sealed class RectangleAnnotation : AnnotationBase
         // 内环退化（矩形过小）时，外环命中即算命中
         if (inner.Width <= 0 || inner.Height <= 0) return true;
         return !inner.Contains(point);
+    }
+
+    public override IReadOnlyList<AnnotationHandle> GetHandles() => BoxHandles.GetHandles(_rect);
+
+    public override bool HitTestBody(SKPoint point, float slop)
+    {
+        // Select 工具下，闭合矩形整个 body 都算命中。
+        var r = _rect;
+        r.Inflate(slop, slop);
+        return r.Contains(point);
+    }
+
+    public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
+    {
+        _rect = BoxHandles.ApplyHandle(_rect, kind, newImagePos).Standardized;
+    }
+
+    public override void MoveBy(SKPoint delta)
+    {
+        _rect.Offset(delta.X, delta.Y);
     }
 }

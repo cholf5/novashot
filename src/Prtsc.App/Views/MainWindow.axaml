@@ -18,6 +18,9 @@
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding Editor.UndoCommand}"/>
     <KeyBinding Gesture="Ctrl+Y" Command="{Binding Editor.RedoCommand}"/>
     <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding Editor.RedoCommand}"/>
+    <!-- M4c.1: Delete 删除当前选中；Escape 取消选择 -->
+    <KeyBinding Gesture="Delete" Command="{Binding Editor.DeleteSelectionCommand}"/>
+    <KeyBinding Gesture="Escape" Command="{Binding Editor.DeselectCommand}"/>
   </Window.KeyBindings>
 
   <DockPanel>
@@ -84,7 +87,9 @@
                     Click="OnEditorBackClick"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
             <!-- 工具选择：RadioButton group 保证单选。tag 承载 ToolKind 值 -->
-            <RadioButton GroupName="Tool" Content="Rect"    Padding="8,4" Tag="Rectangle"     IsChecked="True"  Click="OnToolChanged"/>
+            <RadioButton GroupName="Tool" Content="Sel"     Padding="8,4" Tag="Select"        IsChecked="True"  Click="OnToolChanged"
+                         ToolTip.Tip="Select / move / resize"/>
+            <RadioButton GroupName="Tool" Content="Rect"    Padding="8,4" Tag="Rectangle"     Click="OnToolChanged"/>
             <RadioButton GroupName="Tool" Content="Ellipse" Padding="8,4" Tag="Ellipse"       Click="OnToolChanged"/>
             <RadioButton GroupName="Tool" Content="Line"    Padding="8,4" Tag="Line"          Click="OnToolChanged"/>
             <RadioButton GroupName="Tool" Content="Arrow"   Padding="8,4" Tag="ArrowStraight" Click="OnToolChanged"/>
@@ -94,6 +99,9 @@
                          ToolTip.Tip="Number counter"/>
             <RadioButton GroupName="Tool" Content="Spot"    Padding="8,4" Tag="Spotlight"     Click="OnToolChanged"
                          ToolTip.Tip="Spotlight"/>
+            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
+            <Button Content="Delete (Del)" Padding="10,4"
+                    Command="{Binding Editor.DeleteSelectionCommand}"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
             <Button Content="Undo (Ctrl+Z)" Padding="10,4"
                     Command="{Binding Editor.UndoCommand}"/>

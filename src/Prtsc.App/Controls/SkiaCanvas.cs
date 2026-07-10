@@ -7,6 +7,8 @@ using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Prtsc.App.ViewModels;
 using Prtsc.Core.Annotation;
+using Prtsc.Core.Annotation.Editing;
+using Prtsc.Core.Annotation.Model;
 using Prtsc.Core.Annotation.Tools;
 using SkiaSharp;
 
@@ -14,17 +16,25 @@ namespace Prtsc.App.Controls;
 
 /// <summary>
 /// 编辑器主画布：通过 <see cref="ICustomDrawOperation"/> 拿到 Avalonia Skia 后端的 <see cref="SKCanvas"/>
-/// 直接绘制源图 + 标注 + 拖拽预览。
+/// 直接绘制源图 + 标注 + 拖拽预览 + 选中框/手柄。
 ///
 /// 坐标：内部所有 annotation 均在<b>源图像素空间</b>；控件通过 uniform fit-to-bounds 变换绘制。
 /// Pointer 事件在 DIP 空间到达，经反变换后送给 <see cref="IAnnotationTool"/>。
-///
-/// M4a：只做全量重绘 + 单次拖拽 + Rectangle 提交路径。
+/// 选中框与手柄画在 DIP 空间，保证不随视口缩放变形。
 /// </summary>
 public sealed class SkiaCanvas : Control
 {
     public static readonly StyledProperty<EditorViewModel?> EditorProperty =
         AvaloniaProperty.Register<SkiaCanvas, EditorViewModel?>(nameof(Editor));
+
+    /// <summary>手柄命中半径（DIP）。M2 的 SelectionAdorner 用 8f，此处对齐。</summary>
+    public const float HandleHitRadiusDip = 8f;
+
+    /// <summary>手柄可视方块边长（DIP）。</summary>
+    public const float HandleVisualSizeDip = 8f;
+
+    /// <summary>Body 命中容差（DIP）：细线也能点中。</summary>
+    public const float BodyHitSlopDip = 4f;
 
     public EditorViewModel? Editor
     {
@@ -38,7 +48,6 @@ public sealed class SkiaCanvas : Control
     public SkiaCanvas()
     {
         Focusable = true;
-        // 不透明背景默认；具体清屏在 DrawOp 里做
         ClipToBounds = true;
     }
 
@@ -72,9 +81,10 @@ public sealed class SkiaCanvas : Control
 
     private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // Tool / Style 变化都可能影响拖拽预览外观
+        // Tool / Style / Selection 变化都可能影响渲染
         if (e.PropertyName is nameof(EditorViewModel.CurrentTool)
-            or nameof(EditorViewModel.CurrentStyle))
+            or nameof(EditorViewModel.CurrentStyle)
+            or nameof(EditorViewModel.Selection))
         {
             InvalidateVisual();
         }
@@ -94,6 +104,7 @@ public sealed class SkiaCanvas : Control
             new Rect(bounds.Size),
             editor.Document,
             _activeTool?.Preview,
+            editor.Selection,
             ComputeViewportMatrix(editor, bounds)));
     }
 
@@ -116,9 +127,17 @@ public sealed class SkiaCanvas : Control
         return m;
     }
 
+    /// <summary>image-pixel 空间的 slop（用于命中测试）。视口缩放会让 DIP slop 换算成像素 slop。</summary>
+    private static float DipToImageDistance(SKMatrix imageToDip, float dip)
+    {
+        // 只取 scale X 就行——我们的视口是 uniform
+        var sx = imageToDip.ScaleX;
+        if (sx < 1e-6f) return dip;
+        return dip / sx;
+    }
+
     // ---- Pointer ----
 
-    /// <summary>DIP 点 → image-pixel 点。若无 Editor / 变换不可逆返回 <c>null</c>。</summary>
     private SKPoint? DipToImage(Point dip)
     {
         var editor = Editor;
@@ -139,11 +158,33 @@ public sealed class SkiaCanvas : Control
         if (img is null) return;
 
         Focus();
-        _activeTool = editor.CreateActiveTool();
+
+        // SelectTool 需要在 image-pixel 空间的 slop：由当前视口 scale 换算
+        var matrix = ComputeViewportMatrix(editor, Bounds);
+        var handleRadiusImg = DipToImageDistance(matrix, HandleHitRadiusDip);
+        var bodySlopImg = DipToImageDistance(matrix, BodyHitSlopDip);
+
+        _activeTool = CreateToolWithScale(editor, handleRadiusImg, bodySlopImg);
         _activeTool.OnPointerDown(img.Value, editor.CurrentStyle);
         e.Pointer.Capture(this);
         InvalidateVisual();
         e.Handled = true;
+    }
+
+    private static IAnnotationTool CreateToolWithScale(EditorViewModel editor, float handleRadiusImg, float bodySlopImg)
+    {
+        // 只有 SelectTool 需要 scale-aware 参数；其他工具走 editor.CreateActiveTool。
+        if (editor.CurrentTool == ToolKind.Select)
+        {
+            return new SelectTool(
+                getSelection: () => editor.Selection,
+                setSelection: a => editor.Selection = a,
+                history: editor.History,
+                annotations: editor.Document.Annotations,
+                bodyHitSlop: bodySlopImg,
+                handleHitRadius: handleRadiusImg);
+        }
+        return editor.CreateActiveTool();
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
@@ -186,16 +227,22 @@ public sealed class SkiaCanvas : Control
 
     private sealed class DrawOp : ICustomDrawOperation
     {
+        private static readonly SKColor SelectionOutlineColor = new(0xFF, 0xFF, 0xFF);
+        private static readonly SKColor HandleFillColor       = new(0xFF, 0xFF, 0xFF);
+        private static readonly SKColor HandleStrokeColor     = new(0x00, 0x00, 0x00);
+
         private readonly AnnotationDocument _doc;
-        private readonly Prtsc.Core.Annotation.Model.AnnotationBase? _preview;
+        private readonly AnnotationBase? _preview;
+        private readonly AnnotationBase? _selection;
         private readonly SKMatrix _matrix;
 
-        public DrawOp(Rect bounds, AnnotationDocument doc,
-                      Prtsc.Core.Annotation.Model.AnnotationBase? preview, SKMatrix matrix)
+        public DrawOp(Rect bounds, AnnotationDocument doc, AnnotationBase? preview,
+                      AnnotationBase? selection, SKMatrix matrix)
         {
             Bounds = bounds;
             _doc = doc;
             _preview = preview;
+            _selection = selection;
             _matrix = matrix;
         }
 
@@ -210,11 +257,11 @@ public sealed class SkiaCanvas : Control
         public void Render(ImmediateDrawingContext context)
         {
             var lease = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
-            if (lease is null) return;   // 非 Skia 后端（不应发生）
+            if (lease is null) return;
             using var api = lease.Lease();
             var canvas = api.SkCanvas;
 
-            // 编辑区背景（略深，方便看图像边界）
+            // 背景
             using (var bg = new SKPaint { Color = new SKColor(0x1A, 0x1A, 0x1A) })
             {
                 canvas.DrawRect(0, 0, (float)Bounds.Width, (float)Bounds.Height, bg);
@@ -223,17 +270,57 @@ public sealed class SkiaCanvas : Control
             var restore = canvas.Save();
             canvas.Concat(in _matrix);
 
-            // 图像
+            // image-pixel 空间：画图像 + 标注 + 预览
             canvas.DrawBitmap(_doc.Source, 0, 0);
-
-            // 已提交标注
-            foreach (var a in _doc.Annotations)
-                a.Render(canvas);
-
-            // 拖拽预览
+            foreach (var a in _doc.Annotations) a.Render(canvas);
             _preview?.Render(canvas);
 
             canvas.RestoreToCount(restore);
+
+            // DIP 空间：画选中框与手柄（不随视口缩放变形）
+            if (_selection is not null)
+                DrawSelectionOverlay(canvas, _selection);
+        }
+
+        private void DrawSelectionOverlay(SKCanvas canvas, AnnotationBase selection)
+        {
+            // BoundingBox 从像素映射到 DIP
+            var box = _matrix.MapRect(selection.BoundingBox);
+
+            using (var outline = new SKPaint
+            {
+                Color = SelectionOutlineColor,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
+                IsAntialias = true,
+                PathEffect = SKPathEffect.CreateDash(new float[] { 4f, 3f }, 0f),
+            })
+            {
+                canvas.DrawRect(box, outline);
+            }
+
+            using var fillPaint = new SKPaint
+            {
+                Color = HandleFillColor,
+                Style = SKPaintStyle.Fill,
+                IsAntialias = false,
+            };
+            using var strokePaint = new SKPaint
+            {
+                Color = HandleStrokeColor,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
+                IsAntialias = false,
+            };
+
+            var half = HandleVisualSizeDip * 0.5f;
+            foreach (var h in selection.GetHandles())
+            {
+                var pt = _matrix.MapPoint(h.ImagePos);
+                var r = new SKRect(pt.X - half, pt.Y - half, pt.X + half, pt.Y + half);
+                canvas.DrawRect(r, fillPaint);
+                canvas.DrawRect(r, strokePaint);
+            }
         }
     }
 }

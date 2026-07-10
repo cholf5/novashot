@@ -39,6 +39,26 @@ public sealed class AnnotationDocument
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// 在指定 z-order 位置插入。<paramref name="index"/> 允许等于当前长度（追加到末尾）。
+    /// 由 <c>RemoveAnnotationCommand.Undo</c> 用来恢复原来的层级顺序。
+    /// </summary>
+    public void Insert(int index, AnnotationBase annotation)
+    {
+        ArgumentNullException.ThrowIfNull(annotation);
+        if (index < 0 || index > _annotations.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        _annotations.Insert(index, annotation);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>返回 annotation 在栈里的 z-order 索引；找不到返回 -1。</summary>
+    public int IndexOf(AnnotationBase annotation)
+    {
+        ArgumentNullException.ThrowIfNull(annotation);
+        return _annotations.IndexOf(annotation);
+    }
+
     public bool Remove(AnnotationBase annotation)
     {
         ArgumentNullException.ThrowIfNull(annotation);

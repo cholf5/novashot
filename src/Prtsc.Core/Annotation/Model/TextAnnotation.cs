@@ -1,3 +1,4 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
@@ -85,5 +86,26 @@ public sealed class TextAnnotation : AnnotationBase
         var b = Measure();
         b.Inflate(slop, slop);
         return b.Contains(point);
+    }
+
+    public override IReadOnlyList<AnnotationHandle> GetHandles()
+    {
+        var b = Measure();
+        var center = new SKPoint((b.Left + b.Right) * 0.5f, (b.Top + b.Bottom) * 0.5f);
+        return new[] { new AnnotationHandle(HandleKind.Center, center) };
+    }
+
+    public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
+    {
+        if (kind != HandleKind.Center) return;
+        var b = Measure();
+        var oldCenter = new SKPoint((b.Left + b.Right) * 0.5f, (b.Top + b.Bottom) * 0.5f);
+        MoveBy(new SKPoint(newImagePos.X - oldCenter.X, newImagePos.Y - oldCenter.Y));
+    }
+
+    public override void MoveBy(SKPoint delta)
+    {
+        Position = new SKPoint(Position.X + delta.X, Position.Y + delta.Y);
+        InvalidateCache();
     }
 }

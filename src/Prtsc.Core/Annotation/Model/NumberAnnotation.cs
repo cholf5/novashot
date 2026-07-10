@@ -1,3 +1,4 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
@@ -55,5 +56,20 @@ public sealed class NumberAnnotation : AnnotationBase
         var dx = point.X - Center.X;
         var dy = point.Y - Center.Y;
         return dx * dx + dy * dy <= (Radius + slop) * (Radius + slop);
+    }
+
+    public override IReadOnlyList<AnnotationHandle> GetHandles() => new[]
+    {
+        new AnnotationHandle(HandleKind.Center, Center),
+    };
+
+    public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
+    {
+        if (kind == HandleKind.Center) Center = newImagePos;
+    }
+
+    public override void MoveBy(SKPoint delta)
+    {
+        Center = new SKPoint(Center.X + delta.X, Center.Y + delta.Y);
     }
 }

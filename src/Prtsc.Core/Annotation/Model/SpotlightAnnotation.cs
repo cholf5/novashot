@@ -1,3 +1,4 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
@@ -62,5 +63,25 @@ public sealed class SpotlightAnnotation : AnnotationBase
         var img = new SKRect(0, 0, ImageWidth, ImageHeight);
         if (!img.Contains(point)) return false;
         return !_region.Contains(point);
+    }
+
+    public override IReadOnlyList<AnnotationHandle> GetHandles() => BoxHandles.GetHandles(_region);
+
+    public override bool HitTestBody(SKPoint point, float slop)
+    {
+        // Select 工具下，聚光灯覆盖整张图，任意位置都算命中。
+        var img = new SKRect(0, 0, ImageWidth, ImageHeight);
+        img.Inflate(slop, slop);
+        return img.Contains(point);
+    }
+
+    public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
+    {
+        _region = BoxHandles.ApplyHandle(_region, kind, newImagePos).Standardized;
+    }
+
+    public override void MoveBy(SKPoint delta)
+    {
+        _region.Offset(delta.X, delta.Y);
     }
 }

@@ -16,7 +16,8 @@ namespace Prtsc.App.ViewModels;
 /// - <see cref="Document"/> 借用其 <c>Bitmap</c> 引用，本身不 IDisposable。
 /// - <see cref="History"/>：单一 UndoRedoStack，capacity=50。
 ///
-/// M4a：默认工具 Rectangle、默认样式红色 2 px；M4d 会加工具切换热键与更多样式。
+/// M4c.1：默认工具 Select；新增 <see cref="Selection"/> / <see cref="DeleteSelectionCommand"/> /
+/// <see cref="DeselectCommand"/>。M4d 会补工具热键与更多样式。
 /// </summary>
 public sealed partial class EditorViewModel : ObservableObject, IDisposable
 {
@@ -28,12 +29,18 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
 
     public RelayCommand UndoCommand { get; }
     public RelayCommand RedoCommand { get; }
+    public RelayCommand DeleteSelectionCommand { get; }
+    public RelayCommand DeselectCommand { get; }
 
     [ObservableProperty]
-    private ToolKind _currentTool = ToolKind.Rectangle;
+    private ToolKind _currentTool = ToolKind.Select;
 
     [ObservableProperty]
     private AnnotationStyle _currentStyle = AnnotationStyle.Default;
+
+    /// <summary>当前选中的标注；null=无选择。SelectTool 读写它。</summary>
+    [ObservableProperty]
+    private AnnotationBase? _selection;
 
     public int ImageWidth => Document.Width;
     public int ImageHeight => Document.Height;
@@ -50,8 +57,14 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         RedoCommand = new RelayCommand(
             execute: () => History.Redo(),
             canExecute: () => History.CanRedo);
+        DeleteSelectionCommand = new RelayCommand(
+            execute: DeleteSelection,
+            canExecute: () => Selection is not null);
+        DeselectCommand = new RelayCommand(
+            execute: () => Selection = null);
 
         History.StateChanged += OnHistoryStateChanged;
+        Document.Changed += OnDocumentChanged;
     }
 
     private void OnHistoryStateChanged(object? sender, EventArgs e)
@@ -62,12 +75,35 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanRedo));
     }
 
+    private void OnDocumentChanged(object? sender, EventArgs e)
+    {
+        // 若被选 annotation 已经从文档中移除（如别处 Undo 掉 Add），清空选择
+        if (Selection is not null && Document.IndexOf(Selection) < 0)
+            Selection = null;
+    }
+
+    partial void OnSelectionChanged(AnnotationBase? value)
+    {
+        DeleteSelectionCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnCurrentToolChanged(ToolKind value)
+    {
+        // 切离 Select 工具时清空选中，避免非 Select 工具下手柄仍显示
+        if (value != ToolKind.Select) Selection = null;
+    }
+
     public bool CanUndo => History.CanUndo;
     public bool CanRedo => History.CanRedo;
 
     /// <summary>按 <see cref="CurrentTool"/> 造一个新工具实例（每次拖拽用完即弃）。</summary>
     public IAnnotationTool CreateActiveTool() => CurrentTool switch
     {
+        ToolKind.Select        => new SelectTool(
+                                        getSelection: () => Selection,
+                                        setSelection: a => Selection = a,
+                                        history: History,
+                                        annotations: Document.Annotations),
         ToolKind.Rectangle     => new RectangleTool(),
         ToolKind.Ellipse       => new EllipseTool(),
         ToolKind.Line          => new LineTool(),
@@ -76,7 +112,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         ToolKind.Text          => new TextTool(),
         ToolKind.Number        => new NumberTool(NumberCounter),
         ToolKind.Spotlight     => new SpotlightTool(Document.Width, Document.Height),
-        _ => NopTool.Instance, // Select 与 M5+ 未落地工具用 no-op 兜底
+        _ => NopTool.Instance,
     };
 
     /// <summary>把新标注封装成 AddAnnotationCommand 提交给 <see cref="History"/>。</summary>
@@ -86,13 +122,23 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         History.Execute(new AddAnnotationCommand(Document, annotation));
     }
 
+    private void DeleteSelection()
+    {
+        var sel = Selection;
+        if (sel is null) return;
+        // 先清 Selection，再 Execute，避免 SkiaCanvas 拿到已删除对象的 handles
+        Selection = null;
+        History.Execute(new RemoveAnnotationCommand(Document, sel));
+    }
+
     public void Dispose()
     {
         History.StateChanged -= OnHistoryStateChanged;
+        Document.Changed -= OnDocumentChanged;
         _capturedImage.Dispose();
     }
 
-    /// <summary>M4a 占位：Select / 未实现工具用这个吞掉指针交互。</summary>
+    /// <summary>M5+ 未落地工具用这个吞掉指针交互。</summary>
     private sealed class NopTool : IAnnotationTool
     {
         public static readonly NopTool Instance = new();

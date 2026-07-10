@@ -1,3 +1,4 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
@@ -77,5 +78,30 @@ public sealed class EllipseAnnotation : AnnotationBase
         var lo = (1f - tol) * (1f - tol);
         var hi = (1f + tol) * (1f + tol);
         return f >= lo && f <= hi;
+    }
+
+    public override IReadOnlyList<AnnotationHandle> GetHandles() => BoxHandles.GetHandles(_rect);
+
+    public override bool HitTestBody(SKPoint point, float slop)
+    {
+        // Select 工具下，闭合椭圆整个 body 都算命中。
+        var cx = _rect.MidX;
+        var cy = _rect.MidY;
+        var rx = _rect.Width * 0.5f + slop;
+        var ry = _rect.Height * 0.5f + slop;
+        if (rx <= 0 || ry <= 0) return false;
+        var dx = point.X - cx;
+        var dy = point.Y - cy;
+        return (dx / rx) * (dx / rx) + (dy / ry) * (dy / ry) <= 1f;
+    }
+
+    public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
+    {
+        _rect = BoxHandles.ApplyHandle(_rect, kind, newImagePos).Standardized;
+    }
+
+    public override void MoveBy(SKPoint delta)
+    {
+        _rect.Offset(delta.X, delta.Y);
     }
 }

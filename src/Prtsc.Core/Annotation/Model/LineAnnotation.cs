@@ -1,3 +1,4 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
@@ -70,5 +71,26 @@ public class LineAnnotation : AnnotationBase
         var dx = p.X - qx;
         var dy = p.Y - qy;
         return MathF.Sqrt(dx * dx + dy * dy);
+    }
+
+    public override IReadOnlyList<AnnotationHandle> GetHandles() => new[]
+    {
+        new AnnotationHandle(HandleKind.Start, Start),
+        new AnnotationHandle(HandleKind.End,   End),
+    };
+
+    public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
+    {
+        switch (kind)
+        {
+            case HandleKind.Start: Start = newImagePos; break;
+            case HandleKind.End:   End   = newImagePos; break;
+        }
+    }
+
+    public override void MoveBy(SKPoint delta)
+    {
+        Start = new SKPoint(Start.X + delta.X, Start.Y + delta.Y);
+        End   = new SKPoint(End.X + delta.X,   End.Y + delta.Y);
     }
 }
