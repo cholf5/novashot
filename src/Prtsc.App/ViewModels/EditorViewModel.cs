@@ -24,6 +24,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
 
     public AnnotationDocument Document { get; }
     public UndoRedoStack History { get; }
+    public NumberCounter NumberCounter { get; } = new();
 
     public RelayCommand UndoCommand { get; }
     public RelayCommand RedoCommand { get; }
@@ -67,8 +68,15 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
     /// <summary>按 <see cref="CurrentTool"/> 造一个新工具实例（每次拖拽用完即弃）。</summary>
     public IAnnotationTool CreateActiveTool() => CurrentTool switch
     {
-        ToolKind.Rectangle => new RectangleTool(),
-        _ => NopTool.Instance, // M4a：Select 与其余未实现工具都返回 no-op
+        ToolKind.Rectangle     => new RectangleTool(),
+        ToolKind.Ellipse       => new EllipseTool(),
+        ToolKind.Line          => new LineTool(),
+        ToolKind.ArrowStraight => new ArrowStraightTool(),
+        ToolKind.ArrowCurved   => new ArrowCurvedTool(),
+        ToolKind.Text          => new TextTool(),
+        ToolKind.Number        => new NumberTool(NumberCounter),
+        ToolKind.Spotlight     => new SpotlightTool(Document.Width, Document.Height),
+        _ => NopTool.Instance, // Select 与 M5+ 未落地工具用 no-op 兜底
     };
 
     /// <summary>把新标注封装成 AddAnnotationCommand 提交给 <see cref="History"/>。</summary>

@@ -75,19 +75,25 @@
                    Text="Global hotkeys: PrintScreen / Ctrl+PrintScreen / Ctrl+Shift+PrintScreen"/>
       </StackPanel>
 
-      <!-- Editor view (M4a: back + Rectangle tool marker + Undo / Redo + SkiaCanvas) -->
+      <!-- Editor view (M4b: full tool palette + Undo/Redo + SkiaCanvas) -->
       <Grid IsVisible="{Binding IsInEditorMode}" RowDefinitions="Auto,*">
         <Border Grid.Row="0" Height="44" Background="#18000000">
-          <StackPanel Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center" Spacing="6">
+          <StackPanel Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center" Spacing="4">
             <Button Name="EditorBackButton" Content="← Back"
                     Padding="10,4"
                     Click="OnEditorBackClick"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
-            <ToggleButton Content="Rectangle"
-                          Padding="10,4"
-                          IsChecked="True"
-                          IsEnabled="False"
-                          ToolTip.Tip="M4a: only Rectangle available; M4d will add tool switching + hotkeys"/>
+            <!-- 工具选择：RadioButton group 保证单选。tag 承载 ToolKind 值 -->
+            <RadioButton GroupName="Tool" Content="Rect"    Padding="8,4" Tag="Rectangle"     IsChecked="True"  Click="OnToolChanged"/>
+            <RadioButton GroupName="Tool" Content="Ellipse" Padding="8,4" Tag="Ellipse"       Click="OnToolChanged"/>
+            <RadioButton GroupName="Tool" Content="Line"    Padding="8,4" Tag="Line"          Click="OnToolChanged"/>
+            <RadioButton GroupName="Tool" Content="Arrow"   Padding="8,4" Tag="ArrowStraight" Click="OnToolChanged"/>
+            <RadioButton GroupName="Tool" Content="Curve"   Padding="8,4" Tag="ArrowCurved"   Click="OnToolChanged"/>
+            <RadioButton GroupName="Tool" Content="Text"    Padding="8,4" Tag="Text"          Click="OnToolChanged"/>
+            <RadioButton GroupName="Tool" Content="#"       Padding="8,4" Tag="Number"        Click="OnToolChanged"
+                         ToolTip.Tip="Number counter"/>
+            <RadioButton GroupName="Tool" Content="Spot"    Padding="8,4" Tag="Spotlight"     Click="OnToolChanged"
+                         ToolTip.Tip="Spotlight"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
             <Button Content="Undo (Ctrl+Z)" Padding="10,4"
                     Command="{Binding Editor.UndoCommand}"/>

@@ -1,9 +1,11 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
 using Prtsc.App.ViewModels;
+using Prtsc.Core.Annotation.Tools;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Common;
 using Prtsc.Core.Windows;
@@ -55,6 +57,17 @@ public partial class MainWindow : Window
     private void OnMinimizeToTrayClick(object? sender, RoutedEventArgs e) => Hide();
 
     private void OnEditorBackClick(object? sender, RoutedEventArgs e) => _vm.ReturnToCapture();
+
+    /// <summary>
+    /// 工具栏的 RadioButton Click 事件：Tag 是 <see cref="ToolKind"/> 的字符串名，解析后设 <c>Editor.CurrentTool</c>。
+    /// </summary>
+    private void OnToolChanged(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton rb || rb.IsChecked != true) return;
+        if (rb.Tag is not string tag) return;
+        if (!Enum.TryParse<ToolKind>(tag, out var kind)) return;
+        if (_vm.Editor is { } editor) editor.CurrentTool = kind;
+    }
 
     /// <summary>
     /// Public API：托盘/热键触发全屏抓取。主窗口先隐藏，等 200ms 让 shadow 消失，再抓帧。
