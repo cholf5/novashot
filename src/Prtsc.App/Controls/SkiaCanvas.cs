@@ -287,6 +287,33 @@ public sealed class SkiaCanvas : Control
     }
 
     /// <summary>
+    /// Ctrl+滚轮：调整当前 <see cref="EditorViewModel.CurrentStyle"/> 的描边宽度（1..16）。
+    /// 若有 Selection，同步写回 Selection.Style + <see cref="AnnotationDocument.NotifyMutated"/>。
+    /// 样式改动不进 Undo（延续 M4c 决定）。
+    /// </summary>
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+        var editor = Editor;
+        if (editor is null) return;
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0) return;
+        var current = editor.CurrentStyle.StrokeWidth;
+        var next = StrokeWheelHelper.Step(current, e.Delta.Y);
+        if (Math.Abs(next - current) < 0.5f)
+        {
+            e.Handled = true;
+            return;
+        }
+        editor.CurrentStyle = editor.CurrentStyle with { StrokeWidth = next };
+        if (editor.Selection is { } sel)
+        {
+            sel.Style = sel.Style with { StrokeWidth = next };
+            editor.Document.NotifyMutated();
+        }
+        e.Handled = true;
+    }
+
+    /// <summary>
     /// 计算 TextBox 需要覆盖的 DIP 矩形并请求 EditorViewModel 进入编辑态。
     /// 编辑用的矩形：以 Text.Position（baseline）向上一个 ascent 高，宽度按当前文本 measure。
     /// </summary>

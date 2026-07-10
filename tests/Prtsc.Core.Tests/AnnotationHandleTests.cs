@@ -89,11 +89,15 @@ public class AnnotationHandleTests
     }
 
     [Fact]
-    public void ArrowCurved_has_only_two_handles_in_m4c1()
+    public void ArrowCurved_has_three_handles_start_end_control()
     {
-        // 控制点仍由 SagRatio 自动，不作为可拖 handle
+        // M4d 起：曲箭头暴露第 3 个手柄 (Control)，用于手动调整贝塞尔控制点。
         var a = new ArrowCurvedAnnotation(new SKPoint(0, 0), new SKPoint(100, 0), Style());
-        Assert.Equal(2, a.GetHandles().Count);
+        var handles = a.GetHandles();
+        Assert.Equal(3, handles.Count);
+        Assert.Contains(handles, h => h.Kind == HandleKind.Start);
+        Assert.Contains(handles, h => h.Kind == HandleKind.End);
+        Assert.Contains(handles, h => h.Kind == HandleKind.Control);
     }
 
     [Fact]

@@ -29,7 +29,6 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
 
     public AnnotationDocument Document { get; }
     public UndoRedoStack History { get; }
-    public NumberCounter NumberCounter { get; } = new();
 
     public RelayCommand UndoCommand { get; }
     public RelayCommand RedoCommand { get; }
@@ -154,7 +153,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         ToolKind.ArrowStraight => new ArrowStraightTool(),
         ToolKind.ArrowCurved   => new ArrowCurvedTool(),
         ToolKind.Text          => new TextTool(),
-        ToolKind.Number        => new NumberTool(NumberCounter),
+        ToolKind.Number        => new NumberTool(() => NumberSequence.NextFor(Document.Annotations)),
         ToolKind.Spotlight     => new SpotlightTool(Document.Width, Document.Height),
         _ => NopTool.Instance,
     };

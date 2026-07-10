@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
@@ -133,6 +134,39 @@ public partial class MainWindow : Window
         if (!Enum.TryParse<ToolKind>(tag, out var kind)) return;
         if (_vm.Editor is { } editor) editor.CurrentTool = kind;
     }
+
+    /// <summary>
+    /// M4d 工具热键：<b>V R E O A L T N S</b>（无修饰键）。
+    /// 编辑 Text 时或 TextBox 拿焦时禁用，避免抢用户输入。
+    /// 走 <see cref="OnKeyDown"/> 覆盖而非 <c>Window.KeyBindings</c> —— 后者不看焦点，字母键会被吞掉。
+    /// </summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled) return;
+        if (_vm.Editor is not { } editor) return;
+        if (editor.EditingText is not null) return;
+        if (_textEditBox is { IsFocused: true }) return;
+        if (e.KeyModifiers != KeyModifiers.None) return;
+        var kind = MapKeyToTool(e.Key);
+        if (kind is null) return;
+        editor.CurrentTool = kind.Value;
+        e.Handled = true;
+    }
+
+    private static ToolKind? MapKeyToTool(Key key) => key switch
+    {
+        Key.V => ToolKind.Select,
+        Key.R => ToolKind.Rectangle,
+        Key.E => ToolKind.Ellipse,
+        Key.O => ToolKind.ArrowCurved,
+        Key.A => ToolKind.ArrowStraight,
+        Key.L => ToolKind.Line,
+        Key.T => ToolKind.Text,
+        Key.N => ToolKind.Number,
+        Key.S => ToolKind.Spotlight,
+        _ => null,
+    };
 
     /// <summary>
     /// Public API：托盘/热键触发全屏抓取。主窗口先隐藏，等 200ms 让 shadow 消失，再抓帧。

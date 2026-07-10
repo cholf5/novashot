@@ -142,65 +142,6 @@ public class TextToolTests
     }
 }
 
-public class NumberToolTests
-{
-    private static AnnotationStyle Style() => new(new SKColor(255, 0, 0), 2f);
-
-    [Fact]
-    public void First_click_gets_number_one_and_advances_counter()
-    {
-        var counter = new NumberCounter();
-        var t = new NumberTool(counter);
-        t.OnPointerDown(new SKPoint(50, 50), Style());
-        var a = (NumberAnnotation)t.OnPointerUp(new SKPoint(50, 50))!;
-        Assert.Equal(1, a.Number);
-        Assert.Equal(2, counter.Peek());
-    }
-
-    [Fact]
-    public void Multiple_clicks_assign_sequential_numbers()
-    {
-        var counter = new NumberCounter();
-        var t1 = new NumberTool(counter);
-        t1.OnPointerDown(new SKPoint(0, 0), Style());
-        var a1 = (NumberAnnotation)t1.OnPointerUp(new SKPoint(0, 0))!;
-
-        var t2 = new NumberTool(counter);
-        t2.OnPointerDown(new SKPoint(10, 10), Style());
-        var a2 = (NumberAnnotation)t2.OnPointerUp(new SKPoint(10, 10))!;
-
-        Assert.Equal(1, a1.Number);
-        Assert.Equal(2, a2.Number);
-    }
-
-    [Fact]
-    public void Preview_shows_counter_peek_without_advancing()
-    {
-        var counter = new NumberCounter();
-        var t = new NumberTool(counter);
-        t.OnPointerDown(new SKPoint(0, 0), Style());
-        var p = (NumberAnnotation)t.Preview!;
-        Assert.Equal(1, p.Number);
-        Assert.Equal(1, counter.Peek()); // 未消耗
-    }
-
-    [Fact]
-    public void Cancel_does_not_advance_counter()
-    {
-        var counter = new NumberCounter();
-        var t = new NumberTool(counter);
-        t.OnPointerDown(new SKPoint(0, 0), Style());
-        t.Cancel();
-        Assert.Equal(1, counter.Peek());
-    }
-
-    [Fact]
-    public void Constructor_rejects_null_counter()
-    {
-        Assert.Throws<ArgumentNullException>(() => new NumberTool(null!));
-    }
-}
-
 public class SpotlightToolTests
 {
     private static AnnotationStyle Style() => new(new SKColor(255, 255, 255), 0f);

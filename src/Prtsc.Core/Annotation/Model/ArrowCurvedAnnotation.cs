@@ -1,35 +1,55 @@
+using Prtsc.Core.Annotation.Editing;
 using SkiaSharp;
 
 namespace Prtsc.Core.Annotation.Model;
 
 /// <summary>
-/// 曲箭头：单次拖拽版本，控制点自动取 <see cref="Start"/>-<see cref="End"/> 中点向垂直方向偏移
-/// <see cref="SagRatio"/> × 线段长度，形成一段二次贝塞尔弧。M4c/M4d 会补三点手动控制点交互。
+/// 曲箭头：默认情况下控制点自动取 <see cref="Start"/>-<see cref="End"/> 中点向垂直方向偏移
+/// <see cref="SagRatio"/> × 线段长度，形成一段二次贝塞尔弧。
+///
+/// M4d 起支持"三点手动控制"：拖动 <see cref="HandleKind.Control"/> 手柄会把控制点固化为绝对坐标
+/// （<see cref="HasCustomControlPoint"/> 变 true）。此后 <see cref="MoveHandle"/> Start/End 不改控制点
+/// （视觉上曲线随端点走但控制点保持屏上位置），整体 <see cref="MoveBy"/> 会同步平移。
+/// 调用 <see cref="ResetControlPoint"/> 回到默认推导。
 /// </summary>
 public sealed class ArrowCurvedAnnotation : LineAnnotation
 {
     /// <summary>控制点垂直偏移量占线段长度比例。0.18 视觉上类似 Flameshot Marker 的默认弧度。</summary>
     public const float SagRatio = 0.18f;
 
+    private SKPoint? _customControl;
+
     public ArrowCurvedAnnotation(SKPoint start, SKPoint end, AnnotationStyle style)
         : base(start, end, style) { }
 
-    /// <summary>由 <see cref="Start"/> / <see cref="End"/> 推算的二次贝塞尔控制点。</summary>
+    /// <summary>true = 控制点已被用户手动设置，覆盖推导值。</summary>
+    public bool HasCustomControlPoint => _customControl.HasValue;
+
+    /// <summary>
+    /// 二次贝塞尔控制点。默认由 <see cref="Start"/>/<see cref="End"/> 推导；
+    /// 一旦 setter 被调用（或 MoveHandle Control）则固化为绝对坐标，直到 <see cref="ResetControlPoint"/>。
+    /// </summary>
     public SKPoint ControlPoint
     {
-        get
-        {
-            var mid = new SKPoint((Start.X + End.X) * 0.5f, (Start.Y + End.Y) * 0.5f);
-            var dx = End.X - Start.X;
-            var dy = End.Y - Start.Y;
-            var len = MathF.Sqrt(dx * dx + dy * dy);
-            if (len < 1e-3f) return mid;
-            // 逆时针 90°：法向 (-dy, dx) / len
-            var nx = -dy / len;
-            var ny = dx / len;
-            var off = len * SagRatio;
-            return new SKPoint(mid.X + nx * off, mid.Y + ny * off);
-        }
+        get => _customControl ?? ComputeDerivedControlPoint();
+        set => _customControl = value;
+    }
+
+    /// <summary>清除自定义控制点，回落到 Start/End 推导公式。</summary>
+    public void ResetControlPoint() => _customControl = null;
+
+    private SKPoint ComputeDerivedControlPoint()
+    {
+        var mid = new SKPoint((Start.X + End.X) * 0.5f, (Start.Y + End.Y) * 0.5f);
+        var dx = End.X - Start.X;
+        var dy = End.Y - Start.Y;
+        var len = MathF.Sqrt(dx * dx + dy * dy);
+        if (len < 1e-3f) return mid;
+        // 逆时针 90°：法向 (-dy, dx) / len
+        var nx = -dy / len;
+        var ny = dx / len;
+        var off = len * SagRatio;
+        return new SKPoint(mid.X + nx * off, mid.Y + ny * off);
     }
 
     public override SKRect BoundingBox
@@ -115,5 +135,29 @@ public sealed class ArrowCurvedAnnotation : LineAnnotation
             prev = cur;
         }
         return false;
+    }
+
+    public override IReadOnlyList<AnnotationHandle> GetHandles() => new[]
+    {
+        new AnnotationHandle(HandleKind.Start,   Start),
+        new AnnotationHandle(HandleKind.End,     End),
+        new AnnotationHandle(HandleKind.Control, ControlPoint),
+    };
+
+    public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
+    {
+        if (kind == HandleKind.Control)
+        {
+            _customControl = newImagePos;
+            return;
+        }
+        base.MoveHandle(kind, newImagePos);
+    }
+
+    public override void MoveBy(SKPoint delta)
+    {
+        base.MoveBy(delta);
+        if (_customControl is { } cp)
+            _customControl = new SKPoint(cp.X + delta.X, cp.Y + delta.Y);
     }
 }

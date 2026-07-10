@@ -16,6 +16,7 @@
 
   <Window.Resources>
     <conv:NullToBooleanConverter x:Key="NullToBool"/>
+    <conv:EnumEqualsConverter x:Key="EnumEq"/>
   </Window.Resources>
 
   <Window.KeyBindings>
@@ -91,19 +92,35 @@
                     Padding="10,4"
                     Click="OnEditorBackClick"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
-            <!-- 工具选择：RadioButton group 保证单选。tag 承载 ToolKind 值 -->
-            <RadioButton GroupName="Tool" Content="Sel"     Padding="8,4" Tag="Select"        IsChecked="True"  Click="OnToolChanged"
-                         ToolTip.Tip="Select / move / resize"/>
-            <RadioButton GroupName="Tool" Content="Rect"    Padding="8,4" Tag="Rectangle"     Click="OnToolChanged"/>
-            <RadioButton GroupName="Tool" Content="Ellipse" Padding="8,4" Tag="Ellipse"       Click="OnToolChanged"/>
-            <RadioButton GroupName="Tool" Content="Line"    Padding="8,4" Tag="Line"          Click="OnToolChanged"/>
-            <RadioButton GroupName="Tool" Content="Arrow"   Padding="8,4" Tag="ArrowStraight" Click="OnToolChanged"/>
-            <RadioButton GroupName="Tool" Content="Curve"   Padding="8,4" Tag="ArrowCurved"   Click="OnToolChanged"/>
-            <RadioButton GroupName="Tool" Content="Text"    Padding="8,4" Tag="Text"          Click="OnToolChanged"/>
+            <!-- 工具选择：RadioButton group 保证单选。tag 承载 ToolKind 值；IsChecked 单向绑定
+                 保证热键改 CurrentTool 时按钮视觉同步。M4d 加了字母热键 V R E O A L T N S。 -->
+            <RadioButton GroupName="Tool" Content="Sel"     Padding="8,4" Tag="Select"        Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Select}"
+                         ToolTip.Tip="Select / move / resize (V)"/>
+            <RadioButton GroupName="Tool" Content="Rect"    Padding="8,4" Tag="Rectangle"     Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Rectangle}"
+                         ToolTip.Tip="Rectangle (R)"/>
+            <RadioButton GroupName="Tool" Content="Ellipse" Padding="8,4" Tag="Ellipse"       Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Ellipse}"
+                         ToolTip.Tip="Ellipse (E)"/>
+            <RadioButton GroupName="Tool" Content="Line"    Padding="8,4" Tag="Line"          Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Line}"
+                         ToolTip.Tip="Line (L)"/>
+            <RadioButton GroupName="Tool" Content="Arrow"   Padding="8,4" Tag="ArrowStraight" Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=ArrowStraight}"
+                         ToolTip.Tip="Arrow (A)"/>
+            <RadioButton GroupName="Tool" Content="Curve"   Padding="8,4" Tag="ArrowCurved"   Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=ArrowCurved}"
+                         ToolTip.Tip="Curved arrow (O)"/>
+            <RadioButton GroupName="Tool" Content="Text"    Padding="8,4" Tag="Text"          Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Text}"
+                         ToolTip.Tip="Text (T)"/>
             <RadioButton GroupName="Tool" Content="#"       Padding="8,4" Tag="Number"        Click="OnToolChanged"
-                         ToolTip.Tip="Number counter"/>
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Number}"
+                         ToolTip.Tip="Number counter (N)"/>
             <RadioButton GroupName="Tool" Content="Spot"    Padding="8,4" Tag="Spotlight"     Click="OnToolChanged"
-                         ToolTip.Tip="Spotlight"/>
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Spotlight}"
+                         ToolTip.Tip="Spotlight (S)"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
             <Button Content="Delete (Del)" Padding="10,4"
                     Command="{Binding Editor.DeleteSelectionCommand}"/>
