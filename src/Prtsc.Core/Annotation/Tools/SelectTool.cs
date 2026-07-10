@@ -27,6 +27,7 @@ public sealed class SelectTool : IAnnotationTool
     private readonly Action<AnnotationBase?> _setSelection;
     private readonly UndoRedoStack _history;
     private readonly IReadOnlyList<AnnotationBase> _annotations;
+    private readonly AnnotationDocument? _document;
     private readonly float _bodyHitSlop;
     private readonly float _handleHitRadius;
 
@@ -42,6 +43,7 @@ public sealed class SelectTool : IAnnotationTool
         Action<AnnotationBase?> setSelection,
         UndoRedoStack history,
         IReadOnlyList<AnnotationBase> annotations,
+        AnnotationDocument? document = null,
         float bodyHitSlop = 4f,
         float handleHitRadius = 8f)
     {
@@ -49,6 +51,7 @@ public sealed class SelectTool : IAnnotationTool
         _setSelection = setSelection ?? throw new ArgumentNullException(nameof(setSelection));
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _annotations = annotations ?? throw new ArgumentNullException(nameof(annotations));
+        _document = document;
         _bodyHitSlop = bodyHitSlop;
         _handleHitRadius = handleHitRadius;
     }
@@ -125,7 +128,7 @@ public sealed class SelectTool : IAnnotationTool
 
                     // 回滚到 pre-drag，再 Execute 让 command.Do 重新应用
                     _target.MoveBy(new SKPoint(-total.X, -total.Y));
-                    _history.Execute(new MoveAnnotationCommand(_target, total));
+                    _history.Execute(new MoveAnnotationCommand(_target, total, _document));
                     return null; // SelectTool 从不"新增"标注
                 }
                 case Mode.Resizing:
@@ -135,7 +138,7 @@ public sealed class SelectTool : IAnnotationTool
 
                     // 回滚：Execute 里 Do 会重新拖到 imagePoint
                     _target.MoveHandle(_resizeKind, _resizeBefore);
-                    _history.Execute(new ResizeAnnotationCommand(_target, _resizeKind, _resizeBefore, imagePoint));
+                    _history.Execute(new ResizeAnnotationCommand(_target, _resizeKind, _resizeBefore, imagePoint, _document));
                     return null;
                 }
             }

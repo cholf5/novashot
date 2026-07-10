@@ -73,4 +73,14 @@ public sealed class AnnotationDocument
         _annotations.Clear();
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>
+    /// 通告"某个已存在的标注内部状态发生了变化"（Move/Resize/Style/Text 等原地改动）。
+    /// 集合大小不变，所以既有的 Add/Remove/Insert 不会触发；命令实现方在 Do/Undo 结尾调它。
+    /// SkiaCanvas 借此触发重绘。
+    /// </summary>
+    public void NotifyMutated()
+    {
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 }

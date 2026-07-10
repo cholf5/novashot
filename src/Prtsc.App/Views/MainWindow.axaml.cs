@@ -1,10 +1,13 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
+using Prtsc.App.Controls;
 using Prtsc.App.ViewModels;
+using Prtsc.Core.Annotation.Model;
 using Prtsc.Core.Annotation.Tools;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Common;
@@ -18,6 +21,10 @@ public partial class MainWindow : Window
     private readonly ICaptureService _capture;
     private readonly IWindowService _windowService;
     private readonly ILogger<MainWindow> _logger;
+
+    private SkiaCanvas? _canvas;
+    private TextBox? _textEditBox;
+    private EditorViewModel? _subscribedEditor;
 
     public MainWindow() : this(
         AppServices.GetRequiredService<MainWindowViewModel>(),
@@ -37,6 +44,64 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         Icon = AppIconFactory.CreatePlaceholderWindowIcon();
+
+        _canvas = this.FindControl<SkiaCanvas>("Canvas");
+        _textEditBox = this.FindControl<TextBox>("TextEditBox");
+        if (_canvas is not null) _canvas.ViewportInvalidated += OnCanvasViewportInvalidated;
+        _vm.PropertyChanged += OnVmPropertyChanged;
+        SubscribeToEditor(_vm.Editor);
+    }
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.Editor))
+            SubscribeToEditor(_vm.Editor);
+    }
+
+    private void SubscribeToEditor(EditorViewModel? editor)
+    {
+        if (_subscribedEditor is not null)
+            _subscribedEditor.PropertyChanged -= OnEditorPropertyChanged;
+        _subscribedEditor = editor;
+        if (_subscribedEditor is not null)
+            _subscribedEditor.PropertyChanged += OnEditorPropertyChanged;
+    }
+
+    private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EditorViewModel.EditingText))
+        {
+            // 进入编辑：把焦点交给 TextBox，选中全部文字方便替换
+            if (_subscribedEditor?.EditingText is not null && _textEditBox is not null)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _textEditBox.Focus();
+                    _textEditBox.SelectAll();
+                }, DispatcherPriority.Background);
+            }
+        }
+    }
+
+    private void OnCanvasViewportInvalidated(object? sender, EventArgs e)
+    {
+        var editor = _subscribedEditor;
+        if (editor?.EditingText is not TextAnnotation ta) return;
+        if (_canvas is null) return;
+        if (!_canvas.TryMapImageRectToDip(ta.BoundingBox, out var dipRect, out var scale)) return;
+        var w = Math.Max(dipRect.Width, 60);
+        var h = Math.Max(dipRect.Height, 24);
+        editor.UpdateEditingTextBounds(
+            new Avalonia.Rect(dipRect.X - 2, dipRect.Y - 2, w + 12, h + 4),
+            ta.FontSize * scale);
+    }
+
+    private void OnTextEditLostFocus(object? sender, RoutedEventArgs e)
+    {
+        // 有些切换过程 EditingText 已经被程序清成 null（Enter/Escape 命令刚跑）
+        var editor = _subscribedEditor;
+        if (editor?.EditingText is null) return;
+        editor.CommitTextEditCommand.Execute(null);
     }
 
     private async void OnCaptureFullscreenClick(object? sender, RoutedEventArgs e)

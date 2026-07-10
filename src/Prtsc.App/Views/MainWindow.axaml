@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Prtsc.App.ViewModels"
         xmlns:controls="using:Prtsc.App.Controls"
+        xmlns:conv="using:Prtsc.App.Converters"
         mc:Ignorable="d"
         d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="Prtsc.App.Views.MainWindow"
@@ -12,6 +13,10 @@
         MinWidth="800" MinHeight="600"
         Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
+
+  <Window.Resources>
+    <conv:NullToBooleanConverter x:Key="NullToBool"/>
+  </Window.Resources>
 
   <Window.KeyBindings>
     <!-- Undo / Redo 只在编辑器态可用：CanExecute 由 EditorViewModel 控制 -->
@@ -110,7 +115,36 @@
           </StackPanel>
         </Border>
         <Border Grid.Row="1" Background="#0A000000">
-          <controls:SkiaCanvas Editor="{Binding Editor}" Margin="8"/>
+          <Grid ColumnDefinitions="*,Auto">
+            <!-- 画布 + 浮动 TextBox 编辑层 -->
+            <Grid Grid.Column="0">
+              <controls:SkiaCanvas x:Name="Canvas" Editor="{Binding Editor}" Margin="8"/>
+              <Canvas x:Name="TextEditLayer"
+                      IsHitTestVisible="{Binding Editor.EditingText, Converter={StaticResource NullToBool}}"
+                      Background="Transparent">
+                <TextBox x:Name="TextEditBox"
+                         IsVisible="{Binding Editor.EditingText, Converter={StaticResource NullToBool}}"
+                         Text="{Binding Editor.EditingTextValue, Mode=TwoWay}"
+                         Canvas.Left="{Binding Editor.EditingTextDipBounds.X}"
+                         Canvas.Top="{Binding Editor.EditingTextDipBounds.Y}"
+                         Width="{Binding Editor.EditingTextDipBounds.Width}"
+                         MinWidth="80"
+                         FontSize="{Binding Editor.EditingTextFontSizeDip}"
+                         AcceptsReturn="False"
+                         LostFocus="OnTextEditLostFocus">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter"  Command="{Binding Editor.CommitTextEditCommand}"/>
+                    <KeyBinding Gesture="Escape" Command="{Binding Editor.CancelTextEditCommand}"/>
+                  </TextBox.KeyBindings>
+                </TextBox>
+              </Canvas>
+            </Grid>
+
+            <!-- 右侧属性面板 -->
+            <Border Grid.Column="1" Width="240" Background="#22000000">
+              <controls:StylePanel DataContext="{Binding Editor.StylePanel}"/>
+            </Border>
+          </Grid>
         </Border>
       </Grid>
     </Panel>

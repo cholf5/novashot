@@ -21,6 +21,10 @@ namespace Prtsc.App.Controls;
 /// 坐标：内部所有 annotation 均在<b>源图像素空间</b>；控件通过 uniform fit-to-bounds 变换绘制。
 /// Pointer 事件在 DIP 空间到达，经反变换后送给 <see cref="IAnnotationTool"/>。
 /// 选中框与手柄画在 DIP 空间，保证不随视口缩放变形。
+///
+/// M4c.2：暴露 <see cref="TryMapImageRectToDip"/> + <see cref="ViewportInvalidated"/> 供
+/// MainWindow 定位浮动 TextBox；双击命中 <see cref="TextAnnotation"/> 触发内联编辑；
+/// 渲染时跳过 <see cref="EditorViewModel.EditingText"/> 以免与 TextBox 重叠。
 /// </summary>
 public sealed class SkiaCanvas : Control
 {
@@ -42,6 +46,9 @@ public sealed class SkiaCanvas : Control
         set => SetValue(EditorProperty, value);
     }
 
+    /// <summary>视口矩阵可能改变时触发（Bounds 变、Editor 换、ImageSize 变）。</summary>
+    public event EventHandler? ViewportInvalidated;
+
     private IAnnotationTool? _activeTool;
     private EditorViewModel? _subscribedEditor;
 
@@ -57,6 +64,10 @@ public sealed class SkiaCanvas : Control
         if (change.Property == EditorProperty)
         {
             OnEditorChanged(change.GetOldValue<EditorViewModel?>(), change.GetNewValue<EditorViewModel?>());
+        }
+        else if (change.Property == BoundsProperty)
+        {
+            ViewportInvalidated?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -75,16 +86,18 @@ public sealed class SkiaCanvas : Control
         }
         _activeTool = null;
         InvalidateVisual();
+        ViewportInvalidated?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnDocumentChanged(object? sender, EventArgs e) => InvalidateVisual();
 
     private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // Tool / Style / Selection 变化都可能影响渲染
+        // Tool / Style / Selection / EditingText 变化都可能影响渲染
         if (e.PropertyName is nameof(EditorViewModel.CurrentTool)
             or nameof(EditorViewModel.CurrentStyle)
-            or nameof(EditorViewModel.Selection))
+            or nameof(EditorViewModel.Selection)
+            or nameof(EditorViewModel.EditingText))
         {
             InvalidateVisual();
         }
@@ -105,6 +118,7 @@ public sealed class SkiaCanvas : Control
             editor.Document,
             _activeTool?.Preview,
             editor.Selection,
+            editor.EditingText,
             ComputeViewportMatrix(editor, bounds)));
     }
 
@@ -136,6 +150,25 @@ public sealed class SkiaCanvas : Control
         return dip / sx;
     }
 
+    /// <summary>
+    /// 把 image-pixel 空间矩形映射到本控件的 DIP 坐标。
+    /// 供 MainWindow 定位浮动 TextBox。视口未就绪返回 false。
+    /// </summary>
+    public bool TryMapImageRectToDip(SKRect imageRect, out Rect dipRect, out double dipScale)
+    {
+        dipRect = default;
+        dipScale = 1d;
+        var editor = Editor;
+        if (editor is null) return false;
+        var b = Bounds;
+        if (b.Width <= 0 || b.Height <= 0) return false;
+        var m = ComputeViewportMatrix(editor, b);
+        var mapped = m.MapRect(imageRect);
+        dipRect = new Rect(mapped.Left, mapped.Top, Math.Max(0, mapped.Width), Math.Max(0, mapped.Height));
+        dipScale = m.ScaleX;
+        return true;
+    }
+
     // ---- Pointer ----
 
     private SKPoint? DipToImage(Point dip)
@@ -159,6 +192,18 @@ public sealed class SkiaCanvas : Control
 
         Focus();
 
+        // 双击 + Select 工具 + 命中 TextAnnotation → 进入内联编辑
+        if (e.ClickCount == 2 && editor.CurrentTool == ToolKind.Select)
+        {
+            if (TryFindTextAt(editor, img.Value) is TextAnnotation ta)
+            {
+                editor.Selection = ta;
+                BeginTextEdit(editor, ta, isNewlyCreated: false);
+                e.Handled = true;
+                return;
+            }
+        }
+
         // SelectTool 需要在 image-pixel 空间的 slop：由当前视口 scale 换算
         var matrix = ComputeViewportMatrix(editor, Bounds);
         var handleRadiusImg = DipToImageDistance(matrix, HandleHitRadiusDip);
@@ -171,6 +216,18 @@ public sealed class SkiaCanvas : Control
         e.Handled = true;
     }
 
+    private static TextAnnotation? TryFindTextAt(EditorViewModel editor, SKPoint imagePoint)
+    {
+        // 逆序（栈顶优先）
+        var annotations = editor.Document.Annotations;
+        for (int i = annotations.Count - 1; i >= 0; i--)
+        {
+            if (annotations[i] is TextAnnotation t && t.HitTest(imagePoint, slop: 4f))
+                return t;
+        }
+        return null;
+    }
+
     private static IAnnotationTool CreateToolWithScale(EditorViewModel editor, float handleRadiusImg, float bodySlopImg)
     {
         // 只有 SelectTool 需要 scale-aware 参数；其他工具走 editor.CreateActiveTool。
@@ -181,6 +238,7 @@ public sealed class SkiaCanvas : Control
                 setSelection: a => editor.Selection = a,
                 history: editor.History,
                 annotations: editor.Document.Annotations,
+                document: editor.Document,
                 bodyHitSlop: bodySlopImg,
                 handleHitRadius: handleRadiusImg);
         }
@@ -209,7 +267,12 @@ public sealed class SkiaCanvas : Control
         e.Pointer.Capture(null);
 
         if (committed is not null)
+        {
             editor.ExecuteAdd(committed);
+            // TextTool 新落点：立即进入内联编辑
+            if (committed is TextAnnotation ta)
+                BeginTextEdit(editor, ta, isNewlyCreated: true);
+        }
 
         InvalidateVisual();
         e.Handled = true;
@@ -223,6 +286,34 @@ public sealed class SkiaCanvas : Control
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// 计算 TextBox 需要覆盖的 DIP 矩形并请求 EditorViewModel 进入编辑态。
+    /// 编辑用的矩形：以 Text.Position（baseline）向上一个 ascent 高，宽度按当前文本 measure。
+    /// </summary>
+    private void BeginTextEdit(EditorViewModel editor, TextAnnotation text, bool isNewlyCreated)
+    {
+        if (!TryComputeTextEditBounds(text, out var dipRect, out var fontDip))
+        {
+            // 没有视口就先记一个占位；ViewportInvalidated 会再算一次
+            dipRect = new Rect(0, 0, 120, 30);
+            fontDip = 24;
+        }
+        editor.BeginTextEdit(text, dipRect, fontDip, isNewlyCreated);
+    }
+
+    private bool TryComputeTextEditBounds(TextAnnotation text, out Rect dipRect, out double fontDip)
+    {
+        dipRect = default;
+        fontDip = 24d;
+        if (!TryMapImageRectToDip(text.BoundingBox, out var mapped, out var scale)) return false;
+        // 至少 60px 宽，方便输入
+        var w = Math.Max(mapped.Width, 60);
+        var h = Math.Max(mapped.Height, 24);
+        dipRect = new Rect(mapped.X - 2, mapped.Y - 2, w + 12, h + 4);
+        fontDip = text.FontSize * scale;
+        return true;
+    }
+
     // ---- Custom draw operation ----
 
     private sealed class DrawOp : ICustomDrawOperation
@@ -234,15 +325,17 @@ public sealed class SkiaCanvas : Control
         private readonly AnnotationDocument _doc;
         private readonly AnnotationBase? _preview;
         private readonly AnnotationBase? _selection;
+        private readonly AnnotationBase? _editingText;
         private readonly SKMatrix _matrix;
 
         public DrawOp(Rect bounds, AnnotationDocument doc, AnnotationBase? preview,
-                      AnnotationBase? selection, SKMatrix matrix)
+                      AnnotationBase? selection, AnnotationBase? editingText, SKMatrix matrix)
         {
             Bounds = bounds;
             _doc = doc;
             _preview = preview;
             _selection = selection;
+            _editingText = editingText;
             _matrix = matrix;
         }
 
@@ -270,15 +363,19 @@ public sealed class SkiaCanvas : Control
             var restore = canvas.Save();
             canvas.Concat(in _matrix);
 
-            // image-pixel 空间：画图像 + 标注 + 预览
+            // image-pixel 空间：画图像 + 标注（跳过正在内联编辑的 Text） + 预览
             canvas.DrawBitmap(_doc.Source, 0, 0);
-            foreach (var a in _doc.Annotations) a.Render(canvas);
+            foreach (var a in _doc.Annotations)
+            {
+                if (ReferenceEquals(a, _editingText)) continue;
+                a.Render(canvas);
+            }
             _preview?.Render(canvas);
 
             canvas.RestoreToCount(restore);
 
-            // DIP 空间：画选中框与手柄（不随视口缩放变形）
-            if (_selection is not null)
+            // DIP 空间：画选中框与手柄（不随视口缩放变形；编辑中的 Text 不画）
+            if (_selection is not null && !ReferenceEquals(_selection, _editingText))
                 DrawSelectionOverlay(canvas, _selection);
         }
 
