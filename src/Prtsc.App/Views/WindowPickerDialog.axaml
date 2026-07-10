@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="using:Prtsc.App.Views"
+        mc:Ignorable="d"
+        x:Class="Prtsc.App.Views.WindowPickerDialog"
+        Title="选择要截取的窗口"
+        Width="520" Height="440"
+        MinWidth="380" MinHeight="280"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        CanResize="True"
+        Background="#1F2937">
+
+  <Grid Margin="16" RowDefinitions="Auto,*,Auto">
+    <TextBlock Grid.Row="0" Text="选择要截取的窗口"
+               Foreground="#F1F5F9" FontSize="15" FontWeight="SemiBold"
+               Margin="0,0,0,10"/>
+
+    <Border Grid.Row="1" BorderBrush="#334155" BorderThickness="1" CornerRadius="6">
+      <ListBox Name="WindowList"
+               Background="#0F172A"
+               Foreground="#E2E8F0"
+               BorderThickness="0"
+               DoubleTapped="OnListDoubleTapped">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="local:WindowPickerDialog+Row">
+            <StackPanel Orientation="Vertical" Margin="4,6">
+              <TextBlock Text="{Binding Title}" FontSize="13" Foreground="#F1F5F9"/>
+              <TextBlock Text="{Binding SubText}" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal"
+                HorizontalAlignment="Right" Margin="0,12,0,0" Spacing="8">
+      <Button Name="RefreshButton" Content="刷新" MinWidth="72"/>
+      <Button Name="CancelButton" Content="取消" MinWidth="72"/>
+      <Button Name="OkButton" Content="截取" MinWidth="72" IsDefault="True"
+              Background="#22C55E" Foreground="White"/>
+    </StackPanel>
+  </Grid>
+</Window>

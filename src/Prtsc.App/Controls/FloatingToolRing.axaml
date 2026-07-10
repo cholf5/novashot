@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Prtsc.App.Controls.FloatingToolRing"
+             Focusable="False">
+
+  <UserControl.Styles>
+    <Style Selector="Button.ring">
+      <Setter Property="Width" Value="34"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="FontSize" Value="18"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    <Style Selector="Button.ring:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#333F4B"/>
+    </Style>
+    <Style Selector="Button.ring.accent">
+      <Setter Property="Foreground" Value="#4ADE80"/>
+    </Style>
+    <Style Selector="Button.ring.danger">
+      <Setter Property="Foreground" Value="#F87171"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="#EE1F2937" CornerRadius="6" Padding="4"
+          BoxShadow="0 4 14 0 #66000000"
+          BorderBrush="#334155" BorderThickness="1">
+    <StackPanel Orientation="Horizontal" Spacing="2">
+      <Button Name="CancelButton" Classes="ring danger" Content="✕" ToolTip.Tip="取消 (Esc)"/>
+      <Border Width="1" Background="#334155" Margin="2,4"/>
+      <Button Name="ConfirmButton" Classes="ring accent" Content="✓" ToolTip.Tip="确认 (Enter / 双击)"/>
+    </StackPanel>
+  </Border>
+</UserControl>

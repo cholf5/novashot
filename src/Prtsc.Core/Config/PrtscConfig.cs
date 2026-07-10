@@ -1,0 +1,114 @@
+using System.Text.Json.Serialization;
+
+namespace Prtsc.Core.Config;
+
+/// <summary>
+/// 应用全部持久化配置。JSON 存于 %AppData%\Prtsc\config.json。
+/// 字段对齐 WinShot config.go 结构以复用心智模型，但命名空间独立。
+/// </summary>
+public sealed class PrtscConfig
+{
+    public HotkeyConfig Hotkeys { get; set; } = new();
+    public StartupConfig Startup { get; set; } = new();
+    public QuickSaveConfig QuickSave { get; set; } = new();
+    public ExportConfig Export { get; set; } = new();
+    public WindowConfig Window { get; set; } = new();
+    public EditorConfig Editor { get; set; } = new();
+    public UpdateConfig Update { get; set; } = new();
+    public CloudConfig Cloud { get; set; } = new();
+
+    /// <summary>用户自定义背景图（data URL），最多 8 张。</summary>
+    public List<string> BackgroundImages { get; set; } = new();
+}
+
+public sealed class HotkeyConfig
+{
+    public string Fullscreen { get; set; } = "PrintScreen";
+    public string Region { get; set; } = "Ctrl+PrintScreen";
+    public string Window { get; set; } = "Ctrl+Shift+PrintScreen";
+}
+
+public sealed class StartupConfig
+{
+    public bool LaunchOnStartup { get; set; } = false;
+    public bool MinimizeToTray { get; set; } = false;
+    public bool ShowNotification { get; set; } = true;
+    public bool CloseToTray { get; set; } = true;
+}
+
+public sealed class QuickSaveConfig
+{
+    public string Folder { get; set; } = string.Empty; // 空 = 默认 ~/Pictures/Prtsc
+    public string Pattern { get; set; } = "timestamp"; // timestamp | date | increment
+}
+
+public sealed class ExportConfig
+{
+    public string DefaultFormat { get; set; } = "png"; // png | jpeg
+    public int JpegQuality { get; set; } = 95;
+    public bool IncludeBackground { get; set; } = true;
+    public bool AutoCopyToClipboard { get; set; } = true;
+}
+
+public sealed class WindowConfig
+{
+    public int Width { get; set; } = 1200;
+    public int Height { get; set; } = 800;
+}
+
+public sealed class EditorConfig
+{
+    public int Padding { get; set; } = 40;
+    public int CornerRadius { get; set; } = 12;
+    public int ShadowSize { get; set; } = 20;
+
+    /// <summary>CSS 风格描述：linear-gradient(...) / 十六进制 / url(...)。</summary>
+    public string BackgroundColor { get; set; } = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+
+    public string OutputRatio { get; set; } = "auto"; // auto|1:1|4:3|3:2|16:9|5:3|9:16|3:4|2:3
+    public bool ShowBackground { get; set; } = true;
+
+    public int Inset { get; set; } = 0;
+    public bool AutoBackground { get; set; } = true;
+    public string InsetBackgroundColor { get; set; } = "#ffffff";
+
+    public int ShapeCornerRadius { get; set; } = 0;
+
+    public bool BorderEnabled { get; set; } = false;
+    public int BorderWeight { get; set; } = 2;
+    public string BorderColor { get; set; } = "#000000";
+    public int BorderOpacity { get; set; } = 100;
+    public string BorderType { get; set; } = "center"; // outside|center|inside
+}
+
+public sealed class UpdateConfig
+{
+    public bool CheckOnStartup { get; set; } = true;
+    public string SkippedVersion { get; set; } = string.Empty;
+}
+
+public sealed class CloudConfig
+{
+    public R2Config R2 { get; set; } = new();
+    public GDriveConfig GDrive { get; set; } = new();
+}
+
+public sealed class R2Config
+{
+    public string AccountId { get; set; } = string.Empty;
+    public string Bucket { get; set; } = string.Empty;
+    public string PublicUrl { get; set; } = string.Empty;
+    public string Directory { get; set; } = string.Empty;
+}
+
+public sealed class GDriveConfig
+{
+    public string FolderId { get; set; } = string.Empty;
+}
+
+[JsonSourceGenerationOptions(
+    WriteIndented = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
+[JsonSerializable(typeof(PrtscConfig))]
+public partial class PrtscConfigJsonContext : JsonSerializerContext;

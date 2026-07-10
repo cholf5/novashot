@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Prtsc.App/Prtsc.App.csproj" />
+    <Project Path="src/Prtsc.Core/Prtsc.Core.csproj" />
+    <Project Path="src/Prtsc.Platform.Windows/Prtsc.Platform.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj" />
+    <Project Path="tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj" />
+  </Folder>
+</Solution>

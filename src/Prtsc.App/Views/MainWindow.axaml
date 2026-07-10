@@ -1,0 +1,104 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Prtsc.App.ViewModels"
+        xmlns:controls="using:Prtsc.App.Controls"
+        mc:Ignorable="d"
+        d:DesignWidth="1200" d:DesignHeight="800"
+        x:Class="Prtsc.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Prtsc"
+        MinWidth="800" MinHeight="600"
+        Width="1200" Height="800"
+        WindowStartupLocation="CenterScreen">
+
+  <Window.KeyBindings>
+    <!-- Undo / Redo 只在编辑器态可用：CanExecute 由 EditorViewModel 控制 -->
+    <KeyBinding Gesture="Ctrl+Z" Command="{Binding Editor.UndoCommand}"/>
+    <KeyBinding Gesture="Ctrl+Y" Command="{Binding Editor.RedoCommand}"/>
+    <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding Editor.RedoCommand}"/>
+  </Window.KeyBindings>
+
+  <DockPanel>
+    <!-- Title bar area (placeholder) -->
+    <Border DockPanel.Dock="Top" Height="40" Background="#22000000">
+      <Grid ColumnDefinitions="*, Auto">
+        <TextBlock Grid.Column="0"
+                   Margin="16,0" VerticalAlignment="Center"
+                   Text="Prtsc"
+                   FontWeight="SemiBold" FontSize="14" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0">
+          <Button Name="MinimizeToTrayButton"
+                  Content="Minimize to tray"
+                  Padding="10,4" Margin="4,0"
+                  Click="OnMinimizeToTrayClick"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Height="26" Background="#11000000">
+      <TextBlock Margin="12,0" VerticalAlignment="Center"
+                 FontSize="12"
+                 Text="{Binding StatusText}"/>
+    </Border>
+
+    <!-- Content: Capture toolbar OR Editor, switched by ViewModel.Mode -->
+    <Panel>
+      <!-- Capture idle view -->
+      <StackPanel IsVisible="{Binding IsInCaptureMode}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                  Spacing="16" Width="520">
+        <TextBlock Text="Capture" FontSize="28" FontWeight="Light" HorizontalAlignment="Center"/>
+        <TextBlock Text="Pick a capture mode below or use a global hotkey."
+                   Opacity="0.7" HorizontalAlignment="Center"/>
+        <UniformGrid Columns="3" Margin="0,16,0,0">
+          <Button Name="CaptureFullscreenButton"
+                  Content="Fullscreen"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  Margin="6" Padding="12"
+                  Click="OnCaptureFullscreenClick"/>
+          <Button Name="CaptureRegionButton"
+                  Content="Region"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  Margin="6" Padding="12"
+                  Click="OnCaptureRegionClick"/>
+          <Button Name="CaptureWindowButton"
+                  Content="Window"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  Margin="6" Padding="12"
+                  IsEnabled="False"
+                  Click="OnCaptureWindowClick"/>
+        </UniformGrid>
+        <TextBlock Margin="0,20,0,0" FontSize="12" Opacity="0.6" HorizontalAlignment="Center"
+                   Text="Global hotkeys: PrintScreen / Ctrl+PrintScreen / Ctrl+Shift+PrintScreen"/>
+      </StackPanel>
+
+      <!-- Editor view (M4a: back + Rectangle tool marker + Undo / Redo + SkiaCanvas) -->
+      <Grid IsVisible="{Binding IsInEditorMode}" RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Height="44" Background="#18000000">
+          <StackPanel Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center" Spacing="6">
+            <Button Name="EditorBackButton" Content="← Back"
+                    Padding="10,4"
+                    Click="OnEditorBackClick"/>
+            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
+            <ToggleButton Content="Rectangle"
+                          Padding="10,4"
+                          IsChecked="True"
+                          IsEnabled="False"
+                          ToolTip.Tip="M4a: only Rectangle available; M4d will add tool switching + hotkeys"/>
+            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
+            <Button Content="Undo (Ctrl+Z)" Padding="10,4"
+                    Command="{Binding Editor.UndoCommand}"/>
+            <Button Content="Redo (Ctrl+Y)" Padding="10,4"
+                    Command="{Binding Editor.RedoCommand}"/>
+          </StackPanel>
+        </Border>
+        <Border Grid.Row="1" Background="#0A000000">
+          <controls:SkiaCanvas Editor="{Binding Editor}" Margin="8"/>
+        </Border>
+      </Grid>
+    </Panel>
+  </DockPanel>
+</Window>
