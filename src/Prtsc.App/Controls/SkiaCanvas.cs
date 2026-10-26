@@ -10,6 +10,7 @@ using Prtsc.Core.Annotation;
 using Prtsc.Core.Annotation.Editing;
 using Prtsc.Core.Annotation.Model;
 using Prtsc.Core.Annotation.Tools;
+using Prtsc.Core.Editor;
 using SkiaSharp;
 
 namespace Prtsc.App.Controls;
@@ -419,14 +420,8 @@ public sealed class SkiaCanvas : Control
             var restore = canvas.Save();
             canvas.Concat(in _matrix);
 
-            // image-pixel 空间：画图像 + 标注（跳过正在内联编辑的 Text） + 预览
-            canvas.DrawBitmap(_doc.Source, 0, 0);
-            foreach (var a in _doc.Annotations)
-            {
-                if (ReferenceEquals(a, _editingText)) continue;
-                a.Render(canvas);
-            }
-            _preview?.Render(canvas);
+            // image-pixel 空间：文档内容走共享合成管线（与导出同源，所见即所得）
+            Composition.RenderScene(canvas, _doc, _preview, _editingText);
 
             canvas.RestoreToCount(restore);
 

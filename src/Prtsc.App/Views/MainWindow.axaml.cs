@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
@@ -12,6 +13,7 @@ using Prtsc.Core.Annotation.Model;
 using Prtsc.Core.Annotation.Tools;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Common;
+using Prtsc.Core.Editor.Export;
 using Prtsc.Core.Windows;
 
 namespace Prtsc.App.Views;
@@ -124,6 +126,56 @@ public partial class MainWindow : Window
 
     private void OnEditorBackClick(object? sender, RoutedEventArgs e) => _vm.ReturnToCapture();
 
+    private void OnExportClick(object? sender, RoutedEventArgs e) => _ = ExportCurrentAsync();
+
+    /// <summary>
+    /// M6a 导出：保存对话框（PNG/JPEG/WebP，格式由所选扩展名决定）→
+    /// <see cref="ImageExporter"/>（内部走 <see cref="Composition"/>，与画布渲染同源）→ 落盘。
+    /// 建议文件名沿用 FilenamePatterns 的 timestamp 模式。
+    /// </summary>
+    private async Task ExportCurrentAsync()
+    {
+        if (_vm.Editor is not { } editor) return;
+
+        var suggested = Prtsc.Core.Utils.FilenamePatterns.Generate(
+            Prtsc.Core.Utils.FilenamePatterns.Timestamp, folder: string.Empty,
+            extension: ImageExporter.ExtensionFor(ExportFormat.Png));
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export image",
+            SuggestedFileName = suggested,
+            FileTypeChoices = new List<Avalonia.Platform.Storage.FilePickerFileType>
+            {
+                new("PNG image")  { Patterns = new[] { "*.png" } },
+                new("JPEG image") { Patterns = new[] { "*.jpg", "*.jpeg" } },
+                new("WebP image") { Patterns = new[] { "*.webp" } },
+            },
+        });
+        if (file is null) return;
+
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrEmpty(path))
+        {
+            _vm.StatusText = "Export failed: no local file path.";
+            return;
+        }
+
+        try
+        {
+            var format = ImageExporter.FormatFromExtension(path);
+            ImageExporter.Save(editor.Document, path, format);
+            _logger.LogInformation("Exported {Path} ({Format}, {Width}x{Height})",
+                path, format, editor.ImageWidth, editor.ImageHeight);
+            _vm.StatusText = $"Saved {path}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Export to {Path} failed", path);
+            _vm.StatusText = "Export failed: " + ex.Message;
+        }
+    }
+
     /// <summary>
     /// 工具栏的 RadioButton Click 事件：Tag 是 <see cref="ToolKind"/> 的字符串名，解析后设 <c>Editor.CurrentTool</c>。
     /// </summary>
@@ -136,9 +188,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// M4d 工具热键：<b>V R E O A L T N S</b>（无修饰键）。
+    /// M4d 工具热键：<b>V R E O A L T N S + M5 的 P H M B</b>（无修饰键）。
     /// 编辑 Text 时或 TextBox 拿焦时禁用，避免抢用户输入。
     /// 走 <see cref="OnKeyDown"/> 覆盖而非 <c>Window.KeyBindings</c> —— 后者不看焦点，字母键会被吞掉。
+    /// M6a：Ctrl+S 触发导出（编辑文本中不导出——导出会跳过编辑中的 Text，先提交再存）。
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -147,6 +200,12 @@ public partial class MainWindow : Window
         if (_vm.Editor is not { } editor) return;
         if (editor.EditingText is not null) return;
         if (_textEditBox is { IsFocused: true }) return;
+        if (e.Key == Key.S && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            _ = ExportCurrentAsync();
+            return;
+        }
         if (e.KeyModifiers != KeyModifiers.None) return;
         var kind = MapKeyToTool(e.Key);
         if (kind is null) return;

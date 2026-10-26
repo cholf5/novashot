@@ -142,6 +142,11 @@
                     Command="{Binding Editor.UndoCommand}"/>
             <Button Content="Redo (Ctrl+Y)" Padding="10,4"
                     Command="{Binding Editor.RedoCommand}"/>
+            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
+            <!-- M6a: 导出（格式由保存对话框扩展名决定：png/jpg/webp） -->
+            <Button Content="Save (Ctrl+S)" Padding="10,4"
+                    ToolTip.Tip="Export as PNG / JPEG / WebP (format follows file extension)"
+                    Click="OnExportClick"/>
           </StackPanel>
         </Border>
         <Border Grid.Row="1" Background="#0A000000">
