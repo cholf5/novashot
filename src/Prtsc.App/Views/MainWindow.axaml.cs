@@ -165,6 +165,11 @@ public partial class MainWindow : Window
         Key.T => ToolKind.Text,
         Key.N => ToolKind.Number,
         Key.S => ToolKind.Spotlight,
+        // M5：Flameshot 补齐工具
+        Key.P => ToolKind.Pencil,
+        Key.H => ToolKind.Highlighter,
+        Key.M => ToolKind.Mosaic,
+        Key.B => ToolKind.Blur,
         _ => null,
     };
 

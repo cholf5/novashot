@@ -52,26 +52,9 @@ public class LineAnnotation : AnnotationBase
         return d <= Style.StrokeWidth * 0.5f + slop;
     }
 
-    /// <summary>点到线段的最短距离。M4b/M4c 的 Line/Arrow HitTest 都会用它。</summary>
+    /// <summary>点到线段的最短距离。M5a 起委托 <see cref="PolylineGeometry"/>（与 Pencil/Highlighter 共享）。</summary>
     protected static float DistancePointToSegment(SKPoint p, SKPoint a, SKPoint b)
-    {
-        var abx = b.X - a.X;
-        var aby = b.Y - a.Y;
-        var lenSq = abx * abx + aby * aby;
-        if (lenSq < 1e-6f)
-        {
-            var dx0 = p.X - a.X;
-            var dy0 = p.Y - a.Y;
-            return MathF.Sqrt(dx0 * dx0 + dy0 * dy0);
-        }
-        var t = ((p.X - a.X) * abx + (p.Y - a.Y) * aby) / lenSq;
-        t = Math.Clamp(t, 0f, 1f);
-        var qx = a.X + t * abx;
-        var qy = a.Y + t * aby;
-        var dx = p.X - qx;
-        var dy = p.Y - qy;
-        return MathF.Sqrt(dx * dx + dy * dy);
-    }
+        => PolylineGeometry.DistanceToSegment(p, a, b);
 
     public override IReadOnlyList<AnnotationHandle> GetHandles() => new[]
     {

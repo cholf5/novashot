@@ -105,6 +105,10 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
         TextAnnotation _           => "Text",
         NumberAnnotation _         => "Number",
         SpotlightAnnotation _      => "Spotlight",
+        PencilAnnotation _         => "Pencil",
+        HighlighterAnnotation _    => "Highlighter",
+        MosaicAnnotation _         => "Mosaic",
+        BlurAnnotation _           => "Blur",
         _                          => Editor.Selection!.GetType().Name,
     };
 

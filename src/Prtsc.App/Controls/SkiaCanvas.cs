@@ -287,8 +287,10 @@ public sealed class SkiaCanvas : Control
     }
 
     /// <summary>
-    /// Ctrl+滚轮：调整当前 <see cref="EditorViewModel.CurrentStyle"/> 的描边宽度（1..16）。
-    /// 若有 Selection，同步写回 Selection.Style + <see cref="AnnotationDocument.NotifyMutated"/>。
+    /// Ctrl+滚轮：
+    /// - 选中 Mosaic/Blur 时调效果强度（BlockSize 4..48 / Sigma 2..40），不动 CurrentStyle；
+    /// - 否则调整当前 <see cref="EditorViewModel.CurrentStyle"/> 的描边宽度（1..16），
+    ///   有 Selection 时同步写回 Selection.Style + <see cref="AnnotationDocument.NotifyMutated"/>。
     /// 样式改动不进 Undo（延续 M4c 决定）。
     /// </summary>
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -297,6 +299,33 @@ public sealed class SkiaCanvas : Control
         var editor = Editor;
         if (editor is null) return;
         if ((e.KeyModifiers & KeyModifiers.Control) == 0) return;
+
+        // M5：效果标注优先——调强度而非描边宽
+        if (editor.Selection is MosaicAnnotation mosaic)
+        {
+            var nextBlock = (int)StrokeWheelHelper.Step(mosaic.BlockSize, e.Delta.Y,
+                MosaicAnnotation.MinBlockSize, MosaicAnnotation.MaxBlockSize);
+            if (nextBlock != mosaic.BlockSize)
+            {
+                mosaic.BlockSize = nextBlock;
+                editor.Document.NotifyMutated();
+            }
+            e.Handled = true;
+            return;
+        }
+        if (editor.Selection is BlurAnnotation blur)
+        {
+            var nextSigma = StrokeWheelHelper.Step(blur.Sigma, e.Delta.Y,
+                BlurAnnotation.MinSigma, BlurAnnotation.MaxSigma);
+            if (Math.Abs(nextSigma - blur.Sigma) > 0.01f)
+            {
+                blur.Sigma = nextSigma;
+                editor.Document.NotifyMutated();
+            }
+            e.Handled = true;
+            return;
+        }
+
         var current = editor.CurrentStyle.StrokeWidth;
         var next = StrokeWheelHelper.Step(current, e.Delta.Y);
         if (Math.Abs(next - current) < 0.5f)

@@ -121,6 +121,19 @@
             <RadioButton GroupName="Tool" Content="Spot"    Padding="8,4" Tag="Spotlight"     Click="OnToolChanged"
                          IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Spotlight}"
                          ToolTip.Tip="Spotlight (S)"/>
+            <!-- M5: Flameshot 补齐工具 -->
+            <RadioButton GroupName="Tool" Content="Pen"     Padding="8,4" Tag="Pencil"        Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Pencil}"
+                         ToolTip.Tip="Pencil (P)"/>
+            <RadioButton GroupName="Tool" Content="High"    Padding="8,4" Tag="Highlighter"   Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Highlighter}"
+                         ToolTip.Tip="Highlighter (H)"/>
+            <RadioButton GroupName="Tool" Content="Mosaic"  Padding="8,4" Tag="Mosaic"        Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Mosaic}"
+                         ToolTip.Tip="Pixelate region (M) — Ctrl+Wheel adjusts block size"/>
+            <RadioButton GroupName="Tool" Content="Blur"    Padding="8,4" Tag="Blur"          Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Blur}"
+                         ToolTip.Tip="Blur region (B) — Ctrl+Wheel adjusts strength"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
             <Button Content="Delete (Del)" Padding="10,4"
                     Command="{Binding Editor.DeleteSelectionCommand}"/>
