@@ -65,10 +65,21 @@ public partial class OverlayWindow : Window
 
         Opened += (_, _) =>
         {
+#if MAC_PLATFORM
+            // AppKit 会把无边框窗口钳进工作区（探针实证：请求 (0,0,2560,1440) 落地 (0,96,2560,1314)），
+            // Show 后用原生 setFrame: 铺满整块显示器 + 提层盖住菜单栏/Dock。
+            Prtsc.Platform.Mac.Windowing.MacOverlayChrome.Apply(
+                TryGetPlatformHandle()?.Handle ?? 0, _display);
+#endif
             _adorner?.Focus();
             Focus();
             UpdateRingPosition();
         };
+#if MAC_PLATFORM
+        // 激活周期里 AppKit 可能再次钳制，Activated 时幂等重铺
+        Activated += (_, _) => Prtsc.Platform.Mac.Windowing.MacOverlayChrome.Apply(
+            TryGetPlatformHandle()?.Handle ?? 0, _display);
+#endif
         KeyDown += OnKeyDown;
         // 多屏时 overlay 间切换会触发 Deactivated；不再用它取消。用户只能通过 Esc/工具环取消。
     }

@@ -73,6 +73,8 @@ internal static unsafe partial class MacNative
     // ---------- CoreGraphics：显示器 ----------
     [LibraryImport(MacLibs.CG)] internal static partial int CGGetActiveDisplayList(uint maxDisplays, uint[]? activeDisplays, out uint displayCount);
 
+    [LibraryImport(MacLibs.CG)] internal static partial uint CGMainDisplayID();
+
     [LibraryImport(MacLibs.CG)] internal static partial uint CGDisplayPixelsWide(uint display);
 
     [LibraryImport(MacLibs.CG)] internal static partial uint CGDisplayPixelsHigh(uint display);
@@ -189,6 +191,18 @@ internal static unsafe partial class MacNative
     internal static extern nint objc_msgSend11(nint receiver, nint sel,
         nint planes, nuint wide, nuint high, nuint bps, nuint spp,
         byte hasAlpha, byte isPlanar, nint colorSpaceName, nuint rowBytes, nuint bitsPerPixel);
+
+    // ---------- libobjc：NSWindow chrome（overlay 铺满整屏） ----------
+    // 探针实测（2026-11-01, macOS 26 arm64）：arm64 不走 objc_msgSend_stret，
+    // struct 返回/传参直接走 objc_msgSend；bool 参数默认 marshalling 落 w 寄存器，均可用。
+
+    /// <summary>objc_msgSend 返回 CGRect（frame/visibleFrame 等 getter）。</summary>
+    [DllImport(MacLibs.Objc, EntryPoint = "objc_msgSend")]
+    internal static extern CGRect objc_msgSendRect(nint receiver, nint sel);
+
+    /// <summary>objc_msgSend(CGRect, bool)：setFrame:display:。</summary>
+    [DllImport(MacLibs.Objc, EntryPoint = "objc_msgSend")]
+    internal static extern void objc_msgSendSetFrame(nint receiver, nint sel, CGRect frame, bool display);
 }
 
 [StructLayout(LayoutKind.Sequential)]
