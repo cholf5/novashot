@@ -48,6 +48,20 @@ internal static unsafe partial class MacNative
         }
     }
 
+    /// <summary>kCFNumberDoubleType(6) 读 double。</summary>
+    internal static unsafe bool CFNumberToDouble(nint number, out double value)
+    {
+        value = 0;
+        fixed (double* p = &value)
+        {
+            return CFNumberGetValue(number, 6, (nint)p);
+        }
+    }
+
+    [LibraryImport(MacLibs.CF)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool CFBooleanGetValue(nint boolean, [MarshalAs(UnmanagedType.U1)] out bool value);
+
     /// <summary>把 CFString 读成 UTF-8 托管字符串；非 UTF-16 内部表示时走 GetCString 兜底。</summary>
     internal static string CFStringToString(nint cfstr)
     {
@@ -75,7 +89,7 @@ internal static unsafe partial class MacNative
     // ---------- CoreGraphics：窗口 ----------
     internal const uint kCGWindowListOptionAll = 0;
     internal const uint kCGWindowListOptionOnScreenOnly = 1;
-    internal const uint kCGWindowListOptionExcludeDesktopElements = 2;
+    internal const uint kCGWindowListExcludeDesktopElements = 2;
     internal const uint kCGNullWindowID = 0;
 
     [LibraryImport(MacLibs.CG)] internal static partial nint CGWindowListCopyWindowInfo(uint option, uint relativeToWindow);

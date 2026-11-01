@@ -1,4 +1,5 @@
 using Prtsc.Platform.Mac.Capture;
+using Prtsc.Platform.Mac.Windowing;
 using Xunit;
 
 namespace Prtsc.Mac.Tests;
@@ -26,5 +27,17 @@ public class CGDisplayApiManualTests
         // 不假设存在窗口；只验证调用路径不崩
         var ok = api.TryGetWindowBounds(1, out var bounds);
         Assert.True(ok || bounds.Size.Width == 0);
+    }
+}
+
+[Trait("Category", "Manual")]
+public class CGWindowListApiManualTests
+{
+    [Fact]
+    public void CopyWindowList_DoesNotThrow()
+    {
+        var api = new CGWindowListApi();
+        var rows = api.CopyWindowList();
+        Assert.True(rows.Length >= 0);
     }
 }
