@@ -80,7 +80,7 @@
     </ItemsControl>
 
     <!-- 24 渐变预设（6 列 × 4 行） -->
-    <ItemsControl ItemsSource="{Binding Gradients}">
+    <ItemsControl x:Name="GradientPresets" ItemsSource="{Binding Gradients}">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate><UniformGrid Columns="6"/></ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
@@ -89,9 +89,8 @@
           <ToggleButton Classes="grad" Click="OnGradientClick" Tag="{Binding Value}"
                         ToolTip.Tip="{Binding Name}">
             <ToggleButton.Background>
-              <MultiBinding Converter="{StaticResource CssGradient}">
-                <Binding Path="Value"/>
-              </MultiBinding>
+              <!-- 单值转换器只能接 Binding；此前误用 MultiBinding 导致模板实例化时 InvalidCastException（MAC 冒烟发现） -->
+              <Binding Path="Value" Converter="{StaticResource CssGradient}"/>
             </ToggleButton.Background>
           </ToggleButton>
         </DataTemplate>
