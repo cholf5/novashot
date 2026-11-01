@@ -120,4 +120,24 @@ public sealed partial class CloudSettingsViewModel : ObservableObject
         SaveHint = "已保存。";
         return true;
     }
+
+    /// <summary>表单当前 R2 凭据（连接测试用，不落盘）。</summary>
+    public R2Config ToR2Config() => new()
+    {
+        AccountId = R2AccountId.Trim(),
+        Bucket = R2Bucket.Trim(),
+        AccessKeyId = R2AccessKeyId.Trim(),
+        SecretAccessKey = R2SecretAccessKey.Trim(),
+        PublicUrl = R2PublicUrl.Trim(),
+        Directory = R2Directory.Trim(),
+    };
+
+    /// <summary>表单当前 GDrive 凭据（连接测试用，不落盘）。</summary>
+    public GDriveConfig ToGDriveConfig() => new()
+    {
+        ClientId = GDriveClientId.Trim(),
+        ClientSecret = GDriveClientSecret.Trim(),
+        RefreshToken = GDriveRefreshToken.Trim(),
+        FolderId = GDriveFolderId.Trim(),
+    };
 }

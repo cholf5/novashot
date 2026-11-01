@@ -26,4 +26,32 @@ public partial class CloudSettingsWindow : Window
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// G-25（winshot）：用当前表单凭据做连接测试。R2 = HeadBucket，GDrive = 换 token。
+    /// 结果写 SaveHint；测试不落盘（保存仍需点“保存”）。
+    /// </summary>
+    private async void OnTestConnectionClick(object? sender, RoutedEventArgs e)
+    {
+        TestConnectionButton.IsEnabled = false;
+        _vm.SaveHint = "正在测试连接…";
+        try
+        {
+            var (ok, message) = _vm.ProviderIndex switch
+            {
+                1 => await Prtsc.Core.Cloud.CloudConnectionTester.TestR2Async(_vm.ToR2Config()),
+                2 => await Prtsc.Core.Cloud.CloudConnectionTester.TestGDriveAsync(_vm.ToGDriveConfig()),
+                _ => (false, "先选择 R2 或 Google Drive 渠道再测试。"),
+            };
+            _vm.SaveHint = (ok ? "✓ " : "✗ ") + message;
+        }
+        catch (Exception ex)
+        {
+            _vm.SaveHint = "✗ 连接测试异常：" + ex.Message;
+        }
+        finally
+        {
+            TestConnectionButton.IsEnabled = true;
+        }
+    }
 }

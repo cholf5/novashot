@@ -27,7 +27,10 @@
                    Text="截图可上传到 Cloudflare R2（S3 兼容）或 Google Drive，上传后链接自动复制。凭据明文保存在本机 config.json，不会上传。"/>
 
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="渠道" VerticalAlignment="Center"/>
+          <Button Name="TestConnectionButton" Content="测试连接"
+                  ToolTip.Tip="用当前表单凭据发一次连接测试（R2 = HeadBucket；GDrive = 换 token）"
+                  Click="OnTestConnectionClick"/>
+          <TextBlock Text="渠道" VerticalAlignment="Center" Margin="8,0,0,0"/>
           <ComboBox Name="ProviderCombo" MinWidth="180" SelectedIndex="{Binding ProviderIndex}">
             <ComboBoxItem Content="不上传（none）"/>
             <ComboBoxItem Content="Cloudflare R2"/>
