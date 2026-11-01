@@ -141,6 +141,12 @@ public sealed class MacClipboardService : IClipboardService
         return s == nint.Zero ? null : MacNative.CFStringToString(s);
     }
 
+    /// <summary>
+    /// G-11：macOS 无 CF_HDROP 对应物（NSPasteboard 无文件列表类型可跨应用贴图）。
+    /// Finder 拷贝文件走私有 file URL 类型且语义不同，暂不支持，恒返回 null。
+    /// </summary>
+    public string? TryGetImageFilePath() => null;
+
     // ---------- helpers ----------
 
     private static nint NSStringFromUtf8(string s)

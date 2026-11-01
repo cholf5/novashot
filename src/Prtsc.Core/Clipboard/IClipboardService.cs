@@ -16,6 +16,12 @@ public interface IClipboardService
 
     /// <summary>写入纯文本（M7b：上传成功后复制 URL）。成功返回 true。</summary>
     bool TrySetText(string text);
+
+    /// <summary>
+    /// G-11（winshot）：剪贴板上是文件列表（CF_HDROP，资源管理器“复制文件”）时，
+    /// 返回第一个图片扩展名的文件完整路径；否则 null。
+    /// </summary>
+    string? TryGetImageFilePath();
 }
 
 /// <summary>进程内内存实现：App VM 单元测试用。</summary>
@@ -42,5 +48,12 @@ public sealed class FakeClipboardService : IClipboardService
 
     public string? TryGetText() => _text;
 
+    public string? TryGetImageFilePath() => _imageFilePath;
+
     private string? _text;
+
+    /// <summary>测试注入：模拟 CF_HDROP 里的图片文件路径（null = 剪贴板无文件列表）。</summary>
+    public string? ImageFilePath { get => _imageFilePath; set => _imageFilePath = value; }
+
+    private string? _imageFilePath;
 }

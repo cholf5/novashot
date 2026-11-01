@@ -120,7 +120,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             var path = Prtsc.Core.Clipboard.QuickSave.Save(_configStore.Current, editor.Document, editor.CompositionState);
-            StatusText = "Saved " + path;
+            // G-9（winshot）：QuickSave 成功后自动复制文件路径（导出/粘贴后可直接粘进聊天）
+            var copiedPath = _clipboard.TrySetText(path);
+            StatusText = copiedPath ? "Saved " + path + " (path copied)" : "Saved " + path;
         }
         catch (Exception ex)
         {
@@ -199,7 +201,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Library 索引存储（View 层开 Library 窗口 / Pin 缩略图用；DI 外可能为 null）。</summary>
     public LibraryStore? Library => _library;
 
-    /// <summary>剪贴板位图 → 编辑器（工具栏 Paste / Ctrl+V）。</summary>
+    /// <summary>剪贴板位图 → 编辑器（工具栏 Paste / Ctrl+V）。位图为空时回退 CF_HDROP 文件路径（G-11）。</summary>
     [RelayCommand]
     private void PasteFromClipboard()
     {
@@ -207,12 +209,57 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var bitmap = _clipboard.TryGetImage();
         if (bitmap is null)
         {
-            StatusText = "Clipboard has no image";
+            // G-11（winshot）：资源管理器复制的文件列表——取第一个图片文件解码进编辑器
+            var filePath = _clipboard.TryGetImageFilePath();
+            if (filePath is null)
+            {
+                StatusText = "Clipboard has no image";
+                return;
+            }
+            if (!ImportImageFile(filePath, out var failure))
+            {
+                StatusText = failure ?? "Clipboard file could not be opened";
+                return;
+            }
             return;
         }
         var captured = new CapturedImage(bitmap, new Prtsc.Core.Common.PixelRect(0, 0, bitmap.Width, bitmap.Height),
             scaleFactor: 1.0, CaptureSource.Clipboard);
         EnterEditor(captured);
+    }
+
+    /// <summary>
+    /// 文件 → SKBitmap → 编辑器（I-1 导入与 G-11 HDROP 粘贴共用）。成功返回 true；
+    /// 失败写 <paramref name="failure"/>。位图所有权随 CapturedImage 移交（M6c 交接坑：不 here-Dispose）。
+    /// </summary>
+    public bool ImportImageFile(string path, out string? failure)
+    {
+        failure = null;
+        try
+        {
+            if (!File.Exists(path))
+            {
+                failure = "File not found: " + path;
+                return false;
+            }
+            var bitmap = SKBitmap.Decode(path);
+            if (bitmap is null)
+            {
+                failure = "Unsupported image format: " + Path.GetExtension(path);
+                return false;
+            }
+            var captured = new CapturedImage(bitmap,
+                new Prtsc.Core.Common.PixelRect(0, 0, bitmap.Width, bitmap.Height),
+                scaleFactor: 1.0, CaptureSource.File);
+            EnterEditor(captured);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Import image file failed: {Path}", path);
+            failure = "Import failed: " + ex.Message;
+            return false;
+        }
     }
 
     /// <summary>Pin 贴图参数（合成结果；View 层收到变更后开置顶窗）。</summary>

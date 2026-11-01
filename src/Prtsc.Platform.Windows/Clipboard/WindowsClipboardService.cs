@@ -143,4 +143,40 @@ public sealed class WindowsClipboardService : IClipboardService
         }
         return null;
     }
+
+    /// <summary>
+    /// G-11（winshot clipboard.go）：CF_HDROP 文件列表里找第一个图片扩展名的文件。
+    /// 资源管理器“复制文件”后可直接粘贴进编辑器。
+    /// </summary>
+    public string? TryGetImageFilePath()
+    {
+        if (!User32.IsClipboardFormatAvailable(User32.CF_HDROP)) return null;
+        if (!User32.OpenClipboard(nint.Zero)) return null;
+        try
+        {
+            nint hDrop = User32.GetClipboardData(User32.CF_HDROP);
+            if (hDrop == nint.Zero) return null;
+
+            // DragQueryFileW(0xFFFFFFFF) 返回文件数；逐个取路径，遇到图片扩展名即返回
+            uint count = (uint)User32.DragQueryFileW(hDrop, 0xFFFFFFFF, null, 0);
+            for (uint i = 0; i < count; i++)
+            {
+                uint len = (uint)User32.DragQueryFileW(hDrop, i, null, 0);
+                if (len == 0) continue;
+                var sb = new System.Text.StringBuilder((int)len + 1);
+                if (User32.DragQueryFileW(hDrop, i, sb, (uint)sb.Capacity) == 0) continue;
+                var path = sb.ToString();
+                if (IsImageExtension(Path.GetExtension(path))) return path;
+            }
+            return null;
+        }
+        finally
+        {
+            User32.CloseClipboard();
+        }
+    }
+
+    /// <summary>图片扩展名判定（winshot 对齐：png/jpg/jpeg/gif/bmp/webp）。</summary>
+    internal static bool IsImageExtension(string? extension) =>
+        extension?.ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp";
 }

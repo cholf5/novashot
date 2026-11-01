@@ -145,6 +145,22 @@ public class EditorClipboardTests : IDisposable
         Assert.False(vm.QuickSaveCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void QuickSave_CopiesFilePathToClipboard()
+    {
+        // G-9（winshot）：快存成功后路径进剪贴板
+        var fake = new FakeClipboardService();
+        var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        store.Update(c => c.QuickSave.Folder = Path.Combine(_tempDir, "shots"));
+        var vm = NewVm(fake, store);
+        vm.EnterEditor(Captured());
+
+        vm.QuickSaveCommand.Execute(null);
+
+        var file = Directory.GetFiles(Path.Combine(_tempDir, "shots"))[0];
+        Assert.Equal(file, fake.TryGetText());
+    }
+
     // ---------- Paste ----------
 
     [Fact]
@@ -174,6 +190,51 @@ public class EditorClipboardTests : IDisposable
         Assert.Equal(MainViewMode.CaptureIdle, vm.Mode);
         Assert.Null(vm.Editor);
         Assert.Contains("clipboard", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ---------- G-11: HDROP 文件粘贴 / I-1 导入（共用 ImportImageFile） ----------
+
+    [Fact]
+    public void Paste_HdropFileList_ImportsFirstImageFile()
+    {
+        var fake = new FakeClipboardService();
+        var imagePath = Path.Combine(_tempDir, "hdrop.png");
+        Directory.CreateDirectory(_tempDir);
+        File.WriteAllBytes(imagePath, MakePngBytes());
+        fake.ImageFilePath = imagePath;
+        var vm = NewVm(fake);
+
+        vm.PasteFromClipboardCommand.Execute(null);
+
+        Assert.Equal(MainViewMode.Editor, vm.Mode);
+        Assert.NotNull(vm.Editor);
+        Assert.Equal(4, vm.Editor!.ImageWidth);
+    }
+
+    [Fact]
+    public void ImportImageFile_NonImagePath_FailsWithMessage()
+    {
+        var fake = new FakeClipboardService();
+        Directory.CreateDirectory(_tempDir);
+        var txtPath = Path.Combine(_tempDir, "note.txt");
+        File.WriteAllText(txtPath, "not an image");
+        fake.ImageFilePath = txtPath;
+        var vm = NewVm(fake);
+
+        vm.PasteFromClipboardCommand.Execute(null);
+
+        Assert.Equal(MainViewMode.CaptureIdle, vm.Mode);
+        Assert.Null(vm.Editor);
+        Assert.Contains("Unsupported", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static byte[] MakePngBytes()
+    {
+        using var bmp = new SKBitmap(4, 4);
+        bmp.Erase(SKColors.Olive);
+        using var img = SKImage.FromBitmap(bmp);
+        using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     public void Dispose()

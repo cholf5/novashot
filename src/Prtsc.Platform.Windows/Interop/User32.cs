@@ -41,7 +41,11 @@ internal static class User32
     public const uint CF_DIB = 8;
     public const uint CF_DIBV5 = 17;
     public const uint CF_UNICODETEXT = 13;
+    public const uint CF_HDROP = 15;
     public const uint GMEM_MOVEABLE = 0x0002;
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern nint DragQueryFileW(nint hDrop, uint iFile, System.Text.StringBuilder? lpszFile, uint cch);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool OpenClipboard(nint hWndNewOwner);
