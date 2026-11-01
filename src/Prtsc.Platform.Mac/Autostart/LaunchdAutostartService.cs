@@ -57,6 +57,30 @@ public interface IProcessRunner
     bool Run(string fileName, string arguments);
 }
 
+/// <summary>真实现：Process.Run 同步等待退出码。</summary>
+public sealed class SystemProcessRunner : IProcessRunner
+{
+    public bool Run(string fileName, string arguments)
+    {
+        try
+        {
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = arguments,
+                UseShellExecute = false,
+            });
+            if (p is null) return false;
+            p.WaitForExit(10_000);
+            return p.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
+
 /// <summary>
 /// launchd LaunchAgent 自启实现。
 /// SMAppService 只针对打包 .app；本项目是 dotnet 免打包程序，LaunchAgent 是正确通道。

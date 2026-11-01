@@ -33,7 +33,9 @@ public partial class App : Application
 
             // 同步 config：先 Load 一次
             var store = AppServices.GetRequiredService<IConfigStore>();
-            store.LoadAsync().GetAwaiter().GetResult();
+            // macOS：Avalonia 主线程直接 GetAwaiter().GetResult() 会与异步链死锁（2026-11-01 实证）；
+            // 包进 Task.Run 打破 SynchronizationContext 依赖，Windows 行为不变。
+            Task.Run(() => store.LoadAsync()).GetAwaiter().GetResult();
 
             // Autostart 路径同步（用户可能移动 exe 位置）
             AppServices.GetRequiredService<IAutostartService>().SyncPath();
