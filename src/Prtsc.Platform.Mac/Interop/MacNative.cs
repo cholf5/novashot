@@ -178,6 +178,12 @@ internal static unsafe partial class MacNative
     [LibraryImport(MacLibs.Objc)] internal static partial nint objc_msgSend(nint receiver, nint sel, nint arg1, nint arg2, nint arg3);
 
     [LibraryImport(MacLibs.Objc)] internal static partial nint objc_msgSend(nint receiver, nint sel, byte* arg1);
+
+    /// <summary>11 参 objc_msgSend（NSBitmapImageRep init 等长 selector）。调用方保证签名匹配。</summary>
+    [DllImport(MacLibs.Objc, EntryPoint = "objc_msgSend")]
+    internal static extern nint objc_msgSend11(nint receiver, nint sel,
+        nint planes, nuint wide, nuint high, nuint bps, nuint spp,
+        byte hasAlpha, byte isPlanar, nint colorSpaceName, nuint rowBytes, nuint bitsPerPixel);
 }
 
 [StructLayout(LayoutKind.Sequential)]

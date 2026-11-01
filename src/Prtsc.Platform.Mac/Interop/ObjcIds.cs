@@ -32,6 +32,11 @@ internal static class ObjcIds
     internal static nint LengthSel { get; private set; }
     internal static nint InitWithBitmapDataPlanesSel { get; private set; }
     internal static nint TiffRepresentationSel { get; private set; }
+    internal static nint BitmapDataSel { get; private set; }
+    internal static nint InitWithDataSel { get; private set; }
+    internal static nint PixelsWideSel { get; private set; }
+    internal static nint PixelsHighSel { get; private set; }
+    internal static nint BytesPerRowSel { get; private set; }
 
     // UTI / pasteboard type 常量（自建 CFString 字面量，不依赖 dlsym 导出）
     internal static nint Utf8PlainTextType { get; private set; }
@@ -67,6 +72,11 @@ internal static class ObjcIds
             LengthSel = MacNative.sel_registerName("length");
             InitWithBitmapDataPlanesSel = MacNative.sel_registerName("initWithBitmapDataPlanes:pixelsWide:pixelsHigh:bitsPerSample:samplesPerPixel:hasAlpha:isPlanar:colorSpaceName:bytesPerRow:bitsPerPixel:");
             TiffRepresentationSel = MacNative.sel_registerName("TIFFRepresentation");
+            BitmapDataSel = MacNative.sel_registerName("bitmapData");
+            InitWithDataSel = MacNative.sel_registerName("initWithData:");
+            PixelsWideSel = MacNative.sel_registerName("pixelsWide");
+            PixelsHighSel = MacNative.sel_registerName("pixelsHigh");
+            BytesPerRowSel = MacNative.sel_registerName("bytesPerRow");
 
             Utf8PlainTextType = StringConstant("public.utf8-plain-text");
             PngType = StringConstant("public.png");
