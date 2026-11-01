@@ -12,6 +12,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!-- windows TFM 不会传递 macOS 原生 Skia；仅在 mac 上跑测试时需要 -->
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.119.4" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
   </ItemGroup>
 
   <ItemGroup>

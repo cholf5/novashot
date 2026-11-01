@@ -1,9 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Prtsc.Core.Capture;
+using Prtsc.Core.Clipboard;
 using Prtsc.Core.Windows;
 using Prtsc.Platform.Windows.Autostart;
 using Prtsc.Platform.Windows.Capture;
+using Prtsc.Platform.Windows.Clipboard;
 using Prtsc.Platform.Windows.Hotkeys;
 using Prtsc.Platform.Windows.Windowing;
 
@@ -21,6 +23,7 @@ public static class WindowsServiceCollectionExtensions
         services.TryAddSingleton<IHotkeyService, WindowsHotkeyService>();
         services.TryAddSingleton<IAutostartService, RegistryAutostartService>();
         services.TryAddSingleton<IWindowService, WindowEnumerator>();
+        services.TryAddSingleton<IClipboardService, WindowsClipboardService>();
         return services;
     }
 }

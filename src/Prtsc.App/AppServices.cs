@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.ViewModels;
 using Prtsc.Core;
+using Prtsc.Core.Clipboard;
 using Prtsc.Core.Config;
 using Prtsc.Platform.Windows;
 using Serilog;
@@ -37,8 +39,12 @@ public static class AppServices
             sp.GetRequiredService<ILogger<JsonConfigStore>>(),
             overrideDirectory: configDirectory));
 
-        // ViewModels
-        services.AddSingleton<MainWindowViewModel>();
+        // ViewModels（IClipboardService 由 Platform 层注册；无 Platform 时退回进程内 Fake）
+        services.TryAddSingleton<IClipboardService, FakeClipboardService>();
+        services.AddSingleton<MainWindowViewModel>(sp => new MainWindowViewModel(
+            sp.GetRequiredService<IClipboardService>(),
+            sp.GetRequiredService<IConfigStore>(),
+            sp.GetService<ILogger<MainWindowViewModel>>()));
 
         _provider = services.BuildServiceProvider();
     }

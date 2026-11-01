@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Prtsc.Core</RootNamespace>
     <AssemblyName>Prtsc.Core</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

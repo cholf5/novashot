@@ -13,6 +13,7 @@ using Prtsc.Core.Annotation.Model;
 using Prtsc.Core.Annotation.Tools;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Common;
+using Prtsc.Core.Config;
 using Prtsc.Core.Editor.Export;
 using Prtsc.Core.Windows;
 
@@ -168,11 +169,32 @@ public partial class MainWindow : Window
             _logger.LogInformation("Exported {Path} ({Format}, {Width}x{Height})",
                 path, format, editor.ContentWidth, editor.ContentHeight);
             _vm.StatusText = $"Saved {path}";
+
+            // M6c: Auto-copy —— 导出成功后按 config 自动复制到剪贴板
+            if (IsAutoCopyEnabled())
+            {
+                _vm.CopyCommand.Execute(null);
+                _vm.StatusText = $"Saved {path} (also copied to clipboard)";
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Export to {Path} failed", path);
             _vm.StatusText = "Export failed: " + ex.Message;
+        }
+    }
+
+    /// <summary>config.Export.AutoCopyToClipboard，默认 true；无 config store 时保持旧行为（不复制）。</summary>
+    private bool IsAutoCopyEnabled()
+    {
+        try
+        {
+            return AppServices.GetRequiredService<IConfigStore>().Current.Export.AutoCopyToClipboard;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read AutoCopyToClipboard config; skipping auto-copy");
+            return false;
         }
     }
 
@@ -204,6 +226,25 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             _ = ExportCurrentAsync();
+            return;
+        }
+        // M6c: Ctrl+C 复制 / Ctrl+Q 快存（编辑器内；粘贴在捕获态由 TextBox/系统处理）
+        if (e.Key == Key.C && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            _vm.CopyCommand.Execute(null);
+            return;
+        }
+        if (e.Key == Key.Q && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            _vm.QuickSaveCommand.Execute(null);
+            return;
+        }
+        if (e.Key == Key.V && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            _vm.PasteFromClipboardCommand.Execute(null);
             return;
         }
         if (e.KeyModifiers != KeyModifiers.None) return;

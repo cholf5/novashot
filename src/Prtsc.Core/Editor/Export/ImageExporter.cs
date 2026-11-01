@@ -80,4 +80,12 @@ public static class ImageExporter
         ExportFormat.WebP => ".webp",
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
     };
+
+    /// <summary>格式名字符串 → 枚举；未知值回退 PNG。M6c QuickSave 用。</summary>
+    public static ExportFormat ParseFormat(string name) => name?.ToLowerInvariant() switch
+    {
+        "jpeg" or "jpg" => ExportFormat.Jpeg,
+        "webp" => ExportFormat.WebP,
+        _ => ExportFormat.Png,
+    };
 }

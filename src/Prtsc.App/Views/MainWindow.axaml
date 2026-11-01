@@ -82,6 +82,13 @@
         </UniformGrid>
         <TextBlock Margin="0,20,0,0" FontSize="12" Opacity="0.6" HorizontalAlignment="Center"
                    Text="Global hotkeys: PrintScreen / Ctrl+PrintScreen / Ctrl+Shift+PrintScreen"/>
+        <!-- M6c: 剪贴板粘贴 → 新编辑会话 -->
+        <Button Name="PasteFromClipboardButton"
+                Content="Paste from Clipboard (Ctrl+V)"
+                Margin="0,8,0,0" Padding="12,8"
+                HorizontalAlignment="Stretch"
+                Command="{Binding PasteFromClipboardCommand}"
+                ToolTip.Tip="Open an image from the clipboard in the editor"/>
       </StackPanel>
 
       <!-- Editor view (M4b: full tool palette + Undo/Redo + SkiaCanvas) -->
@@ -147,6 +154,13 @@
             <Button Content="Save (Ctrl+S)" Padding="10,4"
                     ToolTip.Tip="Export as PNG / JPEG / WebP (format follows file extension)"
                     Click="OnExportClick"/>
+            <!-- M6c: 复制到剪贴板 / 快存（命令在主 VM 上，直接绑定根级属性） -->
+            <Button Content="Copy (Ctrl+C)" Padding="10,4"
+                    ToolTip.Tip="Copy composed image to clipboard (CF_DIBV5 + CF_DIB)"
+                    Command="{Binding CopyCommand}"/>
+            <Button Content="Quick Save (Ctrl+Q)" Padding="10,4"
+                    ToolTip.Tip="Save directly to the QuickSave folder (no dialog, follows config)"
+                    Command="{Binding QuickSaveCommand}"/>
           </StackPanel>
         </Border>
         <Border Grid.Row="1" Background="#0A000000">

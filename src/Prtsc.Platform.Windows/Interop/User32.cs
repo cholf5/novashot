@@ -37,6 +37,29 @@ internal static class User32
 
     public const uint MONITORINFOF_PRIMARY = 1;
 
+    // ---- Clipboard (M6c) ----
+    public const uint CF_DIB = 8;
+    public const uint CF_DIBV5 = 17;
+    public const uint GMEM_MOVEABLE = 0x0002;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool OpenClipboard(nint hWndNewOwner);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool CloseClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool EmptyClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern nint SetClipboardData(uint uFormat, nint hMem);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern nint GetClipboardData(uint uFormat);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool IsClipboardFormatAvailable(uint format);
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool RegisterHotKey(nint hWnd, int id, uint fsModifiers, uint vk);
 
