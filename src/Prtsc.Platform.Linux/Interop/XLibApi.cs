@@ -323,6 +323,34 @@ public sealed unsafe class XLibApi : IXLibApi
         _ = write(_eventPipeWrite, one, 1);
     }
 
+    public nint EventWindowHandle => _eventWindow;
+
+    /// <summary>keysym → keycode 反查：遍历 min_keycode..max_keycode 的第一列 keysym。缓存 per-keysym。</summary>
+    public uint KeycodeToKeysym(uint keysym)
+    {
+        if (_display == nint.Zero || keysym == 0) return 0;
+        lock (_keycodeCache)
+        {
+            if (_keycodeCache.TryGetValue(keysym, out var cached)) return cached;
+
+            if (XDisplayKeycodes(_display, out var min, out var max) == 0) return 0;
+            for (var kc = min; kc <= max; kc++)
+            {
+                // 第一列（unshifted）匹配即可（Shift 修饰由 modifier 位表达）
+                var ks = XKeycodeToKeysym(_display, (uint)kc, 0);
+                if (ks == keysym)
+                {
+                    _keycodeCache[keysym] = (uint)kc;
+                    return (uint)kc;
+                }
+            }
+            _keycodeCache[keysym] = 0;
+            return 0;
+        }
+    }
+
+    private readonly Dictionary<uint, uint> _keycodeCache = [];
+
     // ---- 属性读取 helpers ----
 
     private nint[] ReadWindowArray(nint atom, nint window)

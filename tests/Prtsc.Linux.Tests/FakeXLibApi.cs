@@ -62,14 +62,39 @@ internal sealed class FakeXLibApi : IXLibApi
 
     public nint CreateEventWindow() { EventWindowHandle = (nint)0x2000; return EventWindowHandle; }
 
+
+    /// <summary>keysym → 注入的 keycode 表（测试直配）。</summary>
+    public Dictionary<uint, uint> KeysymToKeycode { get; } = new();
+
+    public uint KeycodeToKeysym(uint keysym) => KeysymToKeycode.TryGetValue(keysym, out var kc) ? kc : 0;
+
     public bool GrabKey(nint eventWindow, uint modifiers, uint keycode)
     {
         GrabbedKeys.Add((eventWindow, modifiers, keycode));
         return true;
     }
 
-    public (uint Keycode, uint Modifiers)? NextKeyEvent(CancellationToken ct) => null;
+    public (uint Keycode, uint Modifiers)? NextKeyEvent(CancellationToken ct)
+    {
+        // Fake 不走 self-pipe：直接从注入队列取（取消时抛 OperationCanceled 由上层处理）
+        try
+        {
+            var (kc, mods) = _events.Take(ct);
+            return (kc, mods);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
     public void WakeEventLoop() { }
+
+    // ---- 测试注入：模拟 X 服务发来 KeyPress ----
+
+    private readonly System.Collections.Concurrent.BlockingCollection<(uint, uint)> _events = new();
+
+    public void EmitKeyEvent(uint keycode, uint modifiers) => _events.Add((keycode, modifiers));
 
     public void Dispose() { }
 }

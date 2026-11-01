@@ -90,6 +90,12 @@ public interface IXLibApi : IDisposable
     /// <summary>创建 1×1 input-only 事件窗并 XSelectInput KeyPress。返回窗句柄。</summary>
     nint CreateEventWindow();
 
+    /// <summary>已创建的事件窗（未创建为 0）。供注册方传给 GrabKey。</summary>
+    nint EventWindowHandle { get; }
+
+    /// <summary>keysym → 当前 keymap 的 keycode（XKeycodeToKeysym 反查）。无对应返回 0。</summary>
+    uint KeycodeToKeysym(uint keysym);
+
     /// <summary>XGrabKey（any owner events=false, async grab）。False = 键已被占。</summary>
     bool GrabKey(nint eventWindow, uint modifiers, uint keycode);
 
