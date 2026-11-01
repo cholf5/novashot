@@ -2,12 +2,14 @@
   <Folder Name="/src/">
     <Project Path="src/Prtsc.App/Prtsc.App.csproj" />
     <Project Path="src/Prtsc.Core/Prtsc.Core.csproj" />
+    <Project Path="src/Prtsc.Platform.Linux/Prtsc.Platform.Linux.csproj" />
     <Project Path="src/Prtsc.Platform.Mac/Prtsc.Platform.Mac.csproj" />
     <Project Path="src/Prtsc.Platform.Windows/Prtsc.Platform.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj" />
     <Project Path="tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj" />
+    <Project Path="tests/Prtsc.Linux.Tests/Prtsc.Linux.Tests.csproj" />
     <Project Path="tests/Prtsc.Mac.Tests/Prtsc.Mac.Tests.csproj" />
   </Folder>
 </Solution>

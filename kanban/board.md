@@ -31,11 +31,13 @@
 
 ## Testing / QA
 - QA-1 M4–M6d 真机人工冒烟（11 工具标注 + 选择/撤销 + 样式面板 + 裁剪(X/比例/A 取色) + 合成面板 + Copy/Ctrl+V/Ctrl+Q + Word/微信/Chrome 剪贴板互通 + 三种捕获 + 托盘 + WindowPicker；自 M4 起持续积压，全部只过了编译+单测）（P0）
+- QA-L1 Linux 真机冒烟（X11 三捕获/热键/xclip 两环境/自启/多屏负坐标/KDE+GNOME；清单见 handoff 261101-linux1 §6）（P1）
 
 ## Blocked
 - 
 
 ## Done
+- LINUX-1 Linux 平台层（X11）：5 commit（interop/抓屏 → 窗口/热键 → 剪贴板/自启 → 装配/构建修复）；XGetImage 根窗抓屏 + XComposite 抓窗、XRandR 显示器（DPI 毫米推断吸附）、EWMH 窗口枚举、XGrabKey 热键（NumLock/CapsLock 四变体）、xclip 代持剪贴板、XDG Autostart；AppServices 运行时按 OS 分流（mac/Linux 共用 net10.0 TFM）；Wayland 原生留 LINUX-2；测试 596/596（Core 414 + Mac 76 + App 63×2 + Linux 44）；修 Directory.Build.props 分组事故（EnableWindowsTargeting 曾只对 Linux 生效）（2026-11-01）
 - GAP-1 参考项目差距全量搬运第一批（两参考源码重扫 flameshot 76 项/winshot 66 项）：反色工具(I)、序号最小未用回收(winshot)、Ctrl+滚轮改序号(flameshot)、角度吸附(Ctrl=八方向/对角， Shift=正交)、Esc 取消拖拽、Backspace 删除选中、QuickSave 自动复制路径、CF_HDROP 文件粘贴(winshot)、CloseToTray/MinimizeToTray/窗口尺寸持久化接线、EnterEditor 应用编辑器默认值、IncludeBackground 接线(EditorStateStripping)、Library 删除确认+Del 键+复制路径、托盘 tooltip 版本号、云连接测试(R2 HeadBucket/GDrive token)；测试 553/553（Core 414 + Mac 76 + App 63×2TFM）；明细 .zcode/plans/261101-references-gap-sweep.md（2026-11-01）
 - MAC-1 macOS 平台层：App 双 TFM（windows/net10.0）+ Prtsc.Platform.Mac（CoreGraphics 抓屏含跨屏 region、CGWindowList 窗口枚举/捕获、Carbon 全局热键无需辅助功能权限、NSPasteboard 剪贴板 TIFF/PNG 双向、launchd LaunchAgent 自启）+ 接口上提 Core（IHotkeyService/IAutostartService）+ mac 主线程 sync-over-async 死锁修复；测试 506/506（Core 381 + Mac 72 + App 53×2TFM）；mac 真机启动到托盘+热键注册验证通过；真机冒烟清单见 handoff 261101-mac1 §5（2026-11-01）
 - M7b M7 UI 层：编辑器工具栏 Upload/Library/Pin/Cloud… 按钮 + Ctrl+U/L/P 热键 + PinnedWindow（置顶贴图：拖动/滚轮缩放/双击/Esc 关闭）+ LibraryWindow（缩略图列表/复制链接/打开/删除）+ CloudSettingsWindow（渠道/凭据/AutoUpload）+ 导出与上传后自动写 Library+缩略图 + IClipboardService.TrySetText（CF_UNICODETEXT）；测试 427/427（Core 374 + App 53）（2026-11-01）
