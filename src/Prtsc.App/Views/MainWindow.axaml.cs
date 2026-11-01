@@ -62,6 +62,56 @@ public partial class MainWindow : Window
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.PinnedImageRequested += OnPinnedImageRequested;
         SubscribeToEditor(_vm.Editor);
+
+        // G-16：恢复上次窗口尺寸（配置有效值才覆盖默认 1200×800）
+        ApplyPersistedWindowSize();
+
+        // G-15：CloseToTray —— ✕ 隐藏到托盘而非退出；G-16：关闭时持久化尺寸
+        Closing += OnMainWindowClosing;
+    }
+
+    /// <summary>config.Window 的有效值（>0）才覆盖 AXAML 默认尺寸。</summary>
+    private void ApplyPersistedWindowSize()
+    {
+        try
+        {
+            var window = _configStore.Current.Window;
+            if (window.Width >= MinWidth) Width = window.Width;
+            if (window.Height >= MinHeight) Height = window.Height;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ApplyPersistedWindowSize failed; keeping AXAML default");
+        }
+    }
+
+    private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        // G-16：把当前尺寸写回 config（夹到最小值内）；失败不影响关闭流程
+        try
+        {
+            var w = Math.Max((int)MinWidth, (int)Math.Round(Width));
+            var h = Math.Max((int)MinHeight, (int)Math.Round(Height));
+            _configStore.Update(c =>
+            {
+                c.Window.Width = w;
+                c.Window.Height = h;
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Persist window size failed");
+        }
+
+        // G-15：CloseToTray=true（默认）时 ✕ 隐藏到托盘；真退出只能走托盘 Quit
+        bool closeToTray;
+        try { closeToTray = _configStore.Current.Startup.CloseToTray; }
+        catch { closeToTray = true; }
+        if (closeToTray)
+        {
+            e.Cancel = true;
+            Hide();
+        }
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)

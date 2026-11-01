@@ -74,8 +74,92 @@ public partial class LibraryWindow : Window
     private async void OnDeleteClick(object? sender, RoutedEventArgs e)
     {
         if (_vm.SelectedEntry is not { } item) return;
-        if (await _vm.DeleteAsync(item))
-            _logger.LogDebug("Library entry deleted: {Id}", item.Entry.Id);
+
+        // G-17（winshot）：删除带确认，防误触（记录本身可直接重建，但本地文件会真删）
+        var file = item.Entry.LocalPath;
+        var detail = string.IsNullOrEmpty(file) ? "仅删除历史记录" : $"本地文件 {file} 也将删除";
+        var dialog = new Window
+        {
+            Title = "确认删除",
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            ShowInTaskbar = false,
+            Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 14,
+                Children =
+                {
+                    new Avalonia.Controls.TextBlock
+                    {
+                        Text = $"确定删除「{item.Entry.FileName}」？\n{detail}",
+                        MaxWidth = 420,
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children =
+                        {
+                            CancelButton("取消"),
+                            OkButtonForDelete(item),
+                        },
+                    },
+                },
+            },
+        };
+        await dialog.ShowDialog(this);
+    }
+
+    private Button CancelButton(string label)
+    {
+        var b = new Button { Content = label, Padding = new Avalonia.Thickness(14, 5) };
+        b.Click += (_, _) => Close();
+        return b;
+    }
+
+    private Button OkButtonForDelete(ViewModels.LibraryEntryViewModel item)
+    {
+        var b = new Button
+        {
+            Content = "删除",
+            Padding = new Avalonia.Thickness(14, 5),
+        };
+        b.Click += async (_, _) =>
+        {
+            Close();
+            if (await _vm.DeleteAsync(item))
+                _logger.LogDebug("Library entry deleted: {Id}", item.Entry.Id);
+        };
+        return b;
+    }
+
+    /// <summary>G-17：Del / Backspace 快捷删除（同按钮，走确认框）。</summary>
+    private void OnListKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key is not (Avalonia.Input.Key.Delete or Avalonia.Input.Key.Back)) return;
+        if (_vm.SelectedEntry is null) return;
+        e.Handled = true;
+        OnDeleteClick(this, new RoutedEventArgs());
+    }
+
+    /// <summary>G-18（winshot Copy Path）：复制本地文件路径；无本地文件时提示。</summary>
+    private void OnCopyPathClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm.SelectedEntry is not { } item) return;
+        var path = item.Entry.LocalPath;
+        if (string.IsNullOrEmpty(path))
+        {
+            _vm.CountText = "该记录没有本地文件";
+            return;
+        }
+        if (_clipboard.TrySetText(path))
+            _vm.CountText = "路径已复制";
+        else
+            _logger.LogWarning("Copy path to clipboard failed");
     }
 
     private async void OnEntryDoubleTapped(object? sender, RoutedEventArgs e) => OnOpenLocalClick(sender, e);

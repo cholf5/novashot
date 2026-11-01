@@ -26,9 +26,13 @@
                 HorizontalAlignment="Right">
       <Button Name="CopyUrlButton" Content="复制链接" Padding="12,6"
               Click="OnCopyUrlClick"/>
+      <Button Name="CopyPathButton" Content="复制路径" Padding="12,6"
+              ToolTip.Tip="复制本地文件路径"
+              Click="OnCopyPathClick"/>
       <Button Name="OpenLocalButton" Content="打开图片" Padding="12,6"
               Click="OnOpenLocalClick"/>
       <Button Name="DeleteButton" Content="删除记录" Padding="12,6"
+              ToolTip.Tip="删除选中记录（Del/Backspace）"
               Click="OnDeleteClick"/>
       <Button Name="CloseButton" Content="关闭" Padding="12,6"
               Click="OnCloseClick"/>
@@ -36,7 +40,8 @@
 
     <!-- 列表 -->
     <ListBox Name="EntriesList" ItemsSource="{Binding Entries}"
-             SelectedItem="{Binding Selected}" DoubleTapped="OnEntryDoubleTapped">
+             SelectedItem="{Binding Selected}" DoubleTapped="OnEntryDoubleTapped"
+             KeyDown="OnListKeyDown">
       <ListBox.ItemTemplate>
         <DataTemplate x:DataType="vm:LibraryEntryViewModel">
           <Grid ColumnDefinitions="48,*,Auto,Auto" Margin="4" MinHeight="48">

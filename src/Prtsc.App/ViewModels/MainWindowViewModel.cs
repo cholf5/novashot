@@ -69,9 +69,59 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void EnterEditor(CapturedImage image)
     {
         Editor?.Dispose();
-        Editor = new EditorViewModel(image);
+        var editor = new EditorViewModel(image);
+        ApplyEditorDefaults(editor);
+        Editor = editor;
         Mode = MainViewMode.Editor;
         StatusText = $"Captured {image.Width} x {image.Height} @ {image.ScaleFactor:0.##}x";
+    }
+
+    /// <summary>
+    /// 新编辑器按 config 初始化（G-13/G-14）：EditorConfig 的背景/padding/圆角/阴影/内衬/边框
+    /// 写入初始合成状态；IncludeBackground=false 时直接用剥离背景的派生状态。
+    /// 无 config store（单元测试）时保持 EditorState.Default。
+    /// </summary>
+    private void ApplyEditorDefaults(EditorViewModel editor)
+    {
+        if (_configStore is null) return;
+        try
+        {
+            var cfg = _configStore.Current;
+            var e = cfg.Editor;
+            var state = new Prtsc.Core.Editor.EditorState
+            {
+                Background = e.BackgroundColor.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
+                    ? Prtsc.Core.Editor.BackgroundKind.Gradient
+                    : Prtsc.Core.Editor.BackgroundKind.SolidColor,
+                BackgroundColor = e.BackgroundColor.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
+                    ? default
+                    : Prtsc.Core.Editor.GradientParser.ParseColor(e.BackgroundColor) ?? default,
+                BackgroundGradient = e.BackgroundColor.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
+                    ? e.BackgroundColor
+                    : null,
+                Padding = e.Padding,
+                CornerRadius = e.CornerRadius,
+                ShadowSize = e.ShadowSize,
+                InsetSize = e.Inset,
+                InsetColor = string.IsNullOrWhiteSpace(e.InsetBackgroundColor)
+                    ? null
+                    : Prtsc.Core.Editor.GradientParser.ParseColor(e.InsetBackgroundColor),
+                BorderWidth = e.BorderEnabled ? e.BorderWeight : 0f,
+                BorderColor = Prtsc.Core.Editor.GradientParser.ParseColor(e.BorderColor),
+                Border = e.BorderType switch
+                {
+                    "outside" => Prtsc.Core.Editor.BorderStyle.Outside,
+                    "inside" => Prtsc.Core.Editor.BorderStyle.Inside,
+                    _ => Prtsc.Core.Editor.BorderStyle.Center,
+                },
+            };
+            editor.CompositionState = Prtsc.Core.Editor.EditorStateStripping.StripBackground(
+                state, includeBackground: cfg.Export.IncludeBackground).Clamped();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "ApplyEditorDefaults failed; keeping default composition state");
+        }
     }
 
     public void ReturnToCapture()

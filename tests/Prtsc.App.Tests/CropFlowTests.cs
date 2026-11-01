@@ -22,6 +22,14 @@ public class CropFlowTests : IDisposable
     private MainWindowViewModel NewVm()
     {
         var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        // G-13 起 EnterEditor 会应用 config 编辑器默认值；裁剪尺寸断言基于无合成样式
+        store.Update(c =>
+        {
+            c.Editor.Padding = 0;
+            c.Editor.CornerRadius = 0;
+            c.Editor.ShadowSize = 0;
+            c.Editor.Inset = 0;
+        });
         return new MainWindowViewModel(new FakeClipboardService(), store);
     }
 

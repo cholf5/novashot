@@ -33,9 +33,18 @@ public class EditorClipboardTests : IDisposable
 
     private MainWindowViewModel NewVm(FakeClipboardService? clipboard = null, JsonConfigStore? store = null)
     {
+        var store2 = store ?? new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        // G-13 起 EnterEditor 会应用 config 编辑器默认值；这批测试关注旧行为，清零默认合成样式
+        store2.Update(c =>
+        {
+            c.Editor.Padding = 0;
+            c.Editor.CornerRadius = 0;
+            c.Editor.ShadowSize = 0;
+            c.Editor.Inset = 0;
+        });
         return new MainWindowViewModel(
             clipboard ?? new FakeClipboardService(),
-            store ?? new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir));
+            store2);
     }
 
     // ---------- Copy ----------

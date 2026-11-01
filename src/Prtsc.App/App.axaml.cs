@@ -44,6 +44,10 @@ public partial class App : Application
             desktop.MainWindow = _mainWindow;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+            // G-13：MinimizeToTray=true 时启动即隐藏到托盘（热键/托盘仍可用）
+            if (store.Current.Startup.MinimizeToTray)
+                _mainWindow.Hide();
+
             SetupTrayIcon();
             SetupHotkeys(store.Current.Hotkeys);
 
@@ -64,7 +68,8 @@ public partial class App : Application
         _tray = new TrayIcon
         {
             Icon = AppIconFactory.CreatePlaceholderWindowIcon(),
-            ToolTipText = "Prtsc",
+            // G-19（winshot）：tooltip 带版本号
+            ToolTipText = $"Prtsc v{GetAppVersion()}",
             IsVisible = true,
         };
 
@@ -169,5 +174,16 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             desktop.Shutdown();
+    }
+
+    /// <summary>程序集 InformationalVersion（无则回退文件版本、再回退 "0.1"）。</summary>
+    private static string GetAppVersion()
+    {
+        var asm = typeof(App).Assembly;
+        var info = asm.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(info)) return info!;
+        return asm.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.1";
     }
 }

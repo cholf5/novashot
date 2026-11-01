@@ -84,18 +84,23 @@ public static class GradientParser
         return true;
     }
 
-    private static bool TryParseColor(string token, out SKColor color)
+    /// <summary>解析单色 token（#RRGGBB[A]）。失败返回 null。供配置接线（EditorConfig 颜色串）复用。</summary>
+    public static SKColor? ParseColor(string? css)
     {
-        color = default;
-        if (token.Length == 0 || token[0] != '#') return false;
+        if (string.IsNullOrWhiteSpace(css) || css[0] != '#') return null;
         try
         {
-            color = SKColor.Parse(token);
-            return true;
+            return SKColor.Parse(css);
         }
         catch (FormatException)
         {
-            return false;
+            return null;
         }
+    }
+
+    private static bool TryParseColor(string token, out SKColor color)
+    {
+        color = ParseColor(token) ?? default;
+        return color != default;
     }
 }
