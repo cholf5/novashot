@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using Prtsc.Core.Hotkeys;
 using Prtsc.Platform.Windows.Interop;
 
 namespace Prtsc.Platform.Windows.Hotkeys;

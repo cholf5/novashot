@@ -17,6 +17,9 @@
     <!-- Repository layout -->
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\</BaseIntermediateOutputPath>
+
+    <!-- App 双 TFM 后，mac/linux 也能构建 windows TFM 腿（Windows 机上本就是默认行为） -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(IsTestProject)' != 'true'">

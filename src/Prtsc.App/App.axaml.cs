@@ -7,9 +7,9 @@ using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
 using Prtsc.App.Logging;
 using Prtsc.App.Views;
+using Prtsc.Core.Autostart;
 using Prtsc.Core.Config;
-using Prtsc.Platform.Windows.Autostart;
-using Prtsc.Platform.Windows.Hotkeys;
+using Prtsc.Core.Hotkeys;
 
 namespace Prtsc.App;
 

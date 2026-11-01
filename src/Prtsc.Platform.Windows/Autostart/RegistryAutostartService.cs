@@ -1,16 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
+using Prtsc.Core.Autostart;
 
 namespace Prtsc.Platform.Windows.Autostart;
-
-public interface IAutostartService
-{
-    bool IsEnabled { get; }
-    void Enable();
-    void Disable();
-    /// <summary>如果 exe 路径变了，把 Run 项同步刷新到当前 exe。</summary>
-    void SyncPath();
-}
 
 /// <summary>
 /// HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Prtsc = "<exe>"（带引号）。

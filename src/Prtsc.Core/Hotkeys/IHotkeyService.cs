@@ -1,4 +1,4 @@
-namespace Prtsc.Platform.Windows.Hotkeys;
+namespace Prtsc.Core.Hotkeys;
 
 public enum HotkeyAction
 {

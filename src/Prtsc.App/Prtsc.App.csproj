@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <!-- 双目标：windows TFM 出 Windows 产物；net10.0 出 macOS/Linux 可执行（平台层按 TFM 条件引用） -->
+    <TargetFrameworks>net10.0-windows10.0.19041.0;net10.0</TargetFrameworks>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>Prtsc.App</RootNamespace>
@@ -9,6 +9,15 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <UseAppHost>true</UseAppHost>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) == 'windows'">
+    <OutputType>WinExe</OutputType>
+    <DefineConstants>$(DefineConstants);WIN_PLATFORM</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'">
+    <OutputType>Exe</OutputType>
+    <DefineConstants>$(DefineConstants);MAC_PLATFORM</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,6 +46,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Prtsc.Core\Prtsc.Core.csproj" />
-    <ProjectReference Include="..\Prtsc.Platform.Windows\Prtsc.Platform.Windows.csproj" />
+    <ProjectReference Include="..\Prtsc.Platform.Windows\Prtsc.Platform.Windows.csproj"
+                     Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) == 'windows'" />
+    <ProjectReference Include="..\Prtsc.Platform.Mac\Prtsc.Platform.Mac.csproj"
+                     Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'" />
   </ItemGroup>
 </Project>

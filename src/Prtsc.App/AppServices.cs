@@ -6,9 +6,14 @@ using Prtsc.Core;
 using Prtsc.Core.Cloud;
 using Prtsc.Core.Clipboard;
 using Prtsc.Core.Config;
-using Prtsc.Platform.Windows;
 using Serilog;
 using Serilog.Extensions.Logging;
+
+#if WIN_PLATFORM
+using Prtsc.Platform.Windows;
+#else
+using Prtsc.Platform.Mac;
+#endif
 
 namespace Prtsc.App;
 
@@ -31,9 +36,9 @@ public static class AppServices
         services.AddSingleton<ILoggerFactory>(_ => new SerilogLoggerFactory(Log.Logger, dispose: false));
         services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Logger<>));
 
-        // Core + platform
+        // Core + platform（按 TFM 选择平台层，见文件头 #if）
         services.AddPrtscCore();
-        services.AddPrtscWindows();
+        services.AddPrtscPlatform();
 
         // 云上传：按 config.Cloud.Provider 每次分发（M7a 数据层；UI 在 M7b 接线）
         services.AddSingleton<IUploadService, ConfigUploadService>();
@@ -59,6 +64,14 @@ public static class AppServices
     }
 
     public static T GetRequiredService<T>() where T : notnull => Services.GetRequiredService<T>();
+
+    /// <summary>平台层装配桥：windows TFM → Platform.Windows，其它 → Platform.Mac。</summary>
+    private static IServiceCollection AddPrtscPlatform(this IServiceCollection services)
+#if WIN_PLATFORM
+        => services.AddPrtscWindows();
+#else
+        => services.AddPrtscMac();
+#endif
 
     public static void Shutdown()
     {

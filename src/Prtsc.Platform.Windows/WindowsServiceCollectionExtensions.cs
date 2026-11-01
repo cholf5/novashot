@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Prtsc.Core.Autostart;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Clipboard;
+using Prtsc.Core.Hotkeys;
 using Prtsc.Core.Windows;
 using Prtsc.Platform.Windows.Autostart;
 using Prtsc.Platform.Windows.Capture;

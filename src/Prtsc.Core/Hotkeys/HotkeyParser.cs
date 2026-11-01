@@ -1,10 +1,10 @@
-namespace Prtsc.Platform.Windows.Hotkeys;
+namespace Prtsc.Core.Hotkeys;
 
 /// <summary>
 /// 把 "Ctrl+Shift+PrintScreen" 之类的字符串解析成 modifier flags + virtual-key。
 /// 语义对齐 WinShot internal/hotkeys/hotkeys.go 的 ParseHotkeyString。
 /// </summary>
-internal static class HotkeyParser
+public static class HotkeyParser
 {
     public const uint MOD_ALT = 0x0001;
     public const uint MOD_CONTROL = 0x0002;
