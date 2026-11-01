@@ -124,6 +124,27 @@ public class MacCaptureServiceTests : IDisposable
     }
 
     [Fact]
+    public void EnumerateDisplays_PreviousListSurvivesReenumerationDuringCallerLoop()
+    {
+        // 复现 MainWindow.CaptureRegionAsync：外层 foreach displays，循环体 CaptureDisplay
+        // 内部再次 EnumerateDisplays；若返回内部活缓存，第二次 MoveNext 抛 Collection modified
+        _api.Displays = [
+            new(1, 800, 600, new CGRect(0, 0, 800, 600), IsMain: true),
+            new(2, 800, 600, new CGRect(800, 0, 800, 600), IsMain: false),
+        ];
+        _api.DisplayImages[1] = (800, 600, new SKColor(255, 0, 0));
+        _api.DisplayImages[2] = (800, 600, new SKColor(0, 0, 255));
+
+        var displays = _svc.EnumerateDisplays();
+        var shots = new List<CapturedImage>();
+        foreach (var d in displays)
+            shots.Add(_svc.CaptureDisplay(d.Index));
+
+        Assert.Equal(2, shots.Count);
+        foreach (var s in shots) s.Dispose();
+    }
+
+    [Fact]
     public void EnumerateDisplays_RetinaScale_DerivedFromPixelRatio()
     {
         _api.Displays = [new(1, 3024, 1964, new CGRect(0, 0, 1512, 982), IsMain: true)];

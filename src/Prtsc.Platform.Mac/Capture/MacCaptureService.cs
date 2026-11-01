@@ -15,7 +15,6 @@ public sealed class MacCaptureService : ICaptureService
 {
     private readonly IMacDisplayApi _api;
     private readonly ILogger<MacCaptureService> _logger;
-    private readonly List<DisplayInfo> _displayCache = [];
     private readonly List<uint> _rawIds = [];
 
     public MacCaptureService(IMacDisplayApi api, ILogger<MacCaptureService> logger)
@@ -28,14 +27,16 @@ public sealed class MacCaptureService : ICaptureService
     {
         var raws = _api.EnumerateDisplays();
         var sorted = MacDisplayGeometry.SortForIndexing(raws);
-        _displayCache.Clear();
+        // 每次返回新数组：调用方会在枚举返回值的过程中再次触发本方法（如 Region 流程逐屏 CaptureDisplay），
+        // 若返回内部活缓存，外层 foreach 会抛 Collection was modified
+        var displays = new DisplayInfo[sorted.Length];
         _rawIds.Clear();
         for (var i = 0; i < sorted.Length; i++)
         {
-            _displayCache.Add(MacDisplayGeometry.ToDisplayInfo(sorted[i], MacDisplayGeometry.DeriveScaleFactor(sorted[i]), i));
+            displays[i] = MacDisplayGeometry.ToDisplayInfo(sorted[i], MacDisplayGeometry.DeriveScaleFactor(sorted[i]), i);
             _rawIds.Add(sorted[i].Id);
         }
-        return _displayCache;
+        return displays;
     }
 
     public CapturedImage CaptureFullscreen()
