@@ -40,11 +40,21 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
     /// <summary>右侧属性面板 VM——生命期与 EditorViewModel 一致。</summary>
     public StylePanelViewModel StylePanel { get; }
 
+    /// <summary>M6b：合成外观面板 VM——生命期与 EditorViewModel 一致。</summary>
+    public CompositionPanelViewModel CompositionPanelViewModel { get; }
+
     [ObservableProperty]
     private ToolKind _currentTool = ToolKind.Select;
 
     [ObservableProperty]
     private AnnotationStyle _currentStyle = AnnotationStyle.Default;
+
+    /// <summary>
+    /// M6b：文档级合成状态（背景/padding/圆角/阴影/内衬/边框）。改动不进 Undo，
+    /// 但要触发 <see cref="AnnotationDocument.NotifyMutated"/> 让画布重绘（视口矩阵也随内容尺寸变化）。
+    /// </summary>
+    [ObservableProperty]
+    private Prtsc.Core.Editor.EditorState _compositionState = Prtsc.Core.Editor.EditorState.Default;
 
     /// <summary>当前选中的标注；null=无选择。SelectTool 读写它。</summary>
     [ObservableProperty]
@@ -77,11 +87,29 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
     public int ImageWidth => Document.Width;
     public int ImageHeight => Document.Height;
 
+    /// <summary>合成输出尺寸（含 padding）。M6b 起视口 fit 依据它。</summary>
+    public int ContentWidth { get; private set; }
+    public int ContentHeight { get; private set; }
+
+    partial void OnCompositionStateChanged(Prtsc.Core.Editor.EditorState value)
+    {
+        var size = Prtsc.Core.Editor.Composition.Measure(Document, value);
+        ContentWidth = size.Width;
+        ContentHeight = size.Height;
+        OnPropertyChanged(nameof(ContentWidth));
+        OnPropertyChanged(nameof(ContentHeight));
+        Document.NotifyMutated();
+    }
+
     public EditorViewModel(CapturedImage image)
     {
         _capturedImage = image ?? throw new ArgumentNullException(nameof(image));
         Document = new AnnotationDocument(image.Bitmap);
         History = new UndoRedoStack();
+
+        var initialSize = Prtsc.Core.Editor.Composition.Measure(Document, CompositionState);
+        ContentWidth = initialSize.Width;
+        ContentHeight = initialSize.Height;
 
         UndoCommand = new RelayCommand(
             execute: () => History.Undo(),
@@ -101,6 +129,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         Document.Changed += OnDocumentChanged;
 
         StylePanel = new StylePanelViewModel(this);
+        CompositionPanelViewModel = new CompositionPanelViewModel(this);
     }
 
     private void OnHistoryStateChanged(object? sender, EventArgs e)
@@ -247,6 +276,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         StylePanel.Dispose();
+        CompositionPanelViewModel.Dispose();
         History.StateChanged -= OnHistoryStateChanged;
         Document.Changed -= OnDocumentChanged;
         _capturedImage.Dispose();

@@ -108,4 +108,25 @@ public class ImageExporterTests
             if (File.Exists(path)) File.Delete(path);
         }
     }
+
+    [Fact]
+    public void Render_with_state_includes_padding_and_background()
+    {
+        var doc = DocWithRedRect(40, 30);
+        var state = new Prtsc.Core.Editor.EditorState
+        {
+            Background = Prtsc.Core.Editor.BackgroundKind.SolidColor,
+            BackgroundColor = SKColors.Lime,
+            Padding = 8,
+        };
+        using var image = ImageExporter.Render(doc, state);
+        Assert.Equal(56, image.Width);   // 40 + 2*8
+        Assert.Equal(46, image.Height);  // 30 + 2*8
+
+        // 解码回读：角落是背景色
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        using var decoded = SKBitmap.Decode(data.AsSpan());
+        Assert.Equal(SKColors.Lime, decoded!.GetPixel(2, 2));
+        Assert.Equal(new SKColor(255, 0, 0), decoded.GetPixel(23, 23)); // 图像区 (15,15)+8
+    }
 }

@@ -164,9 +164,9 @@ public partial class MainWindow : Window
         try
         {
             var format = ImageExporter.FormatFromExtension(path);
-            ImageExporter.Save(editor.Document, path, format);
+            ImageExporter.Save(editor.Document, path, format, state: editor.CompositionState);
             _logger.LogInformation("Exported {Path} ({Format}, {Width}x{Height})",
-                path, format, editor.ImageWidth, editor.ImageHeight);
+                path, format, editor.ContentWidth, editor.ContentHeight);
             _vm.StatusText = $"Saved {path}";
         }
         catch (Exception ex)

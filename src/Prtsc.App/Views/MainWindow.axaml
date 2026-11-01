@@ -175,9 +175,15 @@
               </Canvas>
             </Grid>
 
-            <!-- 右侧属性面板 -->
+            <!-- 右侧属性面板：标注样式 + 合成外观（M6b），可滚动 -->
             <Border Grid.Column="1" Width="240" Background="#22000000">
-              <controls:StylePanel DataContext="{Binding Editor.StylePanel}"/>
+              <ScrollViewer>
+                <StackPanel Spacing="10">
+                  <controls:StylePanel DataContext="{Binding Editor.StylePanel}"/>
+                  <Border Height="1" Background="#33FFFFFF" Margin="0,2"/>
+                  <controls:CompositionPanel DataContext="{Binding Editor.CompositionPanelViewModel}"/>
+                </StackPanel>
+              </ScrollViewer>
             </Border>
           </Grid>
         </Border>

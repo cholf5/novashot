@@ -36,4 +36,150 @@ public static class Composition
         }
         preview?.Render(canvas);
     }
+
+    /// <summary>合成输出尺寸 = 文档 + 2×Padding。</summary>
+    public static SKSizeI Measure(AnnotationDocument document, EditorState state)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(state);
+        var s = state.Clamped();
+        return new SKSizeI(document.Width + 2 * s.Padding, document.Height + 2 * s.Padding);
+    }
+
+    /// <summary>
+    /// 带合成状态（背景/padding/圆角/阴影/内衬/边框）的完整管线，画在<b>内容空间</b>
+    /// （左上角 = 内容原点，图像位于 (Padding, Padding)）：
+    /// 背景 → 阴影 → clip 圆角 + 平移后的文档内容 → 边框 → 内衬。
+    /// 默认 <see cref="EditorState.Default"/> 时与四参 <see cref="RenderScene(SKCanvas, AnnotationDocument, AnnotationBase?, AnnotationBase?)"/>
+    /// 逐像素等价。
+    /// </summary>
+    public static void RenderScene(SKCanvas canvas, AnnotationDocument document, EditorState state,
+        AnnotationBase? preview = null, AnnotationBase? skipAnnotation = null)
+    {
+        ArgumentNullException.ThrowIfNull(canvas);
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(state);
+
+        var s = state.Clamped();
+        var size = Measure(document, s);
+        var contentRect = new SKRect(0, 0, size.Width, size.Height);
+        var imageRect = new SKRect(
+            s.Padding, s.Padding,
+            s.Padding + document.Width, s.Padding + document.Height);
+
+        // 1. 背景
+        DrawBackground(canvas, s, contentRect);
+
+        // 2. 阴影（画在图像之下，中心被图像盖住，只露出四周 blur）
+        if (s.ShadowSize > 0)
+        {
+            using var shadowPaint = new SKPaint
+            {
+                Color = EditorState.ShadowColor,
+                IsAntialias = true,
+                ImageFilter = SKImageFilter.CreateBlur(s.ShadowSize, s.ShadowSize),
+            };
+            canvas.DrawRoundRect(new SKRoundRect(imageRect, s.CornerRadius), shadowPaint);
+        }
+
+        // 3. clip 圆角 → 平移到图像原点 → 文档内容（源图 + 标注 z 序）
+        var restore = canvas.Save();
+        if (s.CornerRadius > 0)
+            canvas.ClipRoundRect(new SKRoundRect(imageRect, s.CornerRadius), antialias: true);
+        else
+            canvas.ClipRect(imageRect, antialias: true);
+        canvas.Translate(s.Padding, s.Padding);
+        RenderScene(canvas, document, preview, skipAnnotation);
+        canvas.RestoreToCount(restore);
+
+        // 4. 边框（Outside: 外扩 w/2；Center: 贴边；Inside: 内缩 w/2）
+        if (s.BorderWidth > 0)
+        {
+            var half = s.BorderWidth * 0.5f;
+            var (rect, radius) = s.Border switch
+            {
+                BorderStyle.Outside => (Inflate(imageRect, half), s.CornerRadius + half),
+                BorderStyle.Inside  => (Inflate(imageRect, -half), MathF.Max(0f, s.CornerRadius - half)),
+                _                   => (imageRect, s.CornerRadius),
+            };
+            using var borderPaint = new SKPaint
+            {
+                Color = s.EffectiveBorderColor,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = s.BorderWidth,
+                IsAntialias = true,
+            };
+            DrawRoundedOrRect(canvas, rect, radius, borderPaint);
+        }
+
+        // 5. 内衬（图像边缘向内的等宽色环）
+        if (s.InsetSize > 0)
+        {
+            var half = s.InsetSize * 0.5f;
+            var rect = Inflate(imageRect, -half);
+            var radius = MathF.Max(0f, s.CornerRadius - half);
+            using var insetPaint = new SKPaint
+            {
+                Color = s.EffectiveInsetColor,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = s.InsetSize,
+                IsAntialias = true,
+            };
+            DrawRoundedOrRect(canvas, rect, radius, insetPaint);
+        }
+    }
+
+    private static void DrawBackground(SKCanvas canvas, EditorState s, SKRect contentRect)
+    {
+        switch (s.Background)
+        {
+            case BackgroundKind.SolidColor:
+                using (var fill = new SKPaint { Color = s.BackgroundColor, IsAntialias = false })
+                    canvas.DrawRect(contentRect, fill);
+                break;
+
+            case BackgroundKind.Gradient:
+            {
+                GradientSpec? spec = null;
+                if (s.BackgroundGradient is not null && GradientParser.TryParse(s.BackgroundGradient, out var parsed))
+                    spec = parsed;
+
+                if (spec is null || spec.Stops.Count < 2)
+                {
+                    // 畸形 CSS：退化为纯色，不至于渲染出空白
+                    using var fallback = new SKPaint { Color = s.BackgroundColor, IsAntialias = false };
+                    canvas.DrawRect(contentRect, fallback);
+                    break;
+                }
+
+                // CSS 角度 → 方向向量：0deg=向上，顺时针。135deg = 左上→右下。
+                var rad = spec.AngleDeg * MathF.PI / 180f;
+                var dx = MathF.Sin(rad);
+                var dy = -MathF.Cos(rad);
+                var cx = contentRect.MidX;
+                var cy = contentRect.MidY;
+                // halfExtent 取半对角线，保证渐变覆盖整个矩形（轻微过扫描，标准做法）
+                var halfExtent = MathF.Sqrt(contentRect.Width * contentRect.Width + contentRect.Height * contentRect.Height) * 0.5f;
+                var start = new SKPoint(cx - dx * halfExtent, cy - dy * halfExtent);
+                var end = new SKPoint(cx + dx * halfExtent, cy + dy * halfExtent);
+
+                var colors = spec.Stops.Select(st => st.Color).ToArray();
+                var pos = spec.Stops.Select(st => st.Pos / 100f).ToArray();
+                using var shader = SKShader.CreateLinearGradient(start, end, colors, pos, SKShaderTileMode.Clamp);
+                using var paint = new SKPaint { Shader = shader, IsAntialias = false };
+                canvas.DrawRect(contentRect, paint);
+                break;
+            }
+        }
+    }
+
+    private static SKRect Inflate(SKRect r, float d) => new(r.Left - d, r.Top - d, r.Right + d, r.Bottom + d);
+
+    private static void DrawRoundedOrRect(SKCanvas canvas, SKRect rect, float radius, SKPaint paint)
+    {
+        if (radius > 0f)
+            canvas.DrawRoundRect(new SKRoundRect(rect, radius), paint);
+        else
+            canvas.DrawRect(rect, paint);
+    }
 }

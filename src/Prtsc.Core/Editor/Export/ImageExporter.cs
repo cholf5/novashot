@@ -12,18 +12,25 @@ public static class ImageExporter
     public const int DefaultQuality = 90;
 
     /// <summary>
-    /// 离屏渲染文档内容（无预览、无跳过项），尺寸 = 文档像素尺寸。
+    /// 离屏渲染文档内容（无预览、无跳过项），尺寸由 <see cref="Composition.Measure"/> 决定
+    /// （<paramref name="state"/> 为 null 时 = 文档像素尺寸）。
     /// 返回的 <see cref="SKImage"/> 由调用方 Dispose。
     /// </summary>
-    public static SKImage Render(AnnotationDocument document)
+    public static SKImage Render(AnnotationDocument document, EditorState? state = null)
     {
         ArgumentNullException.ThrowIfNull(document);
-        var info = new SKImageInfo(document.Width, document.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+        var size = state is null
+            ? new SKSizeI(document.Width, document.Height)
+            : Composition.Measure(document, state);
+        var info = new SKImageInfo(size.Width, size.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
         var surface = SKSurface.Create(info)
             ?? throw new InvalidOperationException("Failed to create offscreen surface for export.");
         using (surface)
         {
-            Composition.RenderScene(surface.Canvas, document);
+            if (state is null)
+                Composition.RenderScene(surface.Canvas, document);
+            else
+                Composition.RenderScene(surface.Canvas, document, state);
             surface.Canvas.Flush();
             return surface.Snapshot();
         }
@@ -31,9 +38,9 @@ public static class ImageExporter
 
     /// <summary>编码为指定格式。PNG 忽略 <paramref name="quality"/>；JPEG/WebP 为 1..100。
     /// 返回的 <see cref="SKData"/> 由调用方 Dispose。</summary>
-    public static SKData Encode(AnnotationDocument document, ExportFormat format, int quality = DefaultQuality)
+    public static SKData Encode(AnnotationDocument document, ExportFormat format, int quality = DefaultQuality, EditorState? state = null)
     {
-        using var image = Render(document);
+        using var image = Render(document, state);
         var skFormat = format switch
         {
             ExportFormat.Png  => SKEncodedImageFormat.Png,
@@ -45,10 +52,10 @@ public static class ImageExporter
     }
 
     /// <summary>渲染 + 编码 + 落盘。目录不存在会抛 <see cref="DirectoryNotFoundException"/>。</summary>
-    public static void Save(AnnotationDocument document, string filePath, ExportFormat format, int quality = DefaultQuality)
+    public static void Save(AnnotationDocument document, string filePath, ExportFormat format, int quality = DefaultQuality, EditorState? state = null)
     {
         if (string.IsNullOrWhiteSpace(filePath)) throw new ArgumentException("File path is empty.", nameof(filePath));
-        using var data = Encode(document, format, quality);
+        using var data = Encode(document, format, quality, state);
         using var stream = File.Create(filePath);
         data.SaveTo(stream);
     }

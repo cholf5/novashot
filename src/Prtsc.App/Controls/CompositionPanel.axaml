@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Prtsc.App.ViewModels"
+             xmlns:conv="using:Prtsc.App.Converters"
+             xmlns:controls="using:Prtsc.App.Controls"
+             mc:Ignorable="d"
+             d:DesignWidth="240" d:DesignHeight="520"
+             x:Class="Prtsc.App.Controls.CompositionPanel"
+             x:DataType="vm:CompositionPanelViewModel">
+
+  <UserControl.Resources>
+    <conv:CssGradientToBrushConverter x:Key="CssGradient"/>
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.swatch">
+      <Setter Property="Width" Value="40"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="Margin" Value="3"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    <Style Selector="ToggleButton.swatch:checked">
+      <Setter Property="BorderBrush" Value="#FFFFFFFF"/>
+    </Style>
+    <Style Selector="ToggleButton.grad">
+      <Setter Property="Width" Value="30"/>
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="Margin" Value="2"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="3"/>
+    </Style>
+    <Style Selector="ToggleButton.grad:checked">
+      <Setter Property="BorderBrush" Value="#FFFFFFFF"/>
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Opacity" Value="0.8"/>
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="10" Margin="10">
+    <TextBlock Text="Composition" FontSize="14" FontWeight="SemiBold" Opacity="0.85"/>
+
+    <!-- 背景类型 -->
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <RadioButton GroupName="BgKind" Content="None"     Padding="6,2" FontSize="12" IsChecked="{Binding IsBgNone, Mode=TwoWay}"/>
+      <RadioButton GroupName="BgKind" Content="Solid"    Padding="6,2" FontSize="12" IsChecked="{Binding IsBgSolid, Mode=TwoWay}"/>
+      <RadioButton GroupName="BgKind" Content="Gradient" Padding="6,2" FontSize="12" IsChecked="{Binding IsBgGradient, Mode=TwoWay}"/>
+    </StackPanel>
+
+    <!-- 纯色色板（同 8 色） -->
+    <ItemsControl ItemsSource="{Binding PresetColors}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <ToggleButton Classes="swatch" Click="OnSolidColorClick" Tag="{Binding}">
+            <ToggleButton.Background>
+              <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}"/>
+            </ToggleButton.Background>
+          </ToggleButton>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- 24 渐变预设（6 列 × 4 行） -->
+    <ItemsControl ItemsSource="{Binding Gradients}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><UniformGrid Columns="6"/></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <ToggleButton Classes="grad" Click="OnGradientClick" Tag="{Binding Value}"
+                        ToolTip.Tip="{Binding Name}">
+            <ToggleButton.Background>
+              <MultiBinding Converter="{StaticResource CssGradient}">
+                <Binding Path="Value"/>
+              </MultiBinding>
+            </ToggleButton.Background>
+          </ToggleButton>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Border Height="1" Background="#33FFFFFF" Margin="0,2"/>
+
+    <!-- Padding / Radius -->
+    <StackPanel Spacing="4">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Classes="label" Text="Padding"/>
+        <TextBlock Grid.Column="1" FontSize="12" Opacity="0.6" Text="{Binding Padding, StringFormat={}{0:0}}"/>
+      </Grid>
+      <Slider Minimum="0" Maximum="96" TickFrequency="4" IsSnapToTickEnabled="True"
+              Value="{Binding Padding, Mode=TwoWay}"/>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Classes="label" Text="Corner radius"/>
+        <TextBlock Grid.Column="1" FontSize="12" Opacity="0.6" Text="{Binding CornerRadius, StringFormat={}{0:0}}"/>
+      </Grid>
+      <Slider Minimum="0" Maximum="48" TickFrequency="2" IsSnapToTickEnabled="True"
+              Value="{Binding CornerRadius, Mode=TwoWay}"/>
+    </StackPanel>
+
+    <!-- 阴影 -->
+    <StackPanel Spacing="4">
+      <CheckBox IsChecked="{Binding ShadowOn, Mode=TwoWay}" Content="Shadow" FontSize="12"/>
+      <Slider Minimum="4" Maximum="48" TickFrequency="2" IsSnapToTickEnabled="True"
+              IsEnabled="{Binding ShadowOn}"
+              Value="{Binding ShadowSize, Mode=TwoWay}"/>
+    </StackPanel>
+
+    <!-- 边框 -->
+    <StackPanel Spacing="4">
+      <CheckBox IsChecked="{Binding BorderOn, Mode=TwoWay}" Content="Border" FontSize="12"/>
+      <Slider Minimum="1" Maximum="12" TickFrequency="1" IsSnapToTickEnabled="True"
+              IsEnabled="{Binding BorderOn}"
+              Value="{Binding BorderWidth, Mode=TwoWay}"/>
+      <ComboBox SelectedIndex="{Binding BorderStyleIndex, Mode=TwoWay}"
+                IsEnabled="{Binding BorderOn}" FontSize="12" MinWidth="100">
+        <ComboBoxItem Content="Outside"/>
+        <ComboBoxItem Content="Center"/>
+        <ComboBoxItem Content="Inside"/>
+      </ComboBox>
+      <ItemsControl ItemsSource="{Binding PresetColors}" IsEnabled="{Binding BorderOn}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ToggleButton Classes="swatch" Click="OnBorderColorClick" Tag="{Binding}">
+              <ToggleButton.Background>
+                <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}"/>
+              </ToggleButton.Background>
+            </ToggleButton>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <!-- 内衬 -->
+    <StackPanel Spacing="4">
+      <CheckBox IsChecked="{Binding InsetOn, Mode=TwoWay}" Content="Inset" FontSize="12"/>
+      <Slider Minimum="2" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True"
+              IsEnabled="{Binding InsetOn}"
+              Value="{Binding InsetSize, Mode=TwoWay}"/>
+      <ItemsControl ItemsSource="{Binding PresetColors}" IsEnabled="{Binding InsetOn}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ToggleButton Classes="swatch" Click="OnInsetColorClick" Tag="{Binding}">
+              <ToggleButton.Background>
+                <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}"/>
+              </ToggleButton.Background>
+            </ToggleButton>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

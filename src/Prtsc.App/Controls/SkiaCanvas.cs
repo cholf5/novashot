@@ -53,6 +53,27 @@ public sealed class SkiaCanvas : Control
     private IAnnotationTool? _activeTool;
     private EditorViewModel? _subscribedEditor;
 
+    /// <summary>image 空间 → 内容空间（加 padding）。</summary>
+    private static SKPoint ImageToContent(EditorViewModel editor, SKPoint imagePoint)
+    {
+        var p = editor.CompositionState.Padding;
+        return new SKPoint(imagePoint.X + p, imagePoint.Y + p);
+    }
+
+    /// <summary>内容空间 → image 空间（减 padding）。</summary>
+    private static SKPoint ContentToImage(EditorViewModel editor, SKPoint contentPoint)
+    {
+        var p = editor.CompositionState.Padding;
+        return new SKPoint(contentPoint.X - p, contentPoint.Y - p);
+    }
+
+    /// <summary>image 空间矩形 → 内容空间矩形。</summary>
+    private static SKRect ImageRectToContent(EditorViewModel editor, SKRect imageRect)
+    {
+        var p = editor.CompositionState.Padding;
+        return new SKRect(imageRect.Left + p, imageRect.Top + p, imageRect.Right + p, imageRect.Bottom + p);
+    }
+
     public SkiaCanvas()
     {
         Focusable = true;
@@ -94,13 +115,16 @@ public sealed class SkiaCanvas : Control
 
     private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // Tool / Style / Selection / EditingText 变化都可能影响渲染
+        // Tool / Style / Selection / EditingText / CompositionState 变化都可能影响渲染
+        // （CompositionState 变 padding 时视口矩阵也会变，故一并通知视口重算）
         if (e.PropertyName is nameof(EditorViewModel.CurrentTool)
             or nameof(EditorViewModel.CurrentStyle)
             or nameof(EditorViewModel.Selection)
-            or nameof(EditorViewModel.EditingText))
+            or nameof(EditorViewModel.EditingText)
+            or nameof(EditorViewModel.CompositionState))
         {
             InvalidateVisual();
+            ViewportInvalidated?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -117,6 +141,7 @@ public sealed class SkiaCanvas : Control
         context.Custom(new DrawOp(
             new Rect(bounds.Size),
             editor.Document,
+            editor.CompositionState,
             _activeTool?.Preview,
             editor.Selection,
             editor.EditingText,
@@ -125,12 +150,13 @@ public sealed class SkiaCanvas : Control
 
     /// <summary>
     /// 计算 image-pixel → DIP 的仿射变换：uniform 缩放 + 居中平移。
-    /// image 坐标 (0,0)..(W,H) 会被映射到控件内部一块居中的矩形。
+    /// M6b：fit 的是<b>内容尺寸</b>（含 padding）；标注坐标在 image 空间，由
+    /// <see cref="ImageToContent"/> / <see cref="ContentToImage"/> 换算。
     /// </summary>
     private static SKMatrix ComputeViewportMatrix(EditorViewModel editor, Rect bounds)
     {
-        var w = editor.ImageWidth;
-        var h = editor.ImageHeight;
+        var w = editor.ContentWidth;
+        var h = editor.ContentHeight;
         if (w <= 0 || h <= 0) return SKMatrix.CreateIdentity();
 
         var scale = Math.Min(bounds.Width / w, bounds.Height / h);
@@ -164,7 +190,7 @@ public sealed class SkiaCanvas : Control
         var b = Bounds;
         if (b.Width <= 0 || b.Height <= 0) return false;
         var m = ComputeViewportMatrix(editor, b);
-        var mapped = m.MapRect(imageRect);
+        var mapped = m.MapRect(ImageRectToContent(editor, imageRect));
         dipRect = new Rect(mapped.Left, mapped.Top, Math.Max(0, mapped.Width), Math.Max(0, mapped.Height));
         dipScale = m.ScaleX;
         return true;
@@ -178,7 +204,9 @@ public sealed class SkiaCanvas : Control
         if (editor is null) return null;
         var m = ComputeViewportMatrix(editor, Bounds);
         if (!m.TryInvert(out var inv)) return null;
-        return inv.MapPoint(new SKPoint((float)dip.X, (float)dip.Y));
+        // 矩阵在内容空间；反变换后再减 padding 回到 image 空间
+        var content = inv.MapPoint(new SKPoint((float)dip.X, (float)dip.Y));
+        return ContentToImage(editor, content);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -380,16 +408,19 @@ public sealed class SkiaCanvas : Control
         private static readonly SKColor HandleStrokeColor     = new(0x00, 0x00, 0x00);
 
         private readonly AnnotationDocument _doc;
+        private readonly Prtsc.Core.Editor.EditorState _state;
         private readonly AnnotationBase? _preview;
         private readonly AnnotationBase? _selection;
         private readonly AnnotationBase? _editingText;
         private readonly SKMatrix _matrix;
 
-        public DrawOp(Rect bounds, AnnotationDocument doc, AnnotationBase? preview,
-                      AnnotationBase? selection, AnnotationBase? editingText, SKMatrix matrix)
+        public DrawOp(Rect bounds, AnnotationDocument doc, Prtsc.Core.Editor.EditorState state,
+                      AnnotationBase? preview, AnnotationBase? selection, AnnotationBase? editingText,
+                      SKMatrix matrix)
         {
             Bounds = bounds;
             _doc = doc;
+            _state = state;
             _preview = preview;
             _selection = selection;
             _editingText = editingText;
@@ -411,7 +442,7 @@ public sealed class SkiaCanvas : Control
             using var api = lease.Lease();
             var canvas = api.SkCanvas;
 
-            // 背景
+            // 背景（DIP 空间，内容区之外也可见的暗板）
             using (var bg = new SKPaint { Color = new SKColor(0x1A, 0x1A, 0x1A) })
             {
                 canvas.DrawRect(0, 0, (float)Bounds.Width, (float)Bounds.Height, bg);
@@ -420,8 +451,9 @@ public sealed class SkiaCanvas : Control
             var restore = canvas.Save();
             canvas.Concat(in _matrix);
 
-            // image-pixel 空间：文档内容走共享合成管线（与导出同源，所见即所得）
-            Composition.RenderScene(canvas, _doc, _preview, _editingText);
+            // 内容空间：完整合成管线（背景板/阴影/圆角裁剪/边框/内衬 + 文档内容）。
+            // 标注坐标是 image 空间——管线内部平移 (Padding, Padding)，此处无需换算。
+            Composition.RenderScene(canvas, _doc, _state, _preview, _editingText);
 
             canvas.RestoreToCount(restore);
 
@@ -430,10 +462,21 @@ public sealed class SkiaCanvas : Control
                 DrawSelectionOverlay(canvas, _selection);
         }
 
+        /// <summary>image 空间点 → 内容空间（加 padding）→ DIP。</summary>
+        private SKPoint MapImageToDip(SKPoint imagePoint)
+        {
+            var p = _state.Padding;
+            return _matrix.MapPoint(new SKPoint(imagePoint.X + p, imagePoint.Y + p));
+        }
+
         private void DrawSelectionOverlay(SKCanvas canvas, AnnotationBase selection)
         {
-            // BoundingBox 从像素映射到 DIP
-            var box = _matrix.MapRect(selection.BoundingBox);
+            // BoundingBox 从 image 空间加偏移后映射到 DIP
+            var p = _state.Padding;
+            var contentBox = new SKRect(
+                selection.BoundingBox.Left + p, selection.BoundingBox.Top + p,
+                selection.BoundingBox.Right + p, selection.BoundingBox.Bottom + p);
+            var box = _matrix.MapRect(contentBox);
 
             using (var outline = new SKPaint
             {
@@ -464,7 +507,7 @@ public sealed class SkiaCanvas : Control
             var half = HandleVisualSizeDip * 0.5f;
             foreach (var h in selection.GetHandles())
             {
-                var pt = _matrix.MapPoint(h.ImagePos);
+                var pt = MapImageToDip(h.ImagePos);
                 var r = new SKRect(pt.X - half, pt.Y - half, pt.X + half, pt.Y + half);
                 canvas.DrawRect(r, fillPaint);
                 canvas.DrawRect(r, strokePaint);
