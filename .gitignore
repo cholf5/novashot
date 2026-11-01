@@ -35,3 +35,4 @@ winshot/
 
 # ZCode session artifacts (plan / handoff docs live under docs/handoff/)
 .zcode/
+.VSCodeCounter/
