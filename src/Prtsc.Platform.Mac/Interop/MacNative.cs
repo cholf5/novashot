@@ -62,12 +62,33 @@ internal static unsafe partial class MacNative
     [return: MarshalAs(UnmanagedType.U1)]
     internal static partial bool CFBooleanGetValue(nint boolean, [MarshalAs(UnmanagedType.U1)] out bool value);
 
-    /// <summary>把 CFString 读成 UTF-8 托管字符串；非 UTF-16 内部表示时走 GetCString 兜底。</summary>
-    internal static string CFStringToString(nint cfstr)
+    internal const uint kCFStringEncodingUTF8 = 0x08000100;
+
+    /// <summary>kCFStringEncodingUTF8 把 CFString 读进调用方缓冲。返回 false 表示无法转换。</summary>
+    [LibraryImport(MacLibs.CF)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool CFStringGetCString(nint theString, nint buffer, nuint bufferSize, uint encoding);
+
+    [LibraryImport(MacLibs.CF)] internal static partial nuint CFStringGetLength(nint theString);
+
+    /// <summary>把 CFString 读成托管字符串。纯 CF 实现（CFStringGetCString），不依赖 ObjC runtime / selector
+    /// ——旧实现 objc_msgSend(cfstr, UTF8String sel) 在 ObjcIds 未加载时（窗口枚举先于剪贴板触发）selector=0
+    /// 跳空指针 SIGSEGV（2026-11-01 mac 冒烟 bug #4，坑 12）。</summary>
+    internal static unsafe string CFStringToString(nint cfstr)
     {
         if (cfstr == nint.Zero) return string.Empty;
-        var utf8 = objc_msgSend(cfstr, ObjcIds.Utf8StringSel);
-        return Marshal.PtrToStringUTF8(utf8) ?? string.Empty;
+        var maxBytes = (nuint)CFStringGetLength(cfstr) * 3 + 1; // 与 CFStringGetMaximumSizeForEncoding(UTF8) 同式：每 UTF-16 code unit 最多 3 字节（代理对 2 unit → 4 字节 ≤ 6）
+        var buffer = Marshal.AllocCoTaskMem((int)maxBytes);
+        try
+        {
+            if (!CFStringGetCString(cfstr, buffer, maxBytes, kCFStringEncodingUTF8))
+                return string.Empty;
+            return Marshal.PtrToStringUTF8(buffer) ?? string.Empty;
+        }
+        finally
+        {
+            Marshal.FreeCoTaskMem(buffer);
+        }
     }
 
     // ---------- CoreGraphics：显示器 ----------

@@ -78,7 +78,6 @@
                   Content="Window"
                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                   Margin="6" Padding="12"
-                  IsEnabled="False"
                   Click="OnCaptureWindowClick"/>
         </UniformGrid>
         <TextBlock Margin="0,20,0,0" FontSize="12" Opacity="0.6" HorizontalAlignment="Center"

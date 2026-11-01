@@ -41,8 +41,17 @@
 6. **Avalonia 主线程 `task.GetAwaiter().GetResult()` 会死锁**（JsonConfigStore.LoadAsync 链实证，fake SemaphoreSlim 版不卡）。修法：`Task.Run(() => store.LoadAsync()).GetAwaiter().GetResult()`。App.axaml.cs 已改，Windows 行为不变。
 7. **显示器睡眠时 CVDisplayLink 创建失败**（AvaloniaNativeRenderTimer 报 -6661 kCVReturnInvalidArgument）→ App 启动失败。显示器唤醒即正常。这是环境现象不是代码 bug；本会话探针曾误导，注意。
 8. **Mac F 键 keycode 不连续**（F1=0x7A, F2=0x78, F3=0x63…），必须用标准表，不能线性推导（测试抓过此 bug）。PrintScreen→F13 约定（Mac 无 PrintScreen 键）。
-9. **本 agent shell 环境**（Cindy.app 子进程）：`CGGetActiveDisplayList` 返回 0 显示器、ScreenCaptureKit 报 "TCC declined"——是 shell 进程树没有屏幕录制权限，非代码问题。测试已在真机 GUI 上下文验证窗口枚举/窗口抓图可用；整屏抓图待用户授权后冒烟。
-10. 真机运行验证方式：终端直接 `./src/Prtsc.App/bin/Debug/net10.0/Prtsc`（前台进程；注意显示器需唤醒）。
+9. **本 agent shell 环境**（Cindy.app 子进程）：`CGGetActiveDisplayList` 返回 0 显示器、ScreenCaptureKit 报 "TCC declined"——是 shell 进程树没有屏幕录制权限，非代码问题。（更新：后续用户已授权屏幕录制，shell 内 screencapture/CG 调用可用；辅助功能/System Events 也可用。）
+10. 真机运行验证方式：终端直接 `./src/Prtsc.App/bin/Debug/net10.0/Prtsc`（前台进程；注意显示器需唤醒）。崩溃时抓托管栈：`DOTNET_DbgEnableMiniDump=1 DOTNET_DbgMiniDumpName=/tmp/x.dmp DOTNET_DbgMiniDumpType=4` 启动，崩后 `dotnet-dump analyze` 的 `clrstack`（.ips 里 JIT 帧全部未符号化，只有 dump 能给出托管栈）。
+
+### 坑 12（mac 冒烟 bug #4，2026-11-01）：窗口枚举崩溃——ObjcIds 未加载时 CFStringToString 跳空指针
+
+- **现象**：主窗口打开后点托盘菜单 Capture Window → picker 确认后 1 秒内主线程 SIGSEGV，.ips 崩溃栈纯 JIT 帧（pc=0x0，KERN_INVALID_ADDRESS at 0x0），只有 Signaler observer 以下的系统帧可读，无法直接定位。
+- **根因**：`MacNative.CFStringToString` 旧实现走 `objc_msgSend(cfstr, ObjcIds.Utf8StringSel)`，而 `ObjcIds.EnsureLoaded()`（dlopen AppKit + sel_registerName）只在剪贴板/overlay 路径触发。WindowPicker 构造 → `CGWindowListApi.RowFromDict` 读 owner/title 是进程里第一处调用方 → `Utf8StringSel == 0` → objc_msgSend 用 NULL selector 查到空 IMP → 跳 0x0。**不是双击/时序问题，也与 AvaloniaNative 无关**（Signaler observer 只是 dispatcher 派发入口）。
+- **实证**：崩溃 dump `dotnet-dump analyze` → `dumpclass ObjcIds` 显示全部 28 个静态字段为 0；`clrstack` 顶在 `CFStringToString ← RowFromDict ← WindowPickerDialog..ctor.Reload`。回归测试 `MacNativeStringTests`（独立 filter 单跑，ObjcIds 未加载）在旧代码上让测试宿主崩溃，与新代码 4/4 绿。
+- **修复**：`CFStringToString` 改纯 CF（`CFStringGetCString` + UTF-8，缓冲 = length×3+1），零 ObjC 依赖；注释同步更正（旧注释声称有 GetCString 兜底，实际没有）。
+- **附带**：主窗口 Capture Window 按钮自 M1 基线起硬编码 `IsEnabled="False"`（无任何代码重新启用、无文档说明），本次一并启用（菜单/热键同路径已验证可用）。
+- **验证**：真机全流程两入口各走一遍（托盘菜单 / 主窗口按钮 → picker → 截取 → 进编辑器显示 Captured 5120×2628），无崩溃；全量测试 664/664（Core 414 + Mac 80 + App 63×2 + Linux 44）。
 
 ### 坑 11（mac 冒烟 bug #2，2026-11-01 修复 `6c6b985`）：剪贴板 Copy 崩溃（EXC_BAD_ACCESS）
 
