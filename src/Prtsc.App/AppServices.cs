@@ -11,8 +11,9 @@ using Serilog.Extensions.Logging;
 
 #if WIN_PLATFORM
 using Prtsc.Platform.Windows;
-#else
+#elif MAC_PLATFORM
 using Prtsc.Platform.Mac;
+using Prtsc.Platform.Linux;
 #endif
 
 namespace Prtsc.App;
@@ -36,7 +37,7 @@ public static class AppServices
         services.AddSingleton<ILoggerFactory>(_ => new SerilogLoggerFactory(Log.Logger, dispose: false));
         services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Logger<>));
 
-        // Core + platform（按 TFM 选择平台层，见文件头 #if）
+        // Core + platform（运行时按 OS 分流：windows TFM → Windows；net10.0 上 mac/linux 按 OperatingSystem 选）
         services.AddPrtscCore();
         services.AddPrtscPlatform();
 
@@ -65,12 +66,17 @@ public static class AppServices
 
     public static T GetRequiredService<T>() where T : notnull => Services.GetRequiredService<T>();
 
-    /// <summary>平台层装配桥：windows TFM → Platform.Windows，其它 → Platform.Mac。</summary>
+    /// <summary>
+    /// 平台层装配桥：windows TFM → Platform.Windows；
+    /// net10.0 TFM 上 mac 与 Linux 共用，按运行时 OS 分流（两个平台层都在包内，但只实例化命中的那套）。
+    /// </summary>
     private static IServiceCollection AddPrtscPlatform(this IServiceCollection services)
 #if WIN_PLATFORM
         => services.AddPrtscWindows();
 #else
-        => services.AddPrtscMac();
+        => OperatingSystem.IsMacOS() ? services.AddPrtscMac()
+        : OperatingSystem.IsLinux() ? services.AddPrtscLinux()
+        : services.AddPrtscMac(); // 未知 Unix 类平台退回 mac 装配（让服务缺失在取用时早爆）
 #endif
 
     public static void Shutdown()

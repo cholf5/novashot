@@ -50,5 +50,7 @@
                      Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) == 'windows'" />
     <ProjectReference Include="..\Prtsc.Platform.Mac\Prtsc.Platform.Mac.csproj"
                      Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'" />
+    <ProjectReference Include="..\Prtsc.Platform.Linux\Prtsc.Platform.Linux.csproj"
+                     Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'" />
   </ItemGroup>
 </Project>
