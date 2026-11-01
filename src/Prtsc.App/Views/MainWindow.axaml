@@ -26,6 +26,7 @@
     <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding Editor.RedoCommand}"/>
     <!-- M4c.1: Delete 删除当前选中；Escape 取消选择 -->
     <KeyBinding Gesture="Delete" Command="{Binding Editor.DeleteSelectionCommand}"/>
+    <KeyBinding Gesture="Back" Command="{Binding Editor.DeleteSelectionCommand}"/>
     <KeyBinding Gesture="Escape" Command="{Binding Editor.DeselectCommand}"/>
   </Window.KeyBindings>
 
@@ -141,6 +142,9 @@
             <RadioButton GroupName="Tool" Content="Blur"    Padding="8,4" Tag="Blur"          Click="OnToolChanged"
                          IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Blur}"
                          ToolTip.Tip="Blur region (B) — Ctrl+Wheel adjusts strength"/>
+            <RadioButton GroupName="Tool" Content="Inv"     Padding="8,4" Tag="Invert"        Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Invert}"
+                         ToolTip.Tip="Invert colors (I)"/>
             <!-- M6d: 非破坏裁剪（X） -->
             <RadioButton GroupName="Tool" Content="Crop"    Padding="8,4" Tag="Crop"          Click="OnToolChanged"
                          IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Crop}"

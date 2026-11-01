@@ -378,6 +378,7 @@ public partial class MainWindow : Window
         Key.H => ToolKind.Highlighter,
         Key.M => ToolKind.Mosaic,
         Key.B => ToolKind.Blur,
+        Key.I => ToolKind.Invert,
         // M6d：非破坏裁剪
         Key.X => ToolKind.Crop,
         _ => null,

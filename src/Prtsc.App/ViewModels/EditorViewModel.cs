@@ -207,7 +207,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         ToolKind.ArrowStraight => new ArrowStraightTool(),
         ToolKind.ArrowCurved   => new ArrowCurvedTool(),
         ToolKind.Text          => new TextTool(),
-        ToolKind.Number        => new NumberTool(() => NumberSequence.NextFor(Document.Annotations)),
+        ToolKind.Number        => new NumberTool(() => NumberSequenceMinUnused.NextFor(Document.Annotations)),
         ToolKind.Spotlight     => new SpotlightTool(Document.Width, Document.Height),
         // M5a：自由手绘
         ToolKind.Pencil        => new PencilTool(),
@@ -217,6 +217,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         // M5b：采样型区域效果（非拥有引用 Document.Source，渲染时现场采样）
         ToolKind.Mosaic        => new RegionEffectTool((r, s) => new MosaicAnnotation(r, Document.Source, s)),
         ToolKind.Blur          => new RegionEffectTool((r, s) => new BlurAnnotation(r, Document.Source, s)),
+        ToolKind.Invert        => new RegionEffectTool((r, s) => new InvertAnnotation(r, Document.Source, s)),
         _ => NopTool.Instance,
     };
 

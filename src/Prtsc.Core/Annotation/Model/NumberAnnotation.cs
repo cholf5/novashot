@@ -14,16 +14,21 @@ public sealed class NumberAnnotation : AnnotationBase
     public const float DefaultFontRatio = 1.1f; // 字体高度 / 半径
 
     public SKPoint Center { get; set; }
-    public int Number { get; }
+    public int Number { get; private set; }
     public float Radius { get; set; }
 
     public NumberAnnotation(SKPoint center, int number, AnnotationStyle style, float? radius = null)
         : base(style)
     {
         Center = center;
-        Number = number;
+        Number = ClampNumber(number);
         Radius = radius ?? style.StrokeWidth * DefaultRadiusMul;
     }
+
+    /// <summary>修改编号（Ctrl+滚轮；Flameshot circlecount 行为）。钳在 1..999。</summary>
+    public void SetNumber(int value) => Number = ClampNumber(value);
+
+    private static int ClampNumber(int value) => Math.Clamp(value, 1, 999);
 
     public override SKRect BoundingBox => new(
         Center.X - Radius - 1, Center.Y - Radius - 1,

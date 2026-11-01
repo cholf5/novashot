@@ -62,6 +62,20 @@ public sealed class SkiaCanvas : Control
         ClipToBounds = true;
     }
 
+    /// <summary>
+    /// Esc 取消进行中的工具拖拽（flameshot 逐级退出链的最后一环之前）：释放预览，不产生标注。
+    /// 画布有焦点时（拖拽中会 Capture）先于 MainWindow 的 Deselect 生效。
+    /// </summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || _activeTool is null || e.Key != Key.Escape) return;
+        _activeTool.Cancel();
+        _activeTool = null;
+        InvalidateVisual();
+        e.Handled = true;
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -263,8 +277,60 @@ public sealed class SkiaCanvas : Control
         if (_activeTool is null) return;
         var img = DipToImage(e.GetPosition(this));
         if (img is null) return;
+
+        // 角度吸附（Flameshot drawMoveWithAdjustment）：Line/Arrow Ctrl=八方向、Shift=水平垂直；
+        // Rectangle/Ellipse Ctrl=对角（正方/正圆）。预览不落库，直接改预览终点。
+        if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) != 0)
+        {
+            var snapped = SnapPreviewPoint(_activeTool, img.Value, e.KeyModifiers);
+            if (snapped is { } s) { _activeTool.OnPointerMove(s); InvalidateVisual(); e.Handled = true; return; }
+        }
+
         _activeTool.OnPointerMove(img.Value);
         InvalidateVisual();
+    }
+
+    /// <summary>
+    /// 按修饰键吸附拖拽终点；不适用吸附的工具/状态返回 null（走普通路径）。
+    /// 拖拽起点从预览标注上反推（两点类 = Start；矩形/椭圆 = 预览包围盒角点）。
+    /// </summary>
+    private static SKPoint? SnapPreviewPoint(IAnnotationTool tool, SKPoint cursor, KeyModifiers mods)
+    {
+        SKPoint from;
+        switch (tool)
+        {
+            case LineTool when tool.Preview is LineAnnotation l:
+                from = l.Start;
+                break;
+            case ArrowStraightTool when tool.Preview is ArrowStraightAnnotation a:
+                from = a.Start;
+                break;
+            case ArrowCurvedTool when tool.Preview is ArrowCurvedAnnotation c:
+                from = c.Start;
+                break;
+            case RectangleTool when tool.Preview is RectangleAnnotation r:
+                from = new SKPoint(r.BoundingBox.Left, r.BoundingBox.Top);
+                break;
+            case EllipseTool when tool.Preview is EllipseAnnotation el:
+                from = new SKPoint(el.BoundingBox.Left, el.BoundingBox.Top);
+                break;
+            default:
+                return null;
+        }
+
+        var dx = cursor.X - from.X;
+        var dy = cursor.Y - from.Y;
+        var snapped = tool switch
+        {
+            LineTool or ArrowStraightTool or ArrowCurvedTool
+                => (mods & KeyModifiers.Control) != 0 ? AngleSnap.Snap45(dx, dy)
+                 : (mods & KeyModifiers.Shift) != 0 ? AngleSnap.SnapOrtho(dx, dy)
+                 : (SKPoint?)null,
+            RectangleTool or EllipseTool
+                => (mods & KeyModifiers.Control) != 0 ? AngleSnap.SnapDiagonal(dx, dy) : (SKPoint?)null,
+            _ => null,
+        };
+        return snapped is { } s ? new SKPoint(from.X + s.X, from.Y + s.Y) : null;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -343,6 +409,20 @@ public sealed class SkiaCanvas : Control
             e.Handled = true;
             return;
         }
+
+        // G-3（flameshot circlecount）：选中 Number 时 Ctrl+滚轮改编号值（1..999）
+        if (editor.Selection is NumberAnnotation number)
+        {
+            var nextNumber = (int)StrokeWheelHelper.Step(number.Number, e.Delta.Y, 1, 999);
+            if (nextNumber != number.Number)
+            {
+                number.SetNumber(nextNumber);
+                editor.Document.NotifyMutated();
+            }
+            e.Handled = true;
+            return;
+        }
+
         if (editor.Selection is BlurAnnotation blur)
         {
             var nextSigma = StrokeWheelHelper.Step(blur.Sigma, e.Delta.Y,
