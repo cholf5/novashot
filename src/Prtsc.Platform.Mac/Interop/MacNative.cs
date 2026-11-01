@@ -177,6 +177,13 @@ internal static unsafe partial class MacNative
 
     [LibraryImport(MacLibs.Objc)] internal static partial nint objc_msgSend(nint receiver, nint sel, byte* arg1);
 
+    /// <summary>手动引用计数下的配对释放：仅用于 alloc/init/copy/mutableCopy/new 系返回值。
+    /// 便利构造器（autorelease）绝不能用这个，会过释放。</summary>
+    [LibraryImport(MacLibs.Objc, EntryPoint = "objc_release")] internal static partial void objc_release(nint obj);
+
+    /// <summary>+1 retain。用于把 autorelease 返回值转成 owned 所有权。</summary>
+    [LibraryImport(MacLibs.Objc, EntryPoint = "objc_retain")] internal static partial nint objc_retain(nint obj);
+
     /// <summary>11 参 objc_msgSend（NSBitmapImageRep init 等长 selector）。调用方保证签名匹配。</summary>
     [DllImport(MacLibs.Objc, EntryPoint = "objc_msgSend")]
     internal static extern nint objc_msgSend11(nint receiver, nint sel,

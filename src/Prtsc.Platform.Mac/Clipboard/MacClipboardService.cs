@@ -9,6 +9,16 @@ namespace Prtsc.Platform.Mac.Clipboard;
 /// NSPasteboard 实现。图片写 TIFF（NSBitmapImageRep 编码，最通用）+ PNG 双格式；
 /// 读图 TIFF 优先 PNG。文本 public.utf8-plain-text。快照语义：写入即拷贝。
 /// 依赖 AppKit 类：先 <see cref="ObjcIds.EnsureLoaded"/>（dotnet 宿主必须 dlopen AppKit）。
+///
+/// ⚠ ObjC 内存所有权规则（2026-11-01 复现崩溃后定案，勿"优化"）：
+/// dotnet 宿主下 ObjC runtime 是手动引用计数（非 ARC）：
+/// - alloc/init 系对象：必须配对 objc_release；
+/// - 便利构造器（stringWithUTF8String:、dataWithBytes:length:、TIFFRepresentation、
+///   dataForType:、generalPasteboard 等非 new/copy/mutableCopy 前缀）：返回 autorelease 对象，
+///   注册进当前线程 NSAutoreleasePool，**绝不能手动 release**——
+///   违反即 pool drain 时过释放 → SIGSEGV（objc_release 悬垂指针）。
+/// - 本类所有 objc 对象都是即用即弃，不跨 pool 边界持有，因此 autorelease 语义天然安全。
+/// - 托管侧 CFRelease 仅用于 CF Create/Copy 规则对象（本类无）。
 /// </summary>
 public sealed class MacClipboardService : IClipboardService
 {
@@ -31,24 +41,26 @@ public sealed class MacClipboardService : IClipboardService
         ArgumentNullException.ThrowIfNull(bitmap);
         if (!EnsureAppKit()) return false;
 
-        var pb = MacNative.objc_msgSend(ObjcIds.NSPasteboardClass, ObjcIds.GeneralPasteboardSel);
-        if (pb == nint.Zero) return false;
-
-        // PNG 兜底
         using var pngData = bitmap.Encode(SKEncodedImageFormat.Png, 100);
         if (pngData == null) return false;
+
+        // generalPasteboard 是 autorelease 返回，不持有
+        var pb = MacNative.objc_msgSend(ObjcIds.NSPasteboardClass, ObjcIds.GeneralPasteboardSel);
+        if (pb == nint.Zero) return false;
 
         MacNative.objc_msgSend(pb, ObjcIds.ClearContentsSel);
 
         var wrote = false;
-        // TIFF 优先：NSBitmapImageRep(cgImage) → TIFFRepresentation；这里用像素直接构造 rep
+        // TIFF 优先（消费端兼容性最好）。托管编码（MiniTiffEncoder）：零 objc 对象，
+        // 绕开 NSBitmapImageRep/TIFFRepresentation 的 autorelease 所有权纠缠（2026-11-01 SIGSEGV 根因）。
         try
         {
-            var tiff = BuildTiffData(bitmap);
-            if (tiff != nint.Zero)
+            var tiffBytes = MiniTiffEncoder.Encode(bitmap);
+            var nsTiff = NSDataOwnedFromManaged(tiffBytes);
+            if (nsTiff != nint.Zero)
             {
-                MacNative.objc_msgSend(pb, ObjcIds.SetDataForTypeSel, tiff, ObjcIds.TiffType);
-                MacNative.CFRelease(tiff);
+                MacNative.objc_msgSend(pb, ObjcIds.SetDataForTypeSel, nsTiff, ObjcIds.TiffType);
+                MacNative.objc_release(nsTiff); // 剪贴板已持有自己的引用
                 wrote = true;
             }
         }
@@ -57,16 +69,19 @@ public sealed class MacClipboardService : IClipboardService
             // TIFF 失败不阻塞 PNG
         }
 
+        // PNG 兜底。⚠ NSData 必须 owned（alloc/init）：autorelease 对象写入剪贴板后
+        // 会被 pool drain 释放 → 剪贴板悬垂 → 下一轮 clearContents/读取时 SIGSEGV
+        // （2026-11-01 复现：owned 模式 5 轮稳定，autorelease 模式 round1 即崩）。
         var pngSpan = pngData.Span;
         unsafe
         {
             fixed (byte* pPng = pngSpan)
             {
-                var nsPng = NSDataFromBytes((nint)pPng, (nint)pngSpan.Length);
+                var nsPng = NSDataOwnedFromBytes((nint)pPng, (nint)pngSpan.Length);
                 if (nsPng != nint.Zero)
                 {
                     MacNative.objc_msgSend(pb, ObjcIds.SetDataForTypeSel, nsPng, ObjcIds.PngType);
-                    MacNative.CFRelease(nsPng);
+                    MacNative.objc_release(nsPng); // 剪贴板已持有自己的引用
                     wrote = true;
                 }
             }
@@ -106,18 +121,12 @@ public sealed class MacClipboardService : IClipboardService
         var pb = MacNative.objc_msgSend(ObjcIds.NSPasteboardClass, ObjcIds.GeneralPasteboardSel);
         if (pb == nint.Zero) return false;
 
-        var nsStr = NSStringFromUtf8(text);
+        var nsStr = NSStringFromUtf8(text); // autorelease，不释放
         if (nsStr == nint.Zero) return false;
-        try
-        {
-            MacNative.objc_msgSend(pb, ObjcIds.ClearContentsSel);
-            MacNative.objc_msgSend(pb, ObjcIds.SetStringForTypeSel, nsStr, ObjcIds.Utf8PlainTextType);
-            return true;
-        }
-        finally
-        {
-            MacNative.CFRelease(nsStr);
-        }
+
+        MacNative.objc_msgSend(pb, ObjcIds.ClearContentsSel);
+        MacNative.objc_msgSend(pb, ObjcIds.SetStringForTypeSel, nsStr, ObjcIds.Utf8PlainTextType);
+        return true;
     }
 
     /// <summary>读回文本（Fake 语义对齐，真板读 public.utf8-plain-text）。App 侧上传 URL 复制走这里。</summary>
@@ -148,123 +157,95 @@ public sealed class MacClipboardService : IClipboardService
         }
     }
 
-    /// <summary>SKBitmap → TIFF NSData。NSBitmapImageRep 的 planes=NULL 是"自分配不初始化"语义（非 copy），
-    /// 必须在 init 后手动把 BGRA 像素转 RGBA 写进 bitmapData（2026-11-01 实证：不写则全 0）。</summary>
-    private static unsafe nint BuildTiffData(SKBitmap bitmap)
+    /// <summary>owned NSData（alloc/initWithBytes:length:）。调用方负责 objc_release。</summary>
+    private static nint NSDataOwnedFromBytes(nint bytes, nint length)
     {
-        var repCls = ObjcIds.NSBitmapImageRepClass;
-        if (repCls == nint.Zero) return nint.Zero;
+        var cls = MacNative.objc_getClass("NSData");
+        if (cls == nint.Zero) return nint.Zero;
+        var alloc = MacNative.objc_msgSend(cls, MacNative.sel_registerName("alloc"));
+        if (alloc == nint.Zero) return nint.Zero;
+        var data = MacNative.objc_msgSend(alloc, ObjcIds.InitWithBytesLengthSel, bytes, length);
+        if (data == nint.Zero) MacNative.objc_release(alloc); // init 失败也要平衡 alloc
+        return data;
+    }
 
-        var width = bitmap.Info.Width;
-        var height = bitmap.Info.Height;
-
-        var rep = Alloc(repCls);
-        if (rep == nint.Zero) return nint.Zero;
-
-        var colorSpaceName = NSStringFromUtf8("NSCalibratedRGBColorSpace");
-        try
+    /// <summary>托管 TIFF 字节 → owned NSData。调用方 objc_release。</summary>
+    private static unsafe nint NSDataOwnedFromManaged(byte[] bytes)
+    {
+        fixed (byte* p = bytes)
         {
-            rep = MacNative.objc_msgSend11(rep, ObjcIds.InitWithBitmapDataPlanesSel, nint.Zero,
-                (nuint)width, (nuint)height, 8, 4, hasAlpha: 1, isPlanar: 0, colorSpaceName,
-                (nuint)(width * 4), 32);
-            if (rep == nint.Zero) return nint.Zero;
-
-            var dst = MacNative.objc_msgSend(rep, ObjcIds.BitmapDataSel);
-            if (dst == nint.Zero) return nint.Zero;
-
-            // BGRA8888-premul → RGBA8888（rep 语义 alpha last）；截图是不透明图，premul 直传通道值不变
-            var src = (byte*)bitmap.GetPixels();
-            var d = (byte*)dst;
-            for (var i = 0; i < width * height * 4; i += 4)
-            {
-                d[i] = src[i + 2];     // R
-                d[i + 1] = src[i + 1]; // G
-                d[i + 2] = src[i];     // B
-                d[i + 3] = src[i + 3]; // A
-            }
-
-            return MacNative.objc_msgSend(rep, ObjcIds.TiffRepresentationSel);
-        }
-        finally
-        {
-            MacStrings.Free(colorSpaceName);
-            MacNative.CFRelease(rep);
+            return NSDataOwnedFromBytes((nint)p, (nint)bytes.Length);
         }
     }
 
-    /// <summary>TIFF bytes → NSBitmapImageRep → bitmapData（RGBA8）→ SKBitmap(Bgra8888)。</summary>
+    /// <summary>TIFF bytes → NSBitmapImageRep → bitmapData（RGBA8）→ SKBitmap(Bgra8888)。
+    /// 所有权：rep（alloc/init）用 objc_release；nsData 是 autorelease，不释放。</summary>
     private static unsafe SKBitmap? DecodeTiffToBitmap(byte[] tiff)
     {
         var repCls = ObjcIds.NSBitmapImageRepClass;
         if (repCls == nint.Zero) return null;
 
-        var nsData = NSDataFromManaged(tiff);
+        var nsData = NSDataFromManaged(tiff); // autorelease，不释放（读路径，仅当次使用）
         if (nsData == nint.Zero) return null;
+
+        var rep = Alloc(repCls);
+        if (rep == nint.Zero) return null;
         try
         {
-            var rep = Alloc(repCls);
+            rep = MacNative.objc_msgSend(rep, ObjcIds.InitWithDataSel, nsData);
             if (rep == nint.Zero) return null;
-            try
+
+            var w = MacNative.objc_msgSend(rep, ObjcIds.PixelsWideSel);
+            var h = MacNative.objc_msgSend(rep, ObjcIds.PixelsHighSel);
+            var bpr = MacNative.objc_msgSend(rep, ObjcIds.BytesPerRowSel);
+            var src = MacNative.objc_msgSend(rep, ObjcIds.BitmapDataSel);
+            if (w == 0 || h == 0 || src == nint.Zero) return null;
+
+            var bitmap = new SKBitmap((int)w, (int)h, SKColorType.Bgra8888, SKAlphaType.Premul);
+            var s = (byte*)src;
+            var d = (byte*)bitmap.GetPixels();
+            var spp = 4; // 8bit RGBA 固定（rep 语义 alpha last）
+            for (var y = 0; y < (int)h; y++)
             {
-                rep = MacNative.objc_msgSend(rep, ObjcIds.InitWithDataSel, nsData);
-                if (rep == nint.Zero) return null;
-
-                var w = MacNative.objc_msgSend(rep, ObjcIds.PixelsWideSel);
-                var h = MacNative.objc_msgSend(rep, ObjcIds.PixelsHighSel);
-                var bpr = MacNative.objc_msgSend(rep, ObjcIds.BytesPerRowSel);
-                var src = MacNative.objc_msgSend(rep, ObjcIds.BitmapDataSel);
-                if (w == 0 || h == 0 || src == nint.Zero) return null;
-
-                var bitmap = new SKBitmap((int)w, (int)h, SKColorType.Bgra8888, SKAlphaType.Premul);
-                var s = (byte*)src;
-                var d = (byte*)bitmap.GetPixels();
-                var spp = 4; // 8bit RGBA 固定（rep 语义 alpha last）
-                for (var y = 0; y < (int)h; y++)
+                for (var x = 0; x < (int)w; x++)
                 {
-                    for (var x = 0; x < (int)w; x++)
-                    {
-                        var so = y * (int)bpr + x * (int)spp;
-                        var doff = y * (int)w * 4 + x * 4;
-                        d[doff] = s[so + 2];     // B
-                        d[doff + 1] = s[so + 1]; // G
-                        d[doff + 2] = s[so];     // R
-                        d[doff + 3] = s[so + 3]; // A
-                    }
+                    var so = y * (int)bpr + x * (int)spp;
+                    var doff = y * (int)w * 4 + x * 4;
+                    d[doff] = s[so + 2];     // B
+                    d[doff + 1] = s[so + 1]; // G
+                    d[doff + 2] = s[so];     // R
+                    d[doff + 3] = s[so + 3]; // A
                 }
-                return bitmap;
             }
-            finally
-            {
-                MacNative.CFRelease(rep);
-            }
+            return bitmap;
         }
         finally
         {
-            MacNative.CFRelease(nsData);
+            MacNative.objc_release(rep);
         }
     }
 
+    /// <summary>读剪贴板数据为托管字节。dataForType: 返回 autorelease NSData，只读不释放。</summary>
     private static byte[]? PasteboardDataBytes(nint pb, nint type)
     {
         var data = MacNative.objc_msgSend(pb, ObjcIds.DataForTypeSel, type);
         if (data == nint.Zero) return null;
-        try
-        {
-            var bytes = MacNative.objc_msgSend(data, ObjcIds.BytesSel);
-            var length = MacNative.objc_msgSend(data, ObjcIds.LengthSel);
-            if (bytes == nint.Zero || length == 0) return null;
-            var managed = new byte[(long)length];
-            Marshal.Copy(bytes, managed, 0, managed.Length);
-            return managed;
-        }
-        finally
-        {
-            MacNative.CFRelease(data);
-        }
+
+        var bytes = MacNative.objc_msgSend(data, ObjcIds.BytesSel);
+        var length = MacNative.objc_msgSend(data, ObjcIds.LengthSel);
+        if (bytes == nint.Zero || length == 0) return null;
+        var managed = new byte[(long)length];
+        Marshal.Copy(bytes, managed, 0, managed.Length);
+        return managed;
     }
 
-    private static nint Alloc(nint cls) =>
-        MacNative.objc_msgSend(cls, MacNative.sel_registerName("alloc"));
+    /// <summary>autorelease NSData（dataWithBytes:length:），读路径即用即弃，不释放。</summary>
+    private static nint NSDataFromBytesAutorelease(nint bytes, nint length)
+    {
+        var cls = MacNative.objc_getClass("NSData");
+        if (cls == nint.Zero) return nint.Zero;
+        return MacNative.objc_msgSend(cls, MacNative.sel_registerName("dataWithBytes:length:"), bytes, length);
+    }
 
     private static unsafe nint NSDataFromManaged(byte[] bytes)
     {
@@ -272,15 +253,10 @@ public sealed class MacClipboardService : IClipboardService
         if (cls == nint.Zero) return nint.Zero;
         fixed (byte* p = bytes)
         {
-            return NSDataFromBytes((nint)p, (nint)bytes.Length);
+            return NSDataFromBytesAutorelease((nint)p, (nint)bytes.Length);
         }
     }
 
-    private static nint NSDataFromBytes(nint bytes, nint length)
-    {
-        var cls = MacNative.objc_getClass("NSData");
-        if (cls == nint.Zero) return nint.Zero;
-        return MacNative.objc_msgSend(cls, MacNative.sel_registerName("dataWithBytes:length:"), bytes, length);
-    }
+    private static nint Alloc(nint cls) =>
+        MacNative.objc_msgSend(cls, MacNative.sel_registerName("alloc"));
 }
-

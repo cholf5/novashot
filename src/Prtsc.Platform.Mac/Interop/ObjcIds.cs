@@ -26,6 +26,7 @@ internal static class ObjcIds
     internal static nint Utf8StringSel { get; private set; }
     internal static nint StringWithUtf8Sel { get; private set; }
     internal static nint DataWithBytesLengthSel { get; private set; }
+    internal static nint InitWithBytesLengthSel { get; private set; }
     internal static nint SetDataForTypeSel { get; private set; }
     internal static nint DataForTypeSel { get; private set; }
     internal static nint BytesSel { get; private set; }
@@ -66,6 +67,7 @@ internal static class ObjcIds
             Utf8StringSel = MacNative.sel_registerName("UTF8String");
             StringWithUtf8Sel = MacNative.sel_registerName("stringWithUTF8String:");
             DataWithBytesLengthSel = MacNative.sel_registerName("dataWithBytes:length:");
+            InitWithBytesLengthSel = MacNative.sel_registerName("initWithBytes:length:");
             SetDataForTypeSel = MacNative.sel_registerName("setData:forType:");
             DataForTypeSel = MacNative.sel_registerName("dataForType:");
             BytesSel = MacNative.sel_registerName("bytes");
