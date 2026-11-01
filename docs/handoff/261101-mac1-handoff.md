@@ -44,6 +44,14 @@
 9. **本 agent shell 环境**（Cindy.app 子进程）：`CGGetActiveDisplayList` 返回 0 显示器、ScreenCaptureKit 报 "TCC declined"——是 shell 进程树没有屏幕录制权限，非代码问题。测试已在真机 GUI 上下文验证窗口枚举/窗口抓图可用；整屏抓图待用户授权后冒烟。
 10. 真机运行验证方式：终端直接 `./src/Prtsc.App/bin/Debug/net10.0/Prtsc`（前台进程；注意显示器需唤醒）。
 
+### 坑 11（mac 冒烟 bug #2，2026-11-01 修复 `6c6b985`）：剪贴板 Copy 崩溃（EXC_BAD_ACCESS）
+
+- **现象**：编辑器点复制 → 主线程 SIGSEGV，栈 `objc_autoreleasePoolPop → NSBitmapImageRep dealloc → objc_release`。
+- **根因**：dotnet 宿主 ObjC 是**手动引用计数**（非 ARC）。`TIFFRepresentation` 把 `NSBitmapImageRep` 注册进 autorelease pool；托管侧提前 release(rep) → pool drain 时对已释放对象再 release。`stringWithUTF8String:`（autorelease）被 CFRelease 同罪。**retain/release 各种平衡手法均不稳定**（实测多种组合仍崩）。
+- **终修**：TIFF 路径整体换成托管 `MiniTiffEncoder`（Baseline TIFF RGBA + unassociated alpha，零 objc 对象）；PNG 路径 NSData 用 alloc/init（owned）写入后 release；读路径 `dataForType:`/`stringForType:` 返回值是 autorelease，只读不释放。
+- **验证**：5 轮"写→NSAutoreleasePool drain→读回像素校验"压力测试（`MacClipboardPoolStressTests`，Manual）+ sips 验证生成 TIFF 的尺寸与像素。
+- **教训**：dotnet 宿主下 objc 手动计数，凡便利构造器返回值一律视为 pool 所有；跨 pool 使用的对象必须 owned（alloc/init 或 retain 平衡）。压力测试必须带显式 pool drain（只调一次不崩，第二次 drain 才爆）。
+
 ## 4. 构建要点
 
 - mac 上 `dotnet build` 双 TFM 全绿（Directory.Build.props 已加 `EnableWindowsTargeting=true`，无需手传参数）。
