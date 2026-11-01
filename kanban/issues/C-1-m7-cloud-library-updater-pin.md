@@ -1,6 +1,6 @@
 # C-1 M7 云上传 / Library / Updater / Pin
 
-- **优先级**: P1 ｜ **复杂度**: L ｜ **开发者**: 待领取 ｜ **状态**: To Do
+- **优先级**: P1 ｜ **复杂度**: L ｜ **开发者**: M7a 数据层已完（2026-11-01），M7b/Updater/Pin 待领取 ｜ **状态**: In Progress
 - **依赖**: 无（与 S-1 可并行）
 - **关联**: `docs/handoff/261101-m6cd-handoff.md` §6（M7 起步建议）、`docs/roadmap.md`、参考代码 `references/winshot/internal/{upload,library,updater}`（Windows 机）
 
@@ -10,8 +10,9 @@
 
 ## 子任务
 
-1. `Prtsc.Core/Cloud/`：`IUploadService` + R2 实现（S3 兼容 PUT，签名用 AWS SigV4 手写或最小依赖）；GDrive REST multipart；凭据键 `Prtsc_R2_*` / `Prtsc_GDrive_*`（**不迁移 WinShot 凭据**）。
-2. Library：`%AppData%\Prtsc\library.json` + 缩略图目录；编辑器/托盘入口查看历史。
+1. ~~`Prtsc.Core/Cloud/`：`IUploadService` + R2 实现（S3 兼容 PUT，签名用 AWS SigV4 手写或最小依赖）；GDrive REST multipart；凭据键 `Prtsc_R2_*` / `Prtsc_GDrive_*`（**不迁移 WinShot 凭据**）。~~
+   ✅ **M7a 完成（2026-11-01）**：`Cloud/SigV4Signer`（python 独立预计算向量锁定）+ `R2Uploader`（path-style PUT + SigV4 头 host;x-amz-content-sha256;x-amz-date，region=auto）+ `GDriveTokenClient`（refresh_token→access_token，缓存至过期前 60s）+ `GDriveUploader`（multipart/related metadata+bytes，可选 permissions anyone/reader → webViewLink）+ `ConfigUploadService`（按 Provider 每次分发，共享静态 HttpClient）+ `NullUploadService`。凭据改存 config.json `cloud` 节点（`r2.accessKeyId/secretAccessKey`、`gdrive.clientId/clientSecret/refreshToken`，camelCase；GDrive 节点钉为 `gdrive` 而非默认的 `gDrive`）——不迁移 WinShot 凭据。测试 402/402。
+2. Library：~~`%AppData%\Prtsc\library.json` + 缩略图目录~~ ✅ **数据层完成**（`Library/LibraryStore` 原子写/损坏容错/Remove 按 Id + `ThumbnailWriter` maxEdge 320）；编辑器/托盘入口查看历史 → M7b。
 3. Updater：参考 `UpdateConfig.CheckOnStartup / SkippedVersion`；若与 R-1 Velopack 打包协调，改用 vpk UpdateManager（见 R-1 卡，先沟通再动手）。
 4. Pin 贴图：导出/工具环入口 → 无边框 Topmost 置顶小窗显示截图，可拖动/缩放/双击关闭。
 

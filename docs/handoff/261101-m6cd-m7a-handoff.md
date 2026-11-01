@@ -1,23 +1,22 @@
-# Prtsc 交接备忘 — 2026-11-01（M6c + M6d 完成，M7a 已领取待新会话执行）
+# Prtsc 交接备忘 — 2026-11-01（M7a 云上传数据层完成；下一步 M7b UI / Updater / Pin）
 
-> 目标读者：下一位接手的 AI Agent。本文件取代 `261101-m6cd-handoff.md`（内容已并入）；更早坑清单 `261026-handoff.md` 仍有效。
+> 目标读者：下一位接手的 AI Agent。本文件取代前两版（261026 / 261101-m6cd-m7a-handoff）；历史坑清单已全部并入本文 §3。
 
 ## 0. 本会话结论（TL;DR）
 
-- **M6c（剪贴板双向 + QuickSave）与 M6d（非破坏 Crop + 比例 + 边缘取色）完成**。
-- 用户确认 **M7 方向 A：按原计划做云上传**（R2/GDrive + Library + Updater + Pin）。
-- **M7a 已领取但未开工**——用户要求在**新会话里一次性做完**。本会话只提交了 M7a 的第一块地基（SigV4 签名器），其余全部留给新会话，规格见 §5。
-- 看板/路线图已建：`docs/roadmap.md` + `kanban/board.md`（里程碑重编号 M7→M11，旧编号映射见 roadmap）。
+- **M7a 完成**：SigV4 签名器 + R2 上传 + GDrive（token/multipart）+ ConfigUploadService 分发 + Cloud 凭据配置 + Library 数据层（library.json/原子写/损坏容错/ThumbnailWriter）。测试 **402/402**（Core 360 + App 42），build 0 error（AVLN5001×1 可忽略）。单 commit。
+- **下一步 M7b**：上传 UI（编辑器导出入口/设置页）、Library 窗口（缩略图列表+再次打开/复制）、Pin 贴图窗；Updater 等 R-1 定 Velopack。
+- 用户已确认 M7 方向 A：按原计划做云上传（R2/GDrive + Library + Updater + Pin）。
 
 ## 1. 进度表
 
 | M | 状态 |
 |---|---|
-| M1–M6d | ✅ 全部完成（明细见 kanban Done 卡与旧 handoff） |
-| **M7a** | **地基已提交（`9022a30` SigV4），主体待新会话执行**——规格 §5，计划 `.zcode/plans/plan-m7a-cloud-library.md`，看板卡 `kanban/issues/C-1-m7-cloud-library-updater-pin.md` |
-| M7b / M8–M11 | 按 roadmap；M7 的 UI（上传按钮/Library 窗口/Pin 窗）在 M7a 数据层之后 |
+| M1–M6d | ✅ 全部完成（明细见 kanban Done 卡） |
+| **M7a（数据层）** | ✅ **完成**：明细见 §5 与 kanban Done 卡 |
+| M7b / M8–M11 | M7b=上传 UI/Library 窗口/Pin 窗；其余按 roadmap |
 
-测试基线：**358/358**（Core 316 + App 42）。build 0 error（AVLN5001×1 可忽略）。
+测试基线：**402/402**（Core 360 + App 42）。
 
 ## 2. 近两个里程碑要点（只记增量）
 
@@ -43,24 +42,32 @@
 3. Core 无 Avalonia/Win32；Win32 进 Platform.Windows。
 4. 人工冒烟持续欠着（QA-1 卡，P0）：X 裁剪/比例/A 取色、剪贴板与 Word/微信/Chrome 互通、Ctrl+Q 等。
 
-## 5. M7a 执行规格（新会话从这里开始）
+## 5. M7a 完成明细（供 M7b 接手）
 
-**先跑**：`dotnet build --nologo`（0 error）+ `dotnet test --no-build --nologo`（358/358）。
-**再读**：`kanban/issues/C-1-m7-cloud-library-updater-pin.md` + `.zcode/plans/plan-m7a-cloud-library.md`（本会话已写好完整计划与 TDD 顺序）+ `src/Prtsc.Core/Cloud/SigV4Signer.cs`（已就位，**勿重写**，测试 `tests/Prtsc.Core.Tests/Cloud/SigV4SignerTests.cs` 7 条已绿）。
+**`Prtsc.Core/Cloud/`**（全程无 Win32/无 Avalonia，HttpClient 可注入 FakeHandler 测试）：
+- `SigV4Signer`：纯函数（HashHex/HmacHex/UriEncode/BuildCanonicalRequest/BuildStringToSign/BuildSigningKey/BuildAuthorizationHeader，`EmptySha256`）。⚠ AWS 文档签名向量与其日期**不自洽**，已改用 python 独立预计算的自洽向量锁定——不要"修正"回文档值。
+- `IUploadService`/`UploadRequest`（构造时校验非空）/`UploadResult`（Success/Fail，不抛异常返回失败）+ `NullUploadService`（未配置→中文可读 Fail）。
+- `R2Uploader`：path-style PUT `https://{AccountId}.r2.cloudflarestorage.com/{Bucket}/{Key}`（bucket 在 URI 路径里，签名 host=子域），SigV4 头 `host;x-amz-content-sha256;x-amz-date`，region=`auto`/service=`s3`；成功后拼 `{PublicUrl}/{Key}`（PublicUrl 空→成功但 Url=null）；缺凭据→可读 Fail 且不发请求。`BuildUploadTarget` 公开供向量测试。Authorization 向量同样 python 预计算锁定。
+- `GDriveTokenClient`：refresh_token→access_token（oauth2.googleapis.com/token），缓存至过期前 60s，expires_in 缺失不缓存；凭据缺失/HTTP/解析错误抛异常（由上传器转 Fail）。
+- `GDriveUploader`：multipart/related（metadata {name,parents?} + bytes，Bearer）；FolderId 空=根目录省略 parents；可选 MakePublic（POST permissions anyone/reader → `https://drive.google.com/file/d/{id}/view`）；**公开化失败不算失败**（上传已成功→Success(null)）。`BuildMetadata` 公开供测试。
+- `ConfigUploadService`：每次上传读 `IConfigStore.Current.Cloud.Provider` 分发（r2/gdrive/none，大小写不敏感，未知值可读报错）——config 改动即时生效；HttpClient 共享静态实例。
 
-**已有地基**：SigV4 纯函数（HashHex/HmacHex/UriEncode/BuildCanonicalRequest/BuildStringToSign/BuildSigningKey/BuildAuthorizationHeader，`EmptySha256` 常量）。注意 AWS 文档签名向量与其 2023 版日期**不自洽**（文档示例日期是 20130524 而正文写 2023），已改用 python 独立预计算的自洽向量锁定——不要"修正"回文档值。
+**Config**：`Cloud.Provider("none")/AutoUpload(false)`、`R2.AccessKeyId/SecretAccessKey`、`GDrive.ClientId/ClientSecret/RefreshToken`（camelCase 明文存 config.json）。⚠ JSON 节点名钉成 `"gdrive"`（camelCase 策略默认会产生 `gDrive`，已 `[JsonPropertyName]` 覆盖）；旧 config.json 无新字段→默认值，反序列化有测试锁定。
 
-**待做（TDD 顺序，全程 Core 无 Win32/无 Avalonia，HttpClient 可注入 FakeHandler）**：
-1. Config 增字段 + 往返测试：`CloudConfig.Provider("none")/AutoUpload(false)`、`R2Config.AccessKeyId/SecretAccessKey`、`GDriveConfig.ClientId/ClientSecret/RefreshToken`（camelCase JSON，凭据明文存 config.json，与 WinShot 心智一致）。本会话已删掉红态测试占位 `tests/Prtsc.Core.Tests/Config/CloudConfigTests.cs`，新会话重建。
-2. `IUploadService`/`UploadRequest`/`UploadResult` + `NullUploadService`（未配置→Fail 带可读消息）。
-3. `R2Uploader`：PUT `https://{AccountId}.r2.cloudflarestorage.com/{Bucket}/{Directory}/{FileName}`，SigV4 头（host;x-amz-content-sha256;x-amz-date），成功后 `PublicUrl/Directory/FileName` 拼公开链接。
-4. `GDriveTokenClient`（refresh_token→access_token）+ `GDriveUploader`（multipart related：metadata{name,parents}+bytes；可选 POST permissions anyone/reader 拿公开链接）。
-5. `ConfigUploadService`：按 `Cloud.Provider` 分发（r2/gdrive/none），静态共享 HttpClient。
-6. Library：`LibraryEntry` + `LibraryStore`（`%AppData%\Prtsc\library.json` 原子写、损坏容错）+ `ThumbnailWriter`（maxEdge 320 PNG）。
-7. App DI 注册 `ConfigUploadService`；build+test 全绿 → 单 commit → handoff 增补。
+**`Prtsc.Core/Library/`**：`LibraryEntry`（Id/CreatedAt/FileName/LocalPath/RemoteUrl/Provider/Width/Height/SizeBytes，显式 JsonPropertyName 小驼峰）；`LibraryStore`（`%AppData%\Prtsc\library.json`，.tmp 原子替换，Add 空Id自动生成+查重，Remove 按 Id，Load 缺失→空且**不建文件**，损坏→空+下次 Add 重建）；`ThumbnailWriter`（maxEdge 320 等比 PNG，小图不放大，目录自动创建）。
 
-**明确不做**：上传 UI 按钮/Library 窗口/Pin 窗（M7b）；Updater 实现（等 R-1 定 Velopack，见 C-1 卡风险注记）；凭据 DPAPI 加密；不迁移 WinShot 凭据。
+**App DI**：`IUploadService → ConfigUploadService` 已注册（AppServices）。M7b 只需在 ViewModel/窗口层消费即可。
 
-## 6. 提交清单（本会话）
+**TDD 顺序回顾**：Config 往返 → Null → R2（向量+FakeHandler）→ GDrive（token/multipart/MakePublic）→ 分发 → Library → DI。测试全绿后单 commit。
 
-`658da39` M6d crop/ratio/edge-color → `83f6323` handoff → `9022a30` SigV4 地基（358/358）。
+## 6. 提交清单（历史）
+
+`658da39` M6d crop/ratio/edge-color → `83f6323` handoff → `9022a30` SigV4 地基（358/358）→ 本会话 M7a 单 commit（402/402）。
+
+## 7. M7b 待办速记
+
+- 上传入口：编辑器导出动作 + `Cloud.AutoUpload` 自动上传接线（数据层已就绪，`UploadRequest(fileName, bytes, contentType)`）。
+- 上传成功后动作：状态提示 + URL 复制 + `LibraryStore.AddAsync` + `ThumbnailWriter.Write`（缩略图文件名建议 `thumb_{entryId}.png`）。
+- Library 窗口：缩略图列表（时间/文件名/渠道标记），再次打开/复制/删除（`RemoveAsync`）。
+- Pin 窗：无边框 Topmost，拖动/缩放/双击关闭，关闭不影响主编辑器。
+- 设置页字段：渠道下拉（无/R2/GDrive）+ 对应凭据 + PublicUrl/Directory/FolderId + AutoUpload 开关（字段全部已在 config 就位）。

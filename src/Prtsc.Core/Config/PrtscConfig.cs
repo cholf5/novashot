@@ -89,7 +89,16 @@ public sealed class UpdateConfig
 
 public sealed class CloudConfig
 {
+    /// <summary>上传渠道：none | r2 | gdrive。</summary>
+    public string Provider { get; set; } = "none";
+
+    /// <summary>编辑器保存/复制后自动上传（M7b UI 接线；数据层默认关）。</summary>
+    public bool AutoUpload { get; set; } = false;
+
     public R2Config R2 { get; set; } = new();
+
+    // camelCase 策略会把 GDrive 写成 "gDrive"，这里钉成 "gdrive"（WinShot 心智）。
+    [JsonPropertyName("gdrive")]
     public GDriveConfig GDrive { get; set; } = new();
 }
 
@@ -99,11 +108,20 @@ public sealed class R2Config
     public string Bucket { get; set; } = string.Empty;
     public string PublicUrl { get; set; } = string.Empty;
     public string Directory { get; set; } = string.Empty;
+
+    /// <summary>R2 API Token 的 Access Key ID（凭据明文存 config.json，与 WinShot 心智一致）。</summary>
+    public string AccessKeyId { get; set; } = string.Empty;
+    public string SecretAccessKey { get; set; } = string.Empty;
 }
 
 public sealed class GDriveConfig
 {
     public string FolderId { get; set; } = string.Empty;
+
+    /// <summary>OAuth Desktop 凭据 + 离线 refresh_token（凭据明文存 config.json，与 WinShot 心智一致）。</summary>
+    public string ClientId { get; set; } = string.Empty;
+    public string ClientSecret { get; set; } = string.Empty;
+    public string RefreshToken { get; set; } = string.Empty;
 }
 
 [JsonSourceGenerationOptions(

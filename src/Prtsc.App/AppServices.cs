@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.ViewModels;
 using Prtsc.Core;
+using Prtsc.Core.Cloud;
 using Prtsc.Core.Clipboard;
 using Prtsc.Core.Config;
 using Prtsc.Platform.Windows;
@@ -33,6 +34,9 @@ public static class AppServices
         // Core + platform
         services.AddPrtscCore();
         services.AddPrtscWindows();
+
+        // 云上传：按 config.Cloud.Provider 每次分发（M7a 数据层；UI 在 M7b 接线）
+        services.AddSingleton<IUploadService, ConfigUploadService>();
 
         // Override config directory if provided（测试或便携模式）
         services.AddSingleton<IConfigStore>(sp => new JsonConfigStore(
