@@ -1,0 +1,40 @@
+# Prtsc 路线图（2026-11-01 修订）
+
+> 依据：M6d 交接 `docs/handoff/261101-m6cd-handoff.md` + 对 `references/winshot`、`references/flameshot` 的功能差距盘点。
+> 本文件是里程碑总表与缺口登记处；执行细节与踩坑记录仍以 handoff 文档为准。看板在 `kanban/board.md`。
+
+## 已完成
+
+| 里程碑 | 内容 |
+|---|---|
+| M1–M3 | 脚手架、选框 8-handles、工具环、WGC+GDI 抓帧、Window picker |
+| M4a–M4d | SkiaCanvas 分层渲染、Rect/Ellipse/Line/Arrow(直+曲)/Text/Number/Spotlight、Select+移动缩放+Undo/Redo、样式面板、工具热键 |
+| M5 | Pencil / Highlighter / Mosaic / Blur |
+| M6a–M6d | 合成管线（渐变背景/Padding/圆角/阴影/内衬/边框）+ 导出 PNG/JPEG/WebP + 剪贴板双向(CF_DIBV5/CF_DIB)+QuickSave + 非破坏裁剪/比例预设/边缘取色 |
+
+测试基线 351/351（Core 309 + App 42），build 0 error。
+
+## 未完成
+
+| 里程碑 | 内容 | 看板卡 | 状态 |
+|---|---|---|---|
+| M7 | R2/GDrive 上传、Library 截图历史、Updater、Pin 贴图 | C-1 | 待开工（活跃会话可能已领取，开工前先看 git log） |
+| M8 | 设置中心 GUI（热键录制、自启/托盘、QuickSave、导出质量滑杆、编辑器默认值、WGC 光标开关） | S-1 | 待开工 |
+| M9 | 捕获增强：延时截图、屏幕取色器、Ctrl+O 导入、桌面通知 | D-1 / E-1 / I-1 / N-1 | 待开工 |
+| M10 | 分发就绪：CLI、i18n(zh-CN 首发)、Velopack 打包 | L-1 / L-2 / R-1 | 待开工 |
+| M11 | v1.0：QA-1 真机冒烟全绿 + 用户文档 + 发布 | QA-1 | 收尾门 |
+
+### 与旧交接文档编号的映射
+
+旧 M8（CLI/通知/快捷键自定义/Velopack）拆分：通知 → M9；快捷键自定义 → M8 设置中心；CLI + Velopack → M10。旧 M9（v1.0）→ M11。
+
+## 缺口来源（winshot / flameshot 对比结论）
+
+- **两边都有而 prtsc 缺**：延时截图（D-1）、设置 GUI（S-1）、桌面通知（N-1）、CLI（L-1）、i18n（L-2）。
+- **flameshot 独有值得抄**：屏幕取色器（E-1）、Pin 贴图（已并入 C-1）、工具栏按钮自定义（B-6）、反色（X-1，可选）。
+- **winshot 独有值得抄**：渐变背景合成（M6 已抄）、R2/GDrive 上传（已并入 C-1）、导入图片（I-1）、WindowPicker 缩略图（B-2）。
+- **prtsc 自有积压**：PNG 剪贴板格式（B-1）、跨屏选框（B-3）、crop reshape（B-4）、真机冒烟（QA-1，P0）。
+
+## 顺序建议
+
+QA-1 冒烟随时可做且是 P0；M7 与 S-1 无相互依赖可并行推进；D-1/E-1/N-1/I-1 都是小块，可穿插在 M7/S-1 之间歇脚；L-2 i18n 最好在 R-1 打包之前完成，避免发布后补串。
