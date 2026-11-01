@@ -148,13 +148,11 @@ internal static unsafe partial class MacNative
 
     [LibraryImport(MacLibs.Carbon)] internal static partial nint GetApplicationEventTarget();
 
-    [LibraryImport(MacLibs.Carbon)] internal static partial nint InstallEventHandler(nint target, EventHandlerUPP handler, nuint count, EventTypeSpec* types, void* userData, out nint handlerRef);
+    [LibraryImport(MacLibs.Carbon)] internal static partial nint InstallEventHandler(nint target, delegate* unmanaged<nint, nint, void*, int> handler, nuint count, EventTypeSpec* types, void* userData, out nint handlerRef);
 
     [LibraryImport(MacLibs.Carbon)] internal static partial int RemoveEventHandler(nint handlerRef);
 
     [LibraryImport(MacLibs.Carbon)] internal static partial OSStatus GetEventParameter(nint evt, uint name, uint desiredType, out uint actualType, nuint size, out nuint actualSize, out EventHotKeyID value);
-
-    internal delegate int EventHandlerUPP(nint handlerCallToken, nint evt, void* userData);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct EventTypeSpec { public uint eventClass; public uint eventKind; }

@@ -41,3 +41,17 @@ public class CGWindowListApiManualTests
         Assert.True(rows.Length >= 0);
     }
 }
+
+[Trait("Category", "Manual")]
+public class MacHotkeyServiceManualTests
+{
+    [Fact]
+    public void RegisterAndUnregister_F13_NoError()
+    {
+        using var svc = new Prtsc.Platform.Mac.Hotkeys.MacHotkeyService(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Prtsc.Platform.Mac.Hotkeys.MacHotkeyService>.Instance);
+        svc.Start();
+        svc.RegisterAll("F13", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+        svc.Stop();
+    }
+}
