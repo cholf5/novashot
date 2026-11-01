@@ -25,6 +25,8 @@ public partial class MainWindow : Window
     private readonly ICaptureService _capture;
     private readonly IWindowService _windowService;
     private readonly ILogger<MainWindow> _logger;
+    private readonly IConfigStore _configStore;
+    private readonly Prtsc.Core.Library.LibraryStore _libraryStore;
 
     private SkiaCanvas? _canvas;
     private TextBox? _textEditBox;
@@ -34,14 +36,19 @@ public partial class MainWindow : Window
         AppServices.GetRequiredService<MainWindowViewModel>(),
         AppServices.GetRequiredService<ICaptureService>(),
         AppServices.GetRequiredService<IWindowService>(),
+        AppServices.GetRequiredService<IConfigStore>(),
+        AppServices.GetRequiredService<Prtsc.Core.Library.LibraryStore>(),
         AppServices.GetRequiredService<ILogger<MainWindow>>())
     { }
 
-    public MainWindow(MainWindowViewModel vm, ICaptureService capture, IWindowService windowService, ILogger<MainWindow> logger)
+    public MainWindow(MainWindowViewModel vm, ICaptureService capture, IWindowService windowService,
+        IConfigStore configStore, Prtsc.Core.Library.LibraryStore libraryStore, ILogger<MainWindow> logger)
     {
         _vm = vm;
         _capture = capture;
         _windowService = windowService;
+        _configStore = configStore;
+        _libraryStore = libraryStore;
         _logger = logger;
         DataContext = vm;
 
@@ -53,6 +60,7 @@ public partial class MainWindow : Window
         _textEditBox = this.FindControl<TextBox>("TextEditBox");
         if (_canvas is not null) _canvas.ViewportInvalidated += OnCanvasViewportInvalidated;
         _vm.PropertyChanged += OnVmPropertyChanged;
+        _vm.PinnedImageRequested += OnPinnedImageRequested;
         SubscribeToEditor(_vm.Editor);
     }
 
@@ -129,6 +137,42 @@ public partial class MainWindow : Window
 
     private void OnExportClick(object? sender, RoutedEventArgs e) => _ = ExportCurrentAsync();
 
+    // ---- M7b: cloud upload / library / pin / cloud settings ----
+
+    private void OnLibraryClick(object? sender, RoutedEventArgs e) => ShowLibrary();
+
+    /// <summary>打开 Library 历史窗口（重复调用激活已有窗口）。</summary>
+    internal void ShowLibrary()
+    {
+        if (_libraryWindow is { } existing)
+        {
+            existing.Activate();
+            return;
+        }
+        _libraryWindow = new LibraryWindow(_libraryStore, Prtsc.Core.AppDataPaths.Thumbs,
+            AppServices.GetRequiredService<Prtsc.Core.Clipboard.IClipboardService>());
+        _libraryWindow.Closed += (_, _) => _libraryWindow = null;
+        _libraryWindow.Show();
+    }
+
+    private LibraryWindow? _libraryWindow;
+
+    private void OnCloudSettingsClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new CloudSettingsWindow(_configStore);
+        dialog.Show(this);
+    }
+
+    /// <summary>Pin 事件 → 开贴图窗（位图所有权移交 PinnedWindow）。</summary>
+    private void OnPinnedImageRequested(object? sender, PinnedImageRequestedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var pin = new PinnedWindow(e.Bitmap);
+            pin.Show();
+        });
+    }
+
     /// <summary>
     /// M6a 导出：保存对话框（PNG/JPEG/WebP，格式由所选扩展名决定）→
     /// <see cref="ImageExporter"/>（内部走 <see cref="Composition"/>，与画布渲染同源）→ 落盘。
@@ -170,12 +214,18 @@ public partial class MainWindow : Window
                 path, format, editor.ContentWidth, editor.ContentHeight);
             _vm.StatusText = $"Saved {path}";
 
+            await RecordLibraryAfterExportAsync(path, editor);
+
             // M6c: Auto-copy —— 导出成功后按 config 自动复制到剪贴板
             if (IsAutoCopyEnabled())
             {
                 _vm.CopyCommand.Execute(null);
                 _vm.StatusText = $"Saved {path} (also copied to clipboard)";
             }
+
+            // M7b: Auto-upload —— 导出成功后按 config 自动上传
+            if (_vm.IsAutoUploadEnabled)
+                await _vm.UploadCurrentAsync();
         }
         catch (Exception ex)
         {
@@ -195,6 +245,45 @@ public partial class MainWindow : Window
         {
             _logger.LogWarning(ex, "Failed to read AutoCopyToClipboard config; skipping auto-copy");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// M7b：导出成功后记入 Library 历史（LocalPath = 保存位置；上传信息留空）。
+    /// 记录失败只警告，不影响导出流程。
+    /// </summary>
+    private async Task RecordLibraryAfterExportAsync(string path, EditorViewModel editor)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            var size = Prtsc.Core.Editor.Composition.Measure(editor.Document, editor.CompositionState);
+            var entry = await _libraryStore.AddAsync(new Prtsc.Core.Library.LibraryEntry
+            {
+                CreatedAt = DateTimeOffset.Now,
+                FileName = Path.GetFileName(path),
+                LocalPath = path,
+                Width = size.Width,
+                Height = size.Height,
+                SizeBytes = info.Length,
+            });
+
+            // 缩略图失败不影响导出流程
+            try
+            {
+                using var bitmap = SkiaSharp.SKBitmap.Decode(path);
+                if (bitmap is not null)
+                    Prtsc.Core.Library.ThumbnailWriter.Write(
+                        Prtsc.Core.AppDataPaths.Thumbs, $"thumb_{entry.Id}.png", bitmap);
+            }
+            catch (Exception tex)
+            {
+                _logger.LogWarning(tex, "Thumbnail write failed for {Path}", path);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Library record failed for {Path}", path);
         }
     }
 
@@ -245,6 +334,25 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             _vm.PasteFromClipboardCommand.Execute(null);
+            return;
+        }
+        // M7b: Ctrl+U 上传 / Ctrl+L 历史 / Ctrl+P Pin
+        if (e.Key == Key.U && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            _ = _vm.UploadCurrentAsync();
+            return;
+        }
+        if (e.Key == Key.L && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            ShowLibrary();
+            return;
+        }
+        if (e.Key == Key.P && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            _vm.PinCommand.Execute(null);
             return;
         }
         if (e.KeyModifiers != KeyModifiers.None) return;

@@ -86,6 +86,28 @@ public sealed class WindowsClipboardService : IClipboardService
         return true;
     }
 
+    /// <summary>写 CF_UNICODETEXT（UTF-16LE + 结尾 null）。M7b：复制上传 URL。</summary>
+    public bool TrySetText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+
+        byte[] payload = System.Text.Encoding.Unicode.GetBytes(text + "\0");
+        if (!User32.OpenClipboard(nint.Zero))
+        {
+            _logger?.LogWarning("OpenClipboard failed (error {Error}) for text", System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+            return false;
+        }
+        try
+        {
+            if (!User32.EmptyClipboard()) return false;
+            return PutData(User32.CF_UNICODETEXT, payload);
+        }
+        finally
+        {
+            User32.CloseClipboard();
+        }
+    }
+
     public SKBitmap? TryGetImage()
     {
         // CF_DIBV5 优先（保真），CF_DIB 兜底（老读者）

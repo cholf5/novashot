@@ -40,6 +40,7 @@ internal static class User32
     // ---- Clipboard (M6c) ----
     public const uint CF_DIB = 8;
     public const uint CF_DIBV5 = 17;
+    public const uint CF_UNICODETEXT = 13;
     public const uint GMEM_MOVEABLE = 0x0002;
 
     [DllImport("user32.dll", SetLastError = true)]

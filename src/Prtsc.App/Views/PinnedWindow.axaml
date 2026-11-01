@@ -1,0 +1,31 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        x:Class="Prtsc.App.Views.PinnedWindow"
+        Title="Prtsc.Pin"
+        WindowDecorations="None"
+        TransparencyLevelHint="AcrylicBlur"
+        Background="Transparent"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="Manual">
+
+  <Panel>
+    <!-- 贴图本体：圆角 + 阴影描边 -->
+    <Border Name="PinBorder" CornerRadius="6" ClipToBounds="True"
+            BoxShadow="0 4 16 0 #66000000">
+      <Image Name="PinImage" Stretch="Fill"/>
+    </Border>
+    <!-- 悬停提示条（操作说明） -->
+    <Border Name="HintBar" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+            Margin="0,0,0,4" Background="#B0000000" CornerRadius="4" Padding="8,3"
+            IsVisible="False" IsHitTestVisible="False">
+      <TextBlock Foreground="White" FontSize="11"
+                 Text="拖动移动 · 滚轮缩放 · 双击或 Esc 关闭"/>
+    </Border>
+  </Panel>
+</Window>

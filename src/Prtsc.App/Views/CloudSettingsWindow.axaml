@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Prtsc.App.ViewModels"
+        mc:Ignorable="d"
+        x:Class="Prtsc.App.Views.CloudSettingsWindow"
+        x:DataType="vm:CloudSettingsViewModel"
+        Title="云上传设置"
+        Width="520" Height="620"
+        MinWidth="460" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                Margin="0,12,0,0" Spacing="8">
+      <Button Name="SaveButton" Content="保存" Padding="16,6" Click="OnSaveClick"/>
+      <Button Name="CancelButton" Content="取消" Padding="16,6" Click="OnCancelClick"/>
+    </StackPanel>
+
+    <ScrollViewer>
+      <StackPanel Spacing="12">
+
+        <TextBlock Text="云上传" FontSize="18" FontWeight="SemiBold"/>
+        <TextBlock TextWrapping="Wrap" Opacity="0.75" FontSize="12"
+                   Text="截图可上传到 Cloudflare R2（S3 兼容）或 Google Drive，上传后链接自动复制。凭据明文保存在本机 config.json，不会上传。"/>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="渠道" VerticalAlignment="Center"/>
+          <ComboBox Name="ProviderCombo" MinWidth="180" SelectedIndex="{Binding ProviderIndex}">
+            <ComboBoxItem Content="不上传（none）"/>
+            <ComboBoxItem Content="Cloudflare R2"/>
+            <ComboBoxItem Content="Google Drive"/>
+          </ComboBox>
+        </StackPanel>
+
+        <CheckBox IsChecked="{Binding AutoUpload}" Content="保存后自动上传"/>
+
+        <!-- R2 -->
+        <StackPanel IsVisible="{Binding IsR2Visible}" Spacing="8"
+                    Margin="0,4,0,0">
+          <TextBlock Text="Cloudflare R2" FontWeight="SemiBold"/>
+          <TextBlock Text="在 Cloudflare 控制台 → R2 → Manage API Tokens 创建 Token，并记录 Account ID。" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+          <TextBlock Text="Account ID"/>
+          <TextBox Text="{Binding R2AccountId}"/>
+          <TextBlock Text="Bucket"/>
+          <TextBox Text="{Binding R2Bucket}"/>
+          <TextBlock Text="Access Key ID"/>
+          <TextBox Text="{Binding R2AccessKeyId}"/>
+          <TextBlock Text="Secret Access Key"/>
+          <TextBox Text="{Binding R2SecretAccessKey}" PasswordChar="●"/>
+          <TextBlock Text="公开访问域名（可选；用于生成链接，如 https://img.example.com 或 R2 公开桶地址）" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+          <TextBox Text="{Binding R2PublicUrl}"/>
+          <TextBlock Text="上传目录（可选，如 shots/2026）"/>
+          <TextBox Text="{Binding R2Directory}"/>
+        </StackPanel>
+
+        <!-- GDrive -->
+        <StackPanel IsVisible="{Binding IsGDriveVisible}" Spacing="8"
+                    Margin="0,4,0,0">
+          <TextBlock Text="Google Drive" FontWeight="SemiBold"/>
+          <TextBlock Text="在 Google Cloud Console 创建 OAuth Desktop 客户端，用 oauth2 playground 换取离线 refresh_token。" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+          <TextBlock Text="Client ID"/>
+          <TextBox Text="{Binding GDriveClientId}"/>
+          <TextBlock Text="Client Secret"/>
+          <TextBox Text="{Binding GDriveClientSecret}" PasswordChar="●"/>
+          <TextBlock Text="Refresh Token"/>
+          <TextBox Text="{Binding GDriveRefreshToken}" PasswordChar="●"/>
+          <TextBlock Text="目标文件夹 ID（可选；留空 = 我的云端硬盘根目录）"/>
+          <TextBox Text="{Binding GDriveFolderId}"/>
+        </StackPanel>
+
+        <TextBlock Text="{Binding SaveHint}" FontSize="12" Opacity="0.85"/>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

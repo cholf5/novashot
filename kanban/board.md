@@ -24,7 +24,7 @@
 - R-1 M10 Velopack 打包（安装器 + 便携版；与 C-1 Updater 子任务协调采用 vpk UpdateManager）（P1）
 
 ## In Progress
-- C-1 M7 云上传/Library/Updater/Pin —— M7a 数据层已完成（2026-11-01）：R2 SigV4 / GDrive multipart / ConfigUploadService 分发 / Library 数据层；剩 M7b UI（上传按钮/Library 窗口/Pin 窗）与 Updater
+- C-1 M7 云上传/Library/Updater/Pin —— M7b UI 完成（2026-11-01，工具栏 Upload/Library/Pin/Cloud… + Ctrl+U/L/P + 导出后自动入库/缩略图 + AutoUpload + 剪贴板文本 + 托盘入口）；剩 Updater（等 R-1 Velopack）
 
 ## In Review
 - 
@@ -36,5 +36,6 @@
 - 
 
 ## Done
+- M7b M7 UI 层：编辑器工具栏 Upload/Library/Pin/Cloud… 按钮 + Ctrl+U/L/P 热键 + PinnedWindow（置顶贴图：拖动/滚轮缩放/双击/Esc 关闭）+ LibraryWindow（缩略图列表/复制链接/打开/删除）+ CloudSettingsWindow（渠道/凭据/AutoUpload）+ 导出与上传后自动写 Library+缩略图 + IClipboardService.TrySetText（CF_UNICODETEXT）；测试 427/427（Core 374 + App 53）（2026-11-01）
 - M7a M7 数据层：SigV4 签名器 + R2 上传 + GDrive（token/multipart）+ ConfigUploadService 分发 + Cloud 凭据配置 + Library 数据层（library.json/原子写/缩略图）；测试 402/402（Core 360 + App 42）（2026-11-01）
 - M1–M6d 里程碑汇总（脚手架/捕获/选框 → 标注工具集 → 手绘与区域效果 → 合成管线/剪贴板/裁剪+边缘取色；测试基线 351/351，详见 issues/done-m1-m6d.md）（2026-11-01）

@@ -165,6 +165,19 @@
             <Button Content="Quick Save (Ctrl+Q)" Padding="10,4"
                     ToolTip.Tip="Save directly to the QuickSave folder (no dialog, follows config)"
                     Command="{Binding QuickSaveCommand}"/>
+            <!-- M7b: 云上传 / 历史 / Pin / 云设置 -->
+            <Button Content="Upload" Padding="10,4"
+                    ToolTip.Tip="Upload to configured cloud (R2/Google Drive), URL copied (Ctrl+U)"
+                    Command="{Binding UploadCommand}"/>
+            <Button Content="Library" Padding="10,4"
+                    ToolTip.Tip="Screenshot history (Ctrl+L)"
+                    Click="OnLibraryClick"/>
+            <Button Content="Pin" Padding="10,4"
+                    ToolTip.Tip="Pin composed image to screen (Ctrl+P)"
+                    Command="{Binding PinCommand}"/>
+            <Button Content="Cloud…" Padding="10,4"
+                    ToolTip.Tip="Cloud upload settings"
+                    Click="OnCloudSettingsClick"/>
           </StackPanel>
         </Border>
         <Border Grid.Row="1" Background="#0A000000">

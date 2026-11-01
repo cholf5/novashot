@@ -88,6 +88,26 @@ public partial class App : Application
 
         menu.Add(new NativeMenuItemSeparator());
 
+        // M7b: Library / 云设置入口
+        var libraryItem = new NativeMenuItem("截图历史…");
+        libraryItem.Click += (_, _) =>
+        {
+            if (_mainWindow is { } main)
+                Dispatcher.UIThread.Post(main.ShowLibrary);
+        };
+        menu.Add(libraryItem);
+
+        var cloudSettingsItem = new NativeMenuItem("云上传设置…");
+        cloudSettingsItem.Click += (_, _) =>
+        {
+            if (_mainWindow is { } main)
+                Dispatcher.UIThread.Post(() =>
+                    new CloudSettingsWindow(AppServices.GetRequiredService<IConfigStore>()).Show(main));
+        };
+        menu.Add(cloudSettingsItem);
+
+        menu.Add(new NativeMenuItemSeparator());
+
         var quitItem = new NativeMenuItem("Quit");
         quitItem.Click += (_, _) => Shutdown();
         menu.Add(quitItem);

@@ -13,6 +13,9 @@ public interface IClipboardService
     bool TrySetImage(SKBitmap bitmap);
 
     SKBitmap? TryGetImage();
+
+    /// <summary>写入纯文本（M7b：上传成功后复制 URL）。成功返回 true。</summary>
+    bool TrySetText(string text);
 }
 
 /// <summary>进程内内存实现：App VM 单元测试用。</summary>
@@ -29,4 +32,15 @@ public sealed class FakeClipboardService : IClipboardService
     }
 
     public SKBitmap? TryGetImage() => _bitmap?.Copy();
+
+    public bool TrySetText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        _text = text;
+        return true;
+    }
+
+    public string? TryGetText() => _text;
+
+    private string? _text;
 }

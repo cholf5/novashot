@@ -37,6 +37,9 @@ public static class AppServices
 
         // 云上传：按 config.Cloud.Provider 每次分发（M7a 数据层；UI 在 M7b 接线）
         services.AddSingleton<IUploadService, ConfigUploadService>();
+        services.AddSingleton<Prtsc.Core.Library.LibraryStore>(sp =>
+            new Prtsc.Core.Library.LibraryStore(
+                sp.GetRequiredService<ILogger<Prtsc.Core.Library.LibraryStore>>()));
 
         // Override config directory if provided（测试或便携模式）
         services.AddSingleton<IConfigStore>(sp => new JsonConfigStore(
@@ -48,6 +51,8 @@ public static class AppServices
         services.AddSingleton<MainWindowViewModel>(sp => new MainWindowViewModel(
             sp.GetRequiredService<IClipboardService>(),
             sp.GetRequiredService<IConfigStore>(),
+            sp.GetService<IUploadService>(),
+            sp.GetService<Prtsc.Core.Library.LibraryStore>(),
             sp.GetService<ILogger<MainWindowViewModel>>()));
 
         _provider = services.BuildServiceProvider();

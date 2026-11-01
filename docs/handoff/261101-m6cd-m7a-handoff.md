@@ -1,11 +1,11 @@
-# Prtsc 交接备忘 — 2026-11-01（M7a 云上传数据层完成；下一步 M7b UI / Updater / Pin）
+# Prtsc 交接备忘 — 2026-11-01（M7a 数据层 + M7b UI 完成；剩 Updater 等 R-1）
 
 > 目标读者：下一位接手的 AI Agent。本文件取代前两版（261026 / 261101-m6cd-m7a-handoff）；历史坑清单已全部并入本文 §3。
 
 ## 0. 本会话结论（TL;DR）
 
-- **M7a 完成**：SigV4 签名器 + R2 上传 + GDrive（token/multipart）+ ConfigUploadService 分发 + Cloud 凭据配置 + Library 数据层（library.json/原子写/损坏容错/ThumbnailWriter）。测试 **402/402**（Core 360 + App 42），build 0 error（AVLN5001×1 可忽略）。单 commit。
-- **下一步 M7b**：上传 UI（编辑器导出入口/设置页）、Library 窗口（缩略图列表+再次打开/复制）、Pin 贴图窗；Updater 等 R-1 定 Velopack。
+- **M7a（数据层）+ M7b（UI）完成**：R2/GDrive 上传、Cloud 凭据配置、Library（索引+缩略图）、工具栏 Upload/Library/Pin/Cloud… 按钮、Ctrl+U/L/P 热键、PinnedWindow 贴图、LibraryWindow、CloudSettingsWindow、导出后自动入历史、AutoUpload、剪贴板文本能力。测试 **427/427**（Core 374 + App 53），build 0 error 0 warning（除 OverlayWindow 旧 AVLN5001）。
+- **剩余（C-1 卡）**：Updater —— 等 R-1 定 Velopack 后用 vpk UpdateManager，勿提前自研轮询。
 - 用户已确认 M7 方向 A：按原计划做云上传（R2/GDrive + Library + Updater + Pin）。
 
 ## 1. 进度表
@@ -13,10 +13,11 @@
 | M | 状态 |
 |---|---|
 | M1–M6d | ✅ 全部完成（明细见 kanban Done 卡） |
-| **M7a（数据层）** | ✅ **完成**：明细见 §5 与 kanban Done 卡 |
-| M7b / M8–M11 | M7b=上传 UI/Library 窗口/Pin 窗；其余按 roadmap |
+| **M7a（数据层）** | ✅ **完成**：明细见 §5 |
+| **M7b（UI）** | ✅ **完成**：明细见 §5b；C-1 卡仅剩 Updater（等 R-1） |
+| M8–M11 | 按 roadmap |
 
-测试基线：**402/402**（Core 360 + App 42）。
+测试基线：**427/427**（Core 374 + App 53）。build 0 warning（除 OverlayWindow 旧 AVLN5001）。
 
 ## 2. 近两个里程碑要点（只记增量）
 
@@ -56,18 +57,34 @@
 
 **`Prtsc.Core/Library/`**：`LibraryEntry`（Id/CreatedAt/FileName/LocalPath/RemoteUrl/Provider/Width/Height/SizeBytes，显式 JsonPropertyName 小驼峰）；`LibraryStore`（`%AppData%\Prtsc\library.json`，.tmp 原子替换，Add 空Id自动生成+查重，Remove 按 Id，Load 缺失→空且**不建文件**，损坏→空+下次 Add 重建）；`ThumbnailWriter`（maxEdge 320 等比 PNG，小图不放大，目录自动创建）。
 
-**App DI**：`IUploadService → ConfigUploadService` 已注册（AppServices）。M7b 只需在 ViewModel/窗口层消费即可。
+**App DI**：`IUploadService → ConfigUploadService`、`LibraryStore`（单例，默认 %AppData% 目录）已注册；`MainWindowViewModel` 构造已接 (clipboard, configStore, upload, library, logger)。
+
+## 5b. M7b 完成明细（UI 层，接手 Updater 前必读）
+
+**`Prtsc.Core` 新增**：
+- `UploadCoordinator`（Cloud/）：编排 = 渲染编码（走 config.Export.DefaultFormat/JpegQuality）→ FilenamePatterns 命名 → 上传 → LibraryStore.Add + ThumbnailWriter（从上传字节解码生成 thumb_{id}.png）。Library 写失败不吞成功（Entry=null，Url 仍返回）。`NormalizeProvider`/`ContentTypeFor` 公开可测。
+- `AppDataPaths`：%AppData%\Prtsc 统一路径（Root/Thumbs/LibraryFile）。
+- `IClipboardService.TrySetText`：新增文本能力（上传后复制 URL）；Win32 实现 = CF_UNICODETEXT（EmptyClipboard+SetClipboardData，与图片同套路）；FakeClipboardService 记字段。
+
+**`Prtsc.App` 新增/改动**：
+- `PinnedWindow`：无边框置顶贴图（WindowDecorations="None"，注意别用回 SystemDecorations——已废弃）。拖动（Pointer capture）/滚轮缩放（0.1~5x，Ctrl 粗调）/双击/Esc 关闭；悬停 2s 提示条；位置逐张错开（PinWindowStatics.NextOffset）。**运行时加载器要求无参公共构造**（AVLN3001），参数构造为真正入口；位图所有权归窗体，Closed 时释放。
+- `LibraryWindow` + `LibraryViewModel`：ListBox 缩略图列表（CreatedAt 倒序），复制链接（TrySetText）/打开（本地优先，否则 LaunchUriAsync 远程）/删除（RemoveAsync）；缩略图 thumb_{id}.png 异步补载。
+- `CloudSettingsWindow` + `CloudSettingsViewModel`：渠道 ComboBox（none/r2/gdrive）+ 各凭据表单（Secret 打点）+ AutoUpload；保存走 Update+SaveAsync，缺项校验给中文提示。
+- `MainWindow`：工具栏 Upload/Library/Pin/Cloud… 按钮；Ctrl+U 上传 / Ctrl+L 历史 / Ctrl+P Pin（走 OnKeyDown，与 Ctrl+S/Q/C/V 同层）；导出成功 → `RecordLibraryAfterExportAsync`（入历史+缩略图，失败只警告）→ AutoUpload 时 `UploadCurrentAsync`。ShowLibrary 是 internal（托盘复用，单例窗口）。
+- `App`：托盘新增「截图历史…」「云上传设置…」。
+
+**TDD 注意**：App.Tests 不能引用 Core.Tests 的 FakeHandler（不同程序集）——内联了 StubHandler；`UploadCommand.ExecuteAsync(null)` 是 xunit 亲生的无阻塞 API，别用 `.GetAwaiter().GetResult()`（xUnit1031）。
+
+**未做（下会话候选）**：Pin 窗多屏 DPI 精化（现在按 96 DPI 基准）；Library 窗口「再次复制图片」（只做了链接与打开）；上传重试；AutoUpload 只在手动导出后触发，QuickSave/Copy 路径未接。
 
 **TDD 顺序回顾**：Config 往返 → Null → R2（向量+FakeHandler）→ GDrive（token/multipart/MakePublic）→ 分发 → Library → DI。测试全绿后单 commit。
 
 ## 6. 提交清单（历史）
 
-`658da39` M6d crop/ratio/edge-color → `83f6323` handoff → `9022a30` SigV4 地基（358/358）→ 本会话 M7a 单 commit（402/402）。
+`658da39` M6d → `83f6323` handoff → `9022a30` SigV4 地基（358）→ `b7a7102` M7a 数据层（402）→ 本会话 M7b UI 单 commit（427）。
 
-## 7. M7b 待办速记
+## 7. 剩余待办（C-1 收尾 + 后续）
 
-- 上传入口：编辑器导出动作 + `Cloud.AutoUpload` 自动上传接线（数据层已就绪，`UploadRequest(fileName, bytes, contentType)`）。
-- 上传成功后动作：状态提示 + URL 复制 + `LibraryStore.AddAsync` + `ThumbnailWriter.Write`（缩略图文件名建议 `thumb_{entryId}.png`）。
-- Library 窗口：缩略图列表（时间/文件名/渠道标记），再次打开/复制/删除（`RemoveAsync`）。
-- Pin 窗：无边框 Topmost，拖动/缩放/双击关闭，关闭不影响主编辑器。
-- 设置页字段：渠道下拉（无/R2/GDrive）+ 对应凭据 + PublicUrl/Directory/FolderId + AutoUpload 开关（字段全部已在 config 就位）。
+- **Updater**：等 R-1 定 Velopack（vpk UpdateManager），勿自研轮询——R-1 卡风险注记。
+- 人工冒烟（QA-1，P0）新增项：Upload（R2/GDrive 真凭据）、Ctrl+U/L/P、Pin 拖动/缩放/关闭、Library 三按钮、Cloud 设置保存往返、上传后 URL 粘贴到浏览器可用。
+- M8 设置中心（S-1）做 GUI 时可吸收 CloudSettingsWindow 或保持独立窗口（二选一，先问用户）。

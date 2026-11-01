@@ -2,10 +2,14 @@ using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Prtsc.Core;
 using Prtsc.Core.Annotation;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Clipboard;
+using Prtsc.Core.Cloud;
 using Prtsc.Core.Config;
+using Prtsc.Core.Editor.Export;
+using Prtsc.Core.Library;
 using SkiaSharp;
 
 namespace Prtsc.App.ViewModels;
@@ -20,13 +24,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IClipboardService _clipboard;
     private readonly IConfigStore? _configStore;
+    private readonly IUploadService? _upload;
+    private readonly LibraryStore? _library;
     private readonly ILogger? _logger;
 
-    public MainWindowViewModel(IClipboardService clipboard, IConfigStore? configStore = null, ILogger? logger = null)
+    public MainWindowViewModel(IClipboardService clipboard, IConfigStore? configStore = null,
+        IUploadService? upload = null, LibraryStore? library = null, ILogger? logger = null)
     {
         _clipboard = clipboard;
         _configStore = configStore;
+        _upload = upload;
+        _library = library;
         _logger = logger;
+    }
+
+    /// <summary>DI 外（测试）直接 new 时的兼容构造。</summary>
+    public MainWindowViewModel(IClipboardService clipboard, IConfigStore? configStore, ILogger? logger)
+        : this(clipboard, configStore, upload: null, library: null, logger: logger)
+    {
     }
 
     [ObservableProperty]
@@ -116,6 +131,74 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private bool CanQuickSave() => Editor is not null && _configStore is not null;
 
+    // ---- M7b: cloud upload + library + pin ----
+
+    [ObservableProperty]
+    private bool _isUploading;
+
+    /// <summary>上传当前合成结果；成功后 URL 复制到剪贴板并记入 Library。</summary>
+    [RelayCommand(CanExecute = nameof(CanUpload))]
+    private async Task UploadAsync(CancellationToken ct)
+    {
+        if (Editor is not { } editor) return;
+        if (_upload is null || _configStore is null || _library is null)
+        {
+            StatusText = UploadCoordinator.NotConfiguredHint;
+            return;
+        }
+
+        IsUploading = true;
+        try
+        {
+            var coordinator = new UploadCoordinator(_upload, _configStore, _library, _logger);
+            var outcome = await coordinator.UploadDocumentAsync(
+                editor.Document, editor.CompositionState, ct: ct);
+
+            if (!outcome.Ok)
+            {
+                StatusText = outcome.Error ?? "上传失败";
+                return;
+            }
+
+            if (outcome.Url is { } url && _clipboard.TrySetText(url))
+                StatusText = $"Uploaded {outcome.Entry?.FileName} — URL copied to clipboard";
+            else
+                StatusText = $"Uploaded {outcome.Entry?.FileName}";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Upload canceled";
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Upload failed");
+            StatusText = "Upload failed: " + ex.Message;
+        }
+        finally
+        {
+            IsUploading = false;
+        }
+    }
+
+    private bool CanUpload() => Editor is not null && !IsUploading &&
+        (_upload is null || _configStore?.Current.Cloud.Provider is not (null or "none"));
+
+    partial void OnIsUploadingChanged(bool value) => UploadCommand.NotifyCanExecuteChanged();
+
+    /// <summary>Cloud.AutoUpload 开启且配置了渠道时，导出/复制后自动上传（入口由 View 层调）。</summary>
+    public async Task UploadCurrentAsync(CancellationToken ct = default)
+    {
+        if (UploadCommand.CanExecute(null))
+            await UploadAsync(ct);
+    }
+
+    /// <summary>Cloud.AutoUpload 配置值（View 层导出后判断用）。</summary>
+    public bool IsAutoUploadEnabled =>
+        _configStore is not null && _configStore.Current.Cloud.AutoUpload;
+
+    /// <summary>Library 索引存储（View 层开 Library 窗口 / Pin 缩略图用；DI 外可能为 null）。</summary>
+    public LibraryStore? Library => _library;
+
     /// <summary>剪贴板位图 → 编辑器（工具栏 Paste / Ctrl+V）。</summary>
     [RelayCommand]
     private void PasteFromClipboard()
@@ -132,9 +215,46 @@ public sealed partial class MainWindowViewModel : ObservableObject
         EnterEditor(captured);
     }
 
+    /// <summary>Pin 贴图参数（合成结果；View 层收到变更后开置顶窗）。</summary>
+    public event EventHandler<PinnedImageRequestedEventArgs>? PinnedImageRequested;
+
+    /// <summary>Pin 当前合成结果（工具栏 Pin / Ctrl+P）：弹置顶无边框小窗。</summary>
+    [RelayCommand(CanExecute = nameof(CanCopy))]
+    private void Pin()
+    {
+        if (Editor is not { } editor) return;
+        try
+        {
+            using var image = ImageExporter.Render(editor.Document, editor.CompositionState);
+            using var bitmap = SKBitmap.FromImage(image);
+            if (bitmap.Width <= 0 || bitmap.Height <= 0)
+            {
+                StatusText = "Pin failed: empty image";
+                return;
+            }
+            PinnedImageRequested?.Invoke(this, new PinnedImageRequestedEventArgs(bitmap.Copy()));
+            StatusText = $"Pinned {bitmap.Width} x {bitmap.Height}";
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Pin failed");
+            StatusText = "Pin failed: " + ex.Message;
+        }
+    }
+
     partial void OnEditorChanged(EditorViewModel? value)
     {
         CopyCommand.NotifyCanExecuteChanged();
         QuickSaveCommand.NotifyCanExecuteChanged();
+        UploadCommand.NotifyCanExecuteChanged();
+        PinCommand.NotifyCanExecuteChanged();
     }
+}
+
+/// <summary>Pin 请求事件参数：位图所有权移交订阅者（不收到则丢弃）。</summary>
+public sealed class PinnedImageRequestedEventArgs : EventArgs
+{
+    public SKBitmap Bitmap { get; }
+
+    public PinnedImageRequestedEventArgs(SKBitmap bitmap) => Bitmap = bitmap;
 }
