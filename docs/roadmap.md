@@ -11,14 +11,14 @@
 | M4a–M4d | SkiaCanvas 分层渲染、Rect/Ellipse/Line/Arrow(直+曲)/Text/Number/Spotlight、Select+移动缩放+Undo/Redo、样式面板、工具热键 |
 | M5 | Pencil / Highlighter / Mosaic / Blur |
 | M6a–M6d | 合成管线（渐变背景/Padding/圆角/阴影/内衬/边框）+ 导出 PNG/JPEG/WebP + 剪贴板双向(CF_DIBV5/CF_DIB)+QuickSave + 非破坏裁剪/比例预设/边缘取色 |
-
-测试基线 351/351（Core 309 + App 42），build 0 error。
+| M7a–M7b | R2/GDrive 上传、Cloud 凭据配置、Library（索引+缩略图）、工具栏 Upload/Library/Pin/Cloud… 按钮、PinnedWindow 贴图、LibraryWindow、CloudSettingsWindow；测试 427/427 |
+| MAC-1 | **macOS 平台层**：App 双 TFM + Prtsc.Platform.Mac（CoreGraphics 抓屏、CGWindowList 窗口、Carbon 热键、NSPasteboard 剪贴板、launchd 自启）；测试基线 506/506（Core 381 + Mac 72 + App 53×2TFM），mac 真机启动到托盘+热键注册验证通过（2026-11-01） |
 
 ## 未完成
 
 | 里程碑 | 内容 | 看板卡 | 状态 |
 |---|---|---|---|
-| M7 | R2/GDrive 上传、Library 截图历史、Updater、Pin 贴图 | C-1 | 待开工（活跃会话可能已领取，开工前先看 git log） |
+| M7 | Updater（等 R-1 定 Velopack 后用 vpk UpdateManager，勿自研轮询） | C-1 | 仅剩此项 |
 | M8 | 设置中心 GUI（热键录制、自启/托盘、QuickSave、导出质量滑杆、编辑器默认值、WGC 光标开关） | S-1 | 待开工 |
 | M9 | 捕获增强：延时截图、屏幕取色器、Ctrl+O 导入、桌面通知 | D-1 / E-1 / I-1 / N-1 | 待开工 |
 | M10 | 分发就绪：CLI、i18n(zh-CN 首发)、Velopack 打包 | L-1 / L-2 / R-1 | 待开工 |

@@ -24,7 +24,7 @@
 - R-1 M10 Velopack 打包（安装器 + 便携版；与 C-1 Updater 子任务协调采用 vpk UpdateManager）（P1）
 
 ## In Progress
-- C-1 M7 云上传/Library/Updater/Pin —— M7b UI 完成（2026-11-01，工具栏 Upload/Library/Pin/Cloud… + Ctrl+U/L/P + 导出后自动入库/缩略图 + AutoUpload + 剪贴板文本 + 托盘入口）；剩 Updater（等 R-1 Velopack）
+- C-1 M7 云上传/Library/Updater/Pin —— M7b UI 完成（2026-11-01）；剩 Updater（等 R-1 Velopack）
 
 ## In Review
 - 
@@ -36,6 +36,7 @@
 - 
 
 ## Done
+- MAC-1 macOS 平台层：App 双 TFM（windows/net10.0）+ Prtsc.Platform.Mac（CoreGraphics 抓屏含跨屏 region、CGWindowList 窗口枚举/捕获、Carbon 全局热键无需辅助功能权限、NSPasteboard 剪贴板 TIFF/PNG 双向、launchd LaunchAgent 自启）+ 接口上提 Core（IHotkeyService/IAutostartService）+ mac 主线程 sync-over-async 死锁修复；测试 506/506（Core 381 + Mac 72 + App 53×2TFM）；mac 真机启动到托盘+热键注册验证通过；真机冒烟清单见 handoff 261101-mac1 §5（2026-11-01）
 - M7b M7 UI 层：编辑器工具栏 Upload/Library/Pin/Cloud… 按钮 + Ctrl+U/L/P 热键 + PinnedWindow（置顶贴图：拖动/滚轮缩放/双击/Esc 关闭）+ LibraryWindow（缩略图列表/复制链接/打开/删除）+ CloudSettingsWindow（渠道/凭据/AutoUpload）+ 导出与上传后自动写 Library+缩略图 + IClipboardService.TrySetText（CF_UNICODETEXT）；测试 427/427（Core 374 + App 53）（2026-11-01）
 - M7a M7 数据层：SigV4 签名器 + R2 上传 + GDrive（token/multipart）+ ConfigUploadService 分发 + Cloud 凭据配置 + Library 数据层（library.json/原子写/缩略图）；测试 402/402（Core 360 + App 42）（2026-11-01）
 - M1–M6d 里程碑汇总（脚手架/捕获/选框 → 标注工具集 → 手绘与区域效果 → 合成管线/剪贴板/裁剪+边缘取色；测试基线 351/351，详见 issues/done-m1-m6d.md）（2026-11-01）
