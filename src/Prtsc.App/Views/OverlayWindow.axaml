@@ -19,8 +19,9 @@
     <!-- 选框 + 暗化 + 8 handles + 光标切换 -->
     <controls:SelectionAdorner Name="Adorner"/>
 
-    <!-- 悬浮工具环层：Canvas 允许绝对定位；本身不接受命中，只让子元素接 -->
-    <Canvas Name="ToolRingLayer" Background="Transparent" IsHitTestVisible="True">
+    <!-- 悬浮工具环层：Canvas 允许绝对定位；无 Background 使自身不可命中，
+         避免拦截下层 SelectionAdorner 的鼠标输入（透明背景在 Avalonia 中仍参与命中测试） -->
+    <Canvas Name="ToolRingLayer">
       <controls:FloatingToolRing Name="ToolRing" IsVisible="False"/>
     </Canvas>
 

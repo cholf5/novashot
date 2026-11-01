@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Rendering;
 using Avalonia.Threading;
 
 namespace Prtsc.App.Controls;
@@ -21,7 +22,7 @@ namespace Prtsc.App.Controls;
 /// M2-2：键盘微调 / Ctrl 锁比例 / Shift 中心对称
 /// M2-4：GeometrySettled 400ms 去抖
 /// </summary>
-public sealed class SelectionAdorner : Control
+public sealed class SelectionAdorner : Control, ICustomHitTest
 {
     // ---- 视觉常量（DIP）----
     private const double HandleVisual = 8;
@@ -92,6 +93,12 @@ public sealed class SelectionAdorner : Control
         _settleTimer.Start();
     }
 
+    /// <summary>
+    /// 整个 Bounds 可命中（对齐 Flameshot 全屏 CaptureWidget 一整层接输入的模式）。
+    /// 默认按绘制几何命中时选框内部是透明空洞，内部拖拽（移动选框）会漏到下层背景。
+    /// </summary>
+    public bool HitTest(Point point) => true;
+
     // ------------------------------------------------------------------------
     //  Render
     // ------------------------------------------------------------------------
@@ -161,7 +168,7 @@ public sealed class SelectionAdorner : Control
 
         if (_mode == DragMode.None)
         {
-            Cursor = new Cursor(CursorFor(HitTest(p)));
+            Cursor = new Cursor(CursorFor(HitTestGrip(p)));
             base.OnPointerMoved(e);
             return;
         }
@@ -223,7 +230,7 @@ public sealed class SelectionAdorner : Control
             return;
         }
 
-        var grip = HitTest(p);
+        var grip = HitTestGrip(p);
 
         if (grip == SelectionGeometry.Grip.Outside || _selection is null)
         {
@@ -268,7 +275,7 @@ public sealed class SelectionAdorner : Control
         e.Pointer.Capture(null);
         Cursor = new Cursor(_selection is null
             ? StandardCursorType.Cross
-            : CursorFor(HitTest(e.GetPosition(this))));
+            : CursorFor(HitTestGrip(e.GetPosition(this))));
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
@@ -280,7 +287,7 @@ public sealed class SelectionAdorner : Control
     // ------------------------------------------------------------------------
     //  Hit-testing wrappers（委派到 SelectionGeometry）
     // ------------------------------------------------------------------------
-    private SelectionGeometry.Grip HitTest(Point p) =>
+    private SelectionGeometry.Grip HitTestGrip(Point p) =>
         SelectionGeometry.HitTest(_selection, p, HandleVisual / 2 + HandleHitPad, EdgeHitSlop);
 
     private static StandardCursorType CursorFor(SelectionGeometry.Grip g) => g switch

@@ -15,6 +15,7 @@ namespace Prtsc.App.Tests;
 /// 模板实例化时抛 InvalidCastException——全屏截图进编辑器即崩（2026-11-01 用户报告）。
 /// Headless 会话里真实实例化面板并构建 24 个渐变预设项，锁定该路径。
 /// </summary>
+[Collection("HeadlessUi")]
 public class CompositionPanelXamlTests
 {
     [Fact]
