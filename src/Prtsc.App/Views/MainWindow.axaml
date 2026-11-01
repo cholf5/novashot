@@ -141,6 +141,10 @@
             <RadioButton GroupName="Tool" Content="Blur"    Padding="8,4" Tag="Blur"          Click="OnToolChanged"
                          IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Blur}"
                          ToolTip.Tip="Blur region (B) — Ctrl+Wheel adjusts strength"/>
+            <!-- M6d: 非破坏裁剪（X） -->
+            <RadioButton GroupName="Tool" Content="Crop"    Padding="8,4" Tag="Crop"          Click="OnToolChanged"
+                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Crop}"
+                         ToolTip.Tip="Crop (X) — drag a region; non-destructive"/>
             <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
             <Button Content="Delete (Del)" Padding="10,4"
                     Command="{Binding Editor.DeleteSelectionCommand}"/>

@@ -19,4 +19,5 @@ public enum ToolKind
     Highlighter,
     Mosaic,
     Blur,
+    Crop,
 }

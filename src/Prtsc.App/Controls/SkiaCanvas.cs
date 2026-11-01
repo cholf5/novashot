@@ -53,26 +53,8 @@ public sealed class SkiaCanvas : Control
     private IAnnotationTool? _activeTool;
     private EditorViewModel? _subscribedEditor;
 
-    /// <summary>image 空间 → 内容空间（加 padding）。</summary>
-    private static SKPoint ImageToContent(EditorViewModel editor, SKPoint imagePoint)
-    {
-        var p = editor.CompositionState.Padding;
-        return new SKPoint(imagePoint.X + p, imagePoint.Y + p);
-    }
-
-    /// <summary>内容空间 → image 空间（减 padding）。</summary>
-    private static SKPoint ContentToImage(EditorViewModel editor, SKPoint contentPoint)
-    {
-        var p = editor.CompositionState.Padding;
-        return new SKPoint(contentPoint.X - p, contentPoint.Y - p);
-    }
-
-    /// <summary>image 空间矩形 → 内容空间矩形。</summary>
-    private static SKRect ImageRectToContent(EditorViewModel editor, SKRect imageRect)
-    {
-        var p = editor.CompositionState.Padding;
-        return new SKRect(imageRect.Left + p, imageRect.Top + p, imageRect.Right + p, imageRect.Bottom + p);
-    }
+    // M6d 起：三层坐标换算（image/content/DIP）的唯一实现在 EditorViewModel
+    // （ImageToContent/ContentToImage/ImageRectToContent）——crop 激活时 content 原点 = crop 原点。
 
     public SkiaCanvas()
     {
@@ -145,7 +127,8 @@ public sealed class SkiaCanvas : Control
             _activeTool?.Preview,
             editor.Selection,
             editor.EditingText,
-            ComputeViewportMatrix(editor, bounds)));
+            ComputeViewportMatrix(editor, bounds),
+            CropPreviewRect));
     }
 
     /// <summary>
@@ -190,7 +173,7 @@ public sealed class SkiaCanvas : Control
         var b = Bounds;
         if (b.Width <= 0 || b.Height <= 0) return false;
         var m = ComputeViewportMatrix(editor, b);
-        var mapped = m.MapRect(ImageRectToContent(editor, imageRect));
+        var mapped = m.MapRect(editor.ImageRectToContent(imageRect));
         dipRect = new Rect(mapped.Left, mapped.Top, Math.Max(0, mapped.Width), Math.Max(0, mapped.Height));
         dipScale = m.ScaleX;
         return true;
@@ -204,9 +187,9 @@ public sealed class SkiaCanvas : Control
         if (editor is null) return null;
         var m = ComputeViewportMatrix(editor, Bounds);
         if (!m.TryInvert(out var inv)) return null;
-        // 矩阵在内容空间；反变换后再减 padding 回到 image 空间
+        // 矩阵在内容空间；反变换后经 ContentToImage 回到 image 空间
         var content = inv.MapPoint(new SKPoint((float)dip.X, (float)dip.Y));
-        return ContentToImage(editor, content);
+        return editor.ContentToImage(content);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -292,6 +275,24 @@ public sealed class SkiaCanvas : Control
 
         var img = DipToImage(e.GetPosition(this));
         var committed = img is not null ? _activeTool.OnPointerUp(img.Value) : null;
+
+        // M6d: CropTool 不产出标注——拖拽结果写入 CompositionState.CropRect（含比例吸附）
+        if (_activeTool is CropTool cropTool)
+        {
+            _activeTool = null;
+            e.Pointer.Capture(null);
+            if (cropTool.Committed is { } rect)
+            {
+                var (rw, rh) = editor.PendingCropRatio;
+                editor.ApplyCrop(rw > 0 && rh > 0
+                    ? CropRects.SnapToRatio(rect, rw, rh, new SKRect(0, 0, editor.Document.Width, editor.Document.Height))
+                    : rect);
+            }
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
+
         _activeTool = null;
         e.Pointer.Capture(null);
 
@@ -371,6 +372,9 @@ public sealed class SkiaCanvas : Control
         e.Handled = true;
     }
 
+    /// <summary>拖拽预览（image 空间）；Crop 工具的预览矩形不走标注渲染，overlay 分支用。</summary>
+    private SKRect? CropPreviewRect => _activeTool as CropTool is { } t ? t.PreviewRect : null;
+
     /// <summary>
     /// 计算 TextBox 需要覆盖的 DIP 矩形并请求 EditorViewModel 进入编辑态。
     /// 编辑用的矩形：以 Text.Position（baseline）向上一个 ascent 高，宽度按当前文本 measure。
@@ -413,10 +417,11 @@ public sealed class SkiaCanvas : Control
         private readonly AnnotationBase? _selection;
         private readonly AnnotationBase? _editingText;
         private readonly SKMatrix _matrix;
+        private readonly SKRect? _cropPreviewRect;
 
         public DrawOp(Rect bounds, AnnotationDocument doc, Prtsc.Core.Editor.EditorState state,
                       AnnotationBase? preview, AnnotationBase? selection, AnnotationBase? editingText,
-                      SKMatrix matrix)
+                      SKMatrix matrix, SKRect? cropPreviewRect = null)
         {
             Bounds = bounds;
             _doc = doc;
@@ -425,6 +430,7 @@ public sealed class SkiaCanvas : Control
             _selection = selection;
             _editingText = editingText;
             _matrix = matrix;
+            _cropPreviewRect = cropPreviewRect;
         }
 
         public Rect Bounds { get; }
@@ -460,23 +466,64 @@ public sealed class SkiaCanvas : Control
             // DIP 空间：画选中框与手柄（不随视口缩放变形；编辑中的 Text 不画）
             if (_selection is not null && !ReferenceEquals(_selection, _editingText))
                 DrawSelectionOverlay(canvas, _selection);
+
+            // M6d: 裁剪 overlay——框外暗遮罩 + 白框（编辑器 chrome，永不导出）
+            if (_cropPreviewRect is { } cropRect)
+                DrawCropOverlay(canvas, cropRect);
         }
 
-        /// <summary>image 空间点 → 内容空间（加 padding）→ DIP。</summary>
+        /// <summary>与 EditorViewModel.ImageRectToContent 同式（DrawOp 持的是 state 快照）。</summary>
+        private SKRect ImageRectToContent(SKRect imageRect)
+        {
+            var s = _state;
+            var o = s.CropRect?.Location ?? default;
+            return new SKRect(
+                imageRect.Left - o.X + s.Padding, imageRect.Top - o.Y + s.Padding,
+                imageRect.Right - o.X + s.Padding, imageRect.Bottom - o.Y + s.Padding);
+        }
+
+        /// <summary>裁剪 overlay：全内容暗遮罩，裁剪框内清透 + 白色描边。</summary>
+        private void DrawCropOverlay(SKCanvas canvas, SKRect imageCropRect)
+        {
+            var content = _matrix.MapRect(ImageRectToContent(imageCropRect));
+
+            var restore = canvas.Save();
+            canvas.ResetMatrix();
+
+            using (var dim = new SKPaint { Color = new SKColor(0, 0, 0, 0x80) })
+            {
+                canvas.DrawRect(0, 0, (float)Bounds.Width, (float)Bounds.Height, dim);
+            }
+            using (var clear = new SKPaint { BlendMode = SKBlendMode.Clear })
+            {
+                canvas.DrawRect(content.Left, content.Top, content.Width, content.Height, clear);
+            }
+            using (var frame = new SKPaint
+            {
+                Color = SKColors.White,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1.5f,
+                IsAntialias = true,
+            })
+            {
+                canvas.DrawRect(content.Left, content.Top, content.Width, content.Height, frame);
+            }
+
+            canvas.RestoreToCount(restore);
+        }
+
+        /// <summary>image 空间点 → 内容空间（含 crop 原点 + padding）→ DIP。</summary>
         private SKPoint MapImageToDip(SKPoint imagePoint)
         {
-            var p = _state.Padding;
-            return _matrix.MapPoint(new SKPoint(imagePoint.X + p, imagePoint.Y + p));
+            var s = _state;
+            var o = s.CropRect?.Location ?? default;
+            return _matrix.MapPoint(new SKPoint(imagePoint.X - o.X + s.Padding, imagePoint.Y - o.Y + s.Padding));
         }
 
         private void DrawSelectionOverlay(SKCanvas canvas, AnnotationBase selection)
         {
-            // BoundingBox 从 image 空间加偏移后映射到 DIP
-            var p = _state.Padding;
-            var contentBox = new SKRect(
-                selection.BoundingBox.Left + p, selection.BoundingBox.Top + p,
-                selection.BoundingBox.Right + p, selection.BoundingBox.Bottom + p);
-            var box = _matrix.MapRect(contentBox);
+            // BoundingBox 从 image 空间经内容偏移（crop 原点 + padding）映射到 DIP
+            var box = _matrix.MapRect(ImageRectToContent(selection.BoundingBox));
 
             using (var outline = new SKPaint
             {

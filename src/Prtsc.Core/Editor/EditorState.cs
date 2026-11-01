@@ -40,7 +40,8 @@ public sealed record class EditorState(
     SKColor? InsetColor = null,
     float BorderWidth = 0f,
     SKColor? BorderColor = null,
-    BorderStyle Border = BorderStyle.Center)
+    BorderStyle Border = BorderStyle.Center,
+    SKRect? CropRect = null)
 {
     public static readonly EditorState Default = new();
 
@@ -54,7 +55,26 @@ public sealed record class EditorState(
 
     public bool HasBackground => Background != BackgroundKind.None;
 
-    /// <summary>返回钳制到安全区间的副本（UI 可能给出越界值）。</summary>
+    /// <summary>
+    /// M6d 非破坏裁剪（image 像素空间，Standardized）。null = 不裁剪。
+    /// 裁剪裁的是<b>显示</b>：越界标注被 clip，撤销即恢复，标注数据不动。
+    /// </summary>
+    public SKRect? CropRect { get; init; } = CropRect;
+
+    /// <summary>返回钳制到安全区间的副本（UI 可能给出越界值）。crop 矩形钳回图像范围。</summary>
+    public EditorState Clamped(SKSizeI imageSize) => this with
+    {
+        Padding = Math.Clamp(Padding, 0, 96),
+        CornerRadius = Math.Clamp(CornerRadius, 0f, 64f),
+        ShadowSize = Math.Clamp(ShadowSize, 0f, 64f),
+        InsetSize = Math.Clamp(InsetSize, 0f, 32f),
+        BorderWidth = Math.Clamp(BorderWidth, 0f, 16f),
+        CropRect = CropRect is { } crop
+            ? CropRects.ClampToImage(crop, new SKRect(0, 0, imageSize.Width, imageSize.Height))
+            : null,
+    };
+
+    /// <summary>无图像尺寸上下文时的钳制（仅数值参数；crop 无法校验时保持原样）。</summary>
     public EditorState Clamped() => this with
     {
         Padding = Math.Clamp(Padding, 0, 96),

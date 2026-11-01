@@ -141,6 +141,49 @@ public sealed class CompositionPanelViewModel : ObservableObject
 
     public void SetInsetColor(SKColor color) => Apply(s => s with { InsetColor = color });
 
+    // ---- M6d: crop ratio + auto edge color ----
+
+    /// <summary>预设比例（宽:高）；(0,0) = auto 不吸附。</summary>
+    public static readonly (int W, int H)[] CropRatios =
+        [(0, 0), (1, 1), (4, 3), (3, 2), (16, 9), (5, 3), (9, 16), (3, 4), (2, 3)];
+
+    private int _cropRatioIndex = 0; // 默认 auto
+
+    /// <summary>SelectedIndex 进 CropRatios；选中即应用到当前裁剪框（拖拽时也生效）。</summary>
+    public int CropRatioIndex
+    {
+        get => _cropRatioIndex;
+        set
+        {
+            var idx = Math.Clamp(value, 0, CropRatios.Length - 1);
+            if (idx == _cropRatioIndex && Editor.PendingCropRatio == CropRatioValue) return;
+            _cropRatioIndex = idx;
+            Editor.PendingCropRatio = CropRatioValue;
+            OnPropertyChanged(nameof(CropRatioIndex));
+            // 立即把已有裁剪框（无则全图）变形到目标比例
+            var (w, h) = CropRatioValue;
+            if (w > 0 && h > 0) Editor.SnapCropToRatio(w, h);
+        }
+    }
+
+    private (float W, float H) CropRatioValue
+    {
+        get
+        {
+            var r = CropRatios[Math.Clamp(_cropRatioIndex, 0, CropRatios.Length - 1)];
+            return ((float)r.W, (float)r.H);
+        }
+    }
+
+    public string[] CropRatioLabels => ["auto", "1:1", "4:3", "3:2", "16:9", "5:3", "9:16", "3:4", "2:3"];
+
+    /// <summary>“Auto (edge)” 色板格：用截图边缘主色设背景纯色。</summary>
+    public void SetAutoEdgeColor()
+    {
+        var color = EdgeColorExtractor.Extract(Editor.Document, Editor.CompositionState);
+        Apply(s => s with { Background = BackgroundKind.SolidColor, BackgroundColor = color });
+    }
+
     public void Dispose()
     {
         Editor.PropertyChanged -= OnEditorPropertyChanged;

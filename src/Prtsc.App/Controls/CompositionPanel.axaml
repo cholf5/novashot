@@ -55,6 +55,14 @@
       <RadioButton GroupName="BgKind" Content="Gradient" Padding="6,2" FontSize="12" IsChecked="{Binding IsBgGradient, Mode=TwoWay}"/>
     </StackPanel>
 
+    <!-- M6d: Auto edge（边缘主色）+ 纯色色板 -->
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <ToggleButton Classes="swatch" Click="OnAutoEdgeColorClick"
+                    ToolTip.Tip="Auto (edge): use the dominant color along the image edges">
+        <TextBlock Text="A" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </ToggleButton>
+    </StackPanel>
+
     <!-- 纯色色板（同 8 色） -->
     <ItemsControl ItemsSource="{Binding PresetColors}">
       <ItemsControl.ItemsPanel>
@@ -91,6 +99,12 @@
     </ItemsControl>
 
     <Border Height="1" Background="#33FFFFFF" Margin="0,2"/>
+
+    <!-- M6d: 裁剪比例（对当前/下次拖拽的裁剪框生效） -->
+    <StackPanel Spacing="4">
+      <TextBlock Classes="label" Text="Crop ratio"/>
+      <ComboBox ItemsSource="{Binding CropRatioLabels}" SelectedIndex="{Binding CropRatioIndex, Mode=TwoWay}"/>
+    </StackPanel>
 
     <!-- Padding / Radius -->
     <StackPanel Spacing="4">

@@ -6,6 +6,8 @@ using Prtsc.Core.Annotation.History;
 using Prtsc.Core.Annotation.Model;
 using Prtsc.Core.Annotation.Tools;
 using Prtsc.Core.Capture;
+using Prtsc.Core.Editor;
+using SkiaSharp;
 
 namespace Prtsc.App.ViewModels;
 
@@ -167,7 +169,30 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
     public bool CanUndo => History.CanUndo;
     public bool CanRedo => History.CanRedo;
 
-    /// <summary>按 <see cref="CurrentTool"/> 造一个新工具实例（每次拖拽用完即弃）。</summary>
+    /// <summary>image 空间 → 内容空间（crop 原点平移 + padding）。crop 激活时内容区左上角 = crop 原点。</summary>
+    public SKPoint ImageToContent(SKPoint imagePoint)
+    {
+        var s = CompositionState;
+        var o = s.CropRect?.Location ?? default;
+        return new SKPoint(imagePoint.X - o.X + s.Padding, imagePoint.Y - o.Y + s.Padding);
+    }
+
+    /// <summary>内容空间 → image 空间（<see cref="ImageToContent"/> 的逆）。</summary>
+    public SKPoint ContentToImage(SKPoint contentPoint)
+    {
+        var s = CompositionState;
+        var o = s.CropRect?.Location ?? default;
+        return new SKPoint(contentPoint.X - s.Padding + o.X, contentPoint.Y - s.Padding + o.Y);
+    }
+
+    /// <summary>image 空间矩形 → 内容空间矩形。</summary>
+    public SKRect ImageRectToContent(SKRect imageRect)
+    {
+        var tl = ImageToContent(new SKPoint(imageRect.Left, imageRect.Top));
+        return new SKRect(tl.X, tl.Y, imageRect.Width, imageRect.Height);
+    }
+
+    /// <summary>当前工具每次拖拽用完即弃（每次 pointer down 新建）。</summary>
     public IAnnotationTool CreateActiveTool() => CurrentTool switch
     {
         ToolKind.Select        => new SelectTool(
@@ -187,6 +212,8 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         // M5a：自由手绘
         ToolKind.Pencil        => new PencilTool(),
         ToolKind.Highlighter   => new HighlighterTool(),
+        // M6d：非破坏裁剪（拖拽结果走 ApplyCrop，不产出标注）
+        ToolKind.Crop          => new CropTool(new SKRect(0, 0, Document.Width, Document.Height)),
         // M5b：采样型区域效果（非拥有引用 Document.Source，渲染时现场采样）
         ToolKind.Mosaic        => new RegionEffectTool((r, s) => new MosaicAnnotation(r, Document.Source, s)),
         ToolKind.Blur          => new RegionEffectTool((r, s) => new BlurAnnotation(r, Document.Source, s)),
@@ -199,6 +226,32 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(annotation);
         History.Execute(new AddAnnotationCommand(Document, annotation));
     }
+
+    // ---- M6d: non-destructive crop ----
+
+    /// <summary>
+    /// 应用裁剪框（image 空间；越界自动钳回图像内）。写入 CompositionState.CropRect ——
+    /// 走 OnCompositionStateChanged 通路（不进 Undo，同合成状态策略），ContentWidth/Height 自动跟随。
+    /// null = 撤销裁剪。
+    /// </summary>
+    public void ApplyCrop(SKRect? cropRect)
+    {
+        var bounds = new SKRect(0, 0, Document.Width, Document.Height);
+        var clamped = cropRect is null ? null : CropRects.ClampToImage(cropRect.Value, bounds);
+        CompositionState = CompositionState with { CropRect = clamped };
+    }
+
+    /// <summary>把当前裁剪框（或全图）吸到 w:h 比例并应用。</summary>
+    public void SnapCropToRatio(float w, float h)
+    {
+        var bounds = new SKRect(0, 0, Document.Width, Document.Height);
+        var current = CompositionState.CropRect ?? bounds;
+        var snapped = CropRects.SnapToRatio(current, w, h, bounds);
+        ApplyCrop(snapped);
+    }
+
+    /// <summary>当前裁剪框比例吸附目标（0,0 = auto）。CropTool 拖拽结束时使用。</summary>
+    public (float W, float H) PendingCropRatio { get; set; } = (0f, 0f);
 
     private void DeleteSelection()
     {

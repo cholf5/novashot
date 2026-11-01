@@ -19,6 +19,11 @@ public partial class CompositionPanel : UserControl
 
     private CompositionPanelViewModel? Vm => DataContext as CompositionPanelViewModel;
 
+    private void OnAutoEdgeColorClick(object? sender, RoutedEventArgs e)
+    {
+        Vm?.SetAutoEdgeColor();
+    }
+
     private void OnSolidColorClick(object? sender, RoutedEventArgs e)
     {
         if (Vm is { } vm && sender is ToggleButton { Tag: SKColor color })

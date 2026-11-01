@@ -37,13 +37,25 @@ public static class Composition
         preview?.Render(canvas);
     }
 
-    /// <summary>合成输出尺寸 = 文档 + 2×Padding。</summary>
+    /// <summary>合成输出尺寸 = 裁剪尺寸（无 crop 时全图）+ 2×Padding。</summary>
     public static SKSizeI Measure(AnnotationDocument document, EditorState state)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(state);
-        var s = state.Clamped();
-        return new SKSizeI(document.Width + 2 * s.Padding, document.Height + 2 * s.Padding);
+        var s = state.Clamped(new SKSizeI(document.Width, document.Height));
+        var (cw, ch) = CroppedSize(document, s);
+        return new SKSizeI(cw + 2 * s.Padding, ch + 2 * s.Padding);
+    }
+
+    private static (int Width, int Height) CroppedSize(AnnotationDocument document, EditorState s)
+    {
+        if (s.CropRect is { } crop)
+        {
+            var size = CropRects.ClampToImage(crop, new SKRect(0, 0, document.Width, document.Height));
+            if (size is { } c)
+                return ((int)MathF.Round(c.Width), (int)MathF.Round(c.Height));
+        }
+        return (document.Width, document.Height);
     }
 
     /// <summary>
@@ -60,12 +72,17 @@ public static class Composition
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(state);
 
-        var s = state.Clamped();
+        var s = state.Clamped(new SKSizeI(document.Width, document.Height));
         var size = Measure(document, s);
         var contentRect = new SKRect(0, 0, size.Width, size.Height);
+        var (contentW, contentH) = CroppedSize(document, s);
         var imageRect = new SKRect(
             s.Padding, s.Padding,
-            s.Padding + document.Width, s.Padding + document.Height);
+            s.Padding + contentW, s.Padding + contentH);
+        // 无 crop 时 cropOrigin = (0,0)，与既有路径一致
+        var cropOrigin = s.CropRect is { } crop
+            ? new SKPoint(crop.Left, crop.Top)
+            : new SKPoint(0, 0);
 
         // 1. 背景
         DrawBackground(canvas, s, contentRect);
@@ -82,13 +99,19 @@ public static class Composition
             canvas.DrawRoundRect(new SKRoundRect(imageRect, s.CornerRadius), shadowPaint);
         }
 
-        // 3. clip 圆角 → 平移到图像原点 → 文档内容（源图 + 标注 z 序）
+        // 3. clip 圆角 → 平移到图像原点 → 平移掉 crop 原点 → 文档内容（源图 + 标注 z 序）。
+        // crop 时画布只露出 crop 矩形（标注越界部分被剪掉，非破坏）。
         var restore = canvas.Save();
         if (s.CornerRadius > 0)
             canvas.ClipRoundRect(new SKRoundRect(imageRect, s.CornerRadius), antialias: true);
         else
             canvas.ClipRect(imageRect, antialias: true);
         canvas.Translate(s.Padding, s.Padding);
+        if (s.CropRect is not null)
+        {
+            canvas.ClipRect(new SKRect(0, 0, contentW, contentH), antialias: false);
+            canvas.Translate(-cropOrigin.X, -cropOrigin.Y);
+        }
         RenderScene(canvas, document, preview, skipAnnotation);
         canvas.RestoreToCount(restore);
 
