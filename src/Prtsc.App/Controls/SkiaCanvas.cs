@@ -142,7 +142,8 @@ public sealed class SkiaCanvas : Control
             editor.Selection,
             editor.EditingText,
             ComputeViewportMatrix(editor, bounds),
-            CropPreviewRect));
+            CropPreviewRect,
+            new SKSize(editor.ContentWidth, editor.ContentHeight)));
     }
 
     /// <summary>
@@ -498,10 +499,11 @@ public sealed class SkiaCanvas : Control
         private readonly AnnotationBase? _editingText;
         private readonly SKMatrix _matrix;
         private readonly SKRect? _cropPreviewRect;
+        private readonly SKSize _contentSize;
 
         public DrawOp(Rect bounds, AnnotationDocument doc, Prtsc.Core.Editor.EditorState state,
                       AnnotationBase? preview, AnnotationBase? selection, AnnotationBase? editingText,
-                      SKMatrix matrix, SKRect? cropPreviewRect = null)
+                      SKMatrix matrix, SKRect? cropPreviewRect = null, SKSize contentSize = default)
         {
             Bounds = bounds;
             _doc = doc;
@@ -511,6 +513,15 @@ public sealed class SkiaCanvas : Control
             _editingText = editingText;
             _matrix = matrix;
             _cropPreviewRect = cropPreviewRect;
+            if (contentSize.Width > 0 && contentSize.Height > 0)
+            {
+                _contentSize = contentSize;
+            }
+            else
+            {
+                var measured = Composition.Measure(doc, state);
+                _contentSize = new SKSize(measured.Width, measured.Height);
+            }
         }
 
         public Rect Bounds { get; }
@@ -534,6 +545,14 @@ public sealed class SkiaCanvas : Control
                 canvas.DrawRect(0, 0, (float)Bounds.Width, (float)Bounds.Height, bg);
             }
 
+            // 无背景 = 导出后内容区是透明的（padding 环 / 圆角外角 / 透明源图）。
+            // 预览用棋盘格示意透明区域，否则那些地方与暗色衬底同色，用户看不出画布边界，
+            // 导出后才发现图边上多了一圈透明。占位格只是编辑器 chrome，永不进导出。
+            if (!_state.HasBackground)
+            {
+                TransparencyChecker.Draw(canvas, ContentDipRect());
+            }
+
             var restore = canvas.Save();
             canvas.Concat(in _matrix);
 
@@ -551,6 +570,10 @@ public sealed class SkiaCanvas : Control
             if (_cropPreviewRect is { } cropRect)
                 DrawCropOverlay(canvas, cropRect);
         }
+
+        /// <summary>内容区（= 导出图尺寸）在 DIP 空间的矩形，用于铺透明占位格。</summary>
+        private SKRect ContentDipRect()
+            => _matrix.MapRect(new SKRect(0, 0, _contentSize.Width, _contentSize.Height));
 
         /// <summary>与 EditorViewModel.ImageRectToContent 同式（DrawOp 持的是 state 快照）。</summary>
         private SKRect ImageRectToContent(SKRect imageRect)

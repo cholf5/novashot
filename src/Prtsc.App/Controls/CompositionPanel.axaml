@@ -23,6 +23,7 @@
       <Border Background="#26000000" CornerRadius="8" Padding="3" Margin="0,0,0,9">
         <Grid ColumnDefinitions="*,*,*">
           <RadioButton Classes="chip" GroupName="BgKind" Content="{DynamicResource L.Common.None}"
+                       ToolTip.Tip="{DynamicResource L.Panel.BackgroundNoneTip}"
                        IsChecked="{Binding IsBgNone, Mode=TwoWay}" />
           <RadioButton Grid.Column="1" Classes="chip" GroupName="BgKind" Content="{DynamicResource L.Common.Solid}"
                        IsChecked="{Binding IsBgSolid, Mode=TwoWay}" />

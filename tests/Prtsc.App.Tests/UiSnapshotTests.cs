@@ -13,6 +13,7 @@ using Prtsc.App.ViewModels;
 using Prtsc.App.Views;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Common;
+using Prtsc.Core.Editor;
 using SkiaSharp;
 using Xunit;
 
@@ -79,6 +80,17 @@ public class UiSnapshotTests
 
         Pump(window);
         Save(window, "02-editor-en.png");
+
+        // U-1：Background=None 时预览必须看得见"这里是透明的"（padding 环 / 圆角外角）
+        if (window.DataContext is MainWindowViewModel vmNone && vmNone.Editor is { } editorNone)
+        {
+            var before = editorNone.CompositionState;
+            editorNone.CompositionState = before with { Background = BackgroundKind.None };
+            Pump(window);
+            Save(window, "05-editor-transparent-bg.png");
+            editorNone.CompositionState = before;
+            Pump(window);
+        }
 
         var canvasTab = window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("CanvasTab");
         if (canvasTab is not null)
