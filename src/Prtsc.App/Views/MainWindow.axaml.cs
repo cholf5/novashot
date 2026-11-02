@@ -102,6 +102,8 @@ public partial class MainWindow : Window
                 c.Window.Width = w;
                 c.Window.Height = h;
             });
+            // E-2 跟进：Update 只改内存——尺寸回写此前从未真正落盘（除非碰巧有别处 save），补上防抖写盘
+            _vm.ScheduleConfigSave();
         }
         catch (Exception ex)
         {

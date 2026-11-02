@@ -121,6 +121,60 @@ public class EditorDefaultsFromConfigTests : IDisposable
         Assert.Equal(EditorState.Default with { Padding = 66 }, vm.Editor.CompositionState);
     }
 
+    // ---- E-2 review 跟进 ----
+
+    [Fact]
+    public void CanvasPanelChange_WhenIncludeBackgroundDisabled_DoesNotClobberConfig()
+    {
+        // 剥离模式（includeBackground=false）下编辑器状态是剥离派生态（padding/阴影/内衬/边框清零、
+        // 背景为 None），回写会把用户未触碰的外观配置一并抹掉 → 该模式下不持久化，config 保持权威
+        var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        store.Update(c =>
+        {
+            c.Export.IncludeBackground = false;
+            c.Editor.Padding = 24;
+            c.Editor.ShowBackground = true;
+            c.Editor.BorderEnabled = true;
+            c.Editor.BorderWeight = 3;
+        });
+        var vm = NewVm(store);
+        vm.EnterEditor(Captured());
+
+        vm.Editor!.CompositionPanelViewModel.Padding = 55;
+
+        Assert.Equal(24, store.Current.Editor.Padding);
+        Assert.True(store.Current.Editor.ShowBackground);
+        Assert.True(store.Current.Editor.BorderEnabled);
+        Assert.Equal(3, store.Current.Editor.BorderWeight);
+    }
+
+    [Fact]
+    public async Task FlushConfigSaveSync_PersistsPendingChangesToDisk()
+    {
+        // 退出路径：取消防抖、同步阻塞落盘——防抖窗口内优雅退出不丢改动
+        var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        await store.LoadAsync();
+        var vm = NewVm(store);
+        vm.EnterEditor(Captured());
+
+        vm.Editor!.CompositionPanelViewModel.Padding = 55;
+        vm.FlushConfigSaveSync();
+
+        var reread = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        await reread.LoadAsync();
+        Assert.Equal(55, reread.Current.Editor.Padding);
+    }
+
+    [Fact]
+    public void FlushConfigSaveSync_WithoutConfig_DoesNotThrow()
+    {
+        var vm = new MainWindowViewModel(new FakeClipboardService());
+        vm.EnterEditor(Captured());
+
+        vm.Editor!.CompositionPanelViewModel.Padding = 66;
+        vm.FlushConfigSaveSync();
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, recursive: true);

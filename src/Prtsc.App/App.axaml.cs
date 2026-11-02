@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
 using Prtsc.App.Logging;
+using Prtsc.App.ViewModels;
 using Prtsc.App.Views;
 using Prtsc.Core.Autostart;
 using Prtsc.Core.Config;
@@ -76,6 +77,9 @@ public partial class App : Application
 
             desktop.Exit += (_, _) =>
             {
+                // E-2 跟进：退出前把防抖中的 config 改动（画布参数/窗口尺寸）同步落盘，
+                // 优雅退出（托盘 Quit / 会话结束）不丢最后 500ms；进程强杀仍可接受丢失
+                (_mainWindow?.DataContext as MainWindowViewModel)?.FlushConfigSaveSync();
                 _hotkeys?.Dispose();
                 _tray?.Dispose();
                 LoggingSetup.Close();

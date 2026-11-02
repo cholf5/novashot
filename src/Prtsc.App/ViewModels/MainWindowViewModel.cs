@@ -148,6 +148,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void OnCanvasStateChanged(Prtsc.Core.Editor.EditorState state)
     {
         if (_configStore is null) return;
+        // export.includeBackground=false 时编辑器状态是剥离派生态（padding/阴影/内衬/边框已清零、
+        // 背景为 None），回写会把用户未触碰的外观配置一并抹掉 → 剥离模式下不持久化，config 保持权威
+        if (!_configStore.Current.Export.IncludeBackground) return;
         try
         {
             _configStore.Update(c => Prtsc.Core.Editor.EditorConfigMapper.ApplyTo(state, c.Editor));
@@ -157,23 +160,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _logger?.LogWarning(ex, "Canvas state persistence failed");
             return;
         }
-        _configDirty = true;
         ScheduleConfigSave();
     }
 
-    private void ScheduleConfigSave()
+    /// <summary>
+    /// 标记 config 有未落盘改动并安排 500ms 防抖写盘。画布回写与关窗尺寸回写（G-16）共用：
+    /// Update 只改内存，落盘统一走这里；进程退出前由 <see cref="FlushConfigSaveSync"/> 兜底。
+    /// </summary>
+    public void ScheduleConfigSave()
     {
-        _configSaveDebounceCts?.Cancel();
-        _configSaveDebounceCts?.Dispose();
+        if (_configStore is null) return;
+        _configDirty = true;
+        CancelConfigDebounce();
         _configSaveDebounceCts = new CancellationTokenSource();
-        _ = SaveAfterDebounceAsync(_configSaveDebounceCts.Token);
+        _ = SaveAfterDebounceAsync(_configSaveDebounceCts);
     }
 
-    private async Task SaveAfterDebounceAsync(CancellationToken token)
+    private async Task SaveAfterDebounceAsync(CancellationTokenSource cts)
     {
         try
         {
-            await Task.Delay(ConfigSaveDebounce, token).ConfigureAwait(false);
+            await Task.Delay(ConfigSaveDebounce, cts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -189,18 +196,63 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _logger?.LogWarning(ex, "Debounced config save failed");
             return;
         }
+        // 期间有新改动 / flush 接管（CTS 已被换掉）：脏标归接管者管，过期 save 不清
+        if (!ReferenceEquals(_configSaveDebounceCts, cts)) return;
         _configDirty = false;
     }
 
-    /// <summary>离开编辑器时 flush：取消防抖立即落盘，保证「改完后」已持久化。</summary>
+    /// <summary>离开编辑器时 flush：取消防抖立即落盘（异步），保证「改完后」已持久化。</summary>
     private void FlushConfigSave()
+    {
+        CancelConfigDebounce();
+        if (!TakeConfigDirty()) return;
+        _ = SaveFlushAsync();
+    }
+
+    private async Task SaveFlushAsync()
+    {
+        try
+        {
+            await _configStore.SaveAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _configDirty = true; // 落盘失败：恢复脏标，留待下次 flush / 退出重试
+            _logger?.LogWarning(ex, "Config flush save failed");
+        }
+    }
+
+    /// <summary>
+    /// 进程退出（desktop.Exit）前同步落盘：取消防抖、阻塞等待写完，优雅退出不丢最后 500ms 内的改动。
+    /// 与 <see cref="FlushConfigSave"/> 的差别是阻塞——进程即将退出，fire-and-forget 会被杀；
+    /// 失败只记日志，不阻塞退出。
+    /// </summary>
+    public void FlushConfigSaveSync()
+    {
+        CancelConfigDebounce();
+        if (!TakeConfigDirty()) return;
+        try
+        {
+            _configStore.SaveAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Config save on exit failed");
+        }
+    }
+
+    private void CancelConfigDebounce()
     {
         _configSaveDebounceCts?.Cancel();
         _configSaveDebounceCts?.Dispose();
         _configSaveDebounceCts = null;
-        if (!_configDirty || _configStore is null) return;
+    }
+
+    private bool TakeConfigDirty()
+    {
+        if (!_configDirty || _configStore is null) return false;
         _configDirty = false;
-        _ = _configStore.SaveAsync();
+        return true;
     }
 
     public void ReturnToCapture()
