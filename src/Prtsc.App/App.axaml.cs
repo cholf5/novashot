@@ -45,6 +45,20 @@ public partial class App : Application
                 Dispatcher.UIThread.Post(RefreshWindowTitles);
             };
 
+            // S-1：设置保存后的统一副作用——热键重注册 + 语言全局刷新（Update 在 UI 线程同步触发 Changed）
+            store.Changed += (_, cfg) =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    ReapplyHotkeys(cfg.Hotkeys);
+                    if (!string.Equals(Localization.Loc.Preference, cfg.Language, StringComparison.OrdinalIgnoreCase)
+                        && cfg.Language is "system" or "en" or "zh-CN")
+                    {
+                        Localization.Loc.SetPreference(cfg.Language, this);
+                    }
+                });
+            };
+
             // Autostart 路径同步（用户可能移动 exe 位置）
             AppServices.GetRequiredService<IAutostartService>().SyncPath();
 
@@ -134,14 +148,15 @@ public partial class App : Application
 
         menu.Add(new NativeMenuItemSeparator());
 
-        // 语言：跟随系统 / English / 简体中文
-        var languageMenu = new NativeMenuItem(L("Tray.Language"));
-        var languageItems = new NativeMenu();
-        AddLanguageItem(languageItems, Localization.Loc.SystemDefault, L("Capture.LanguageSystem"));
-        AddLanguageItem(languageItems, Localization.Loc.English, "English");
-        AddLanguageItem(languageItems, Localization.Loc.ChineseSimplified, "简体中文");
-        languageMenu.Menu = languageItems;
-        menu.Add(languageMenu);
+        // S-1：设置中心（语言入口从托盘搬进设置，radio 勾选态风险一并消除）
+        var settingsItem = new NativeMenuItem(L("Tray.Settings"));
+        settingsItem.Click += (_, _) =>
+        {
+            if (_mainWindow is { } main)
+                Dispatcher.UIThread.Post(() =>
+                    new SettingsWindow(AppServices.GetRequiredService<IConfigStore>()).Show(main));
+        };
+        menu.Add(settingsItem);
 
         menu.Add(new NativeMenuItemSeparator());
 
@@ -150,32 +165,6 @@ public partial class App : Application
         menu.Add(quitItem);
 
         _tray.Menu = menu;
-    }
-
-    private void AddLanguageItem(NativeMenu menu, string preference, string label)
-    {
-        var item = new NativeMenuItem(label)
-        {
-            ToggleType = MenuItemToggleType.Radio,
-            IsChecked = string.Equals(Localization.Loc.Preference, preference, StringComparison.OrdinalIgnoreCase),
-        };
-        item.Click += (_, _) => ChangeLanguage(preference);
-        menu.Add(item);
-    }
-
-    /// <summary>切语言：写 config → 立刻重刷资源（窗口不重建）。</summary>
-    private void ChangeLanguage(string preference)
-    {
-        try
-        {
-            AppServices.GetRequiredService<IConfigStore>().Update(c => c.Language = preference);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Persist language failed");
-        }
-
-        Localization.Loc.SetPreference(preference, this);
     }
 
     /// <summary>窗口标题是普通 string 属性，切语言后手动同步一遍。</summary>
@@ -194,6 +183,21 @@ public partial class App : Application
         try
         {
             _hotkeys.Start();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to start hotkey pump");
+        }
+
+        ReapplyHotkeys(cfg);
+    }
+
+    /// <summary>S-1：热键配置变更后重注册（注册失败仅记日志，泵不停；现有动作继续用旧键）。</summary>
+    private void ReapplyHotkeys(HotkeyConfig cfg)
+    {
+        if (_hotkeys is null) return;
+        try
+        {
             _hotkeys.RegisterAll(cfg.Fullscreen, cfg.Region, cfg.Window);
         }
         catch (Exception ex)

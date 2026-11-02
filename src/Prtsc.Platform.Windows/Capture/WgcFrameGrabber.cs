@@ -29,7 +29,7 @@ internal sealed class WgcFrameGrabber
     /// 用 GraphicsCaptureItem 抓单帧。超时抛 <see cref="TimeoutException"/>。
     /// 返回 BGRA8888 premul 的 SKBitmap；由调用方持有。
     /// </summary>
-    public SKBitmap CaptureItem(GraphicsCaptureItem item, TimeSpan timeout)
+    public SKBitmap CaptureItem(GraphicsCaptureItem item, TimeSpan timeout, bool includeCursor)
     {
         var size = item.Size;
         if (size.Width <= 0 || size.Height <= 0)
@@ -43,7 +43,7 @@ internal sealed class WgcFrameGrabber
 
         var session = framePool.CreateCaptureSession(item);
         TrySetBool(session, "IsBorderRequired", false);
-        TrySetBool(session, "IsCursorCaptureEnabled", true);
+        TrySetBool(session, "IsCursorCaptureEnabled", includeCursor);
 
         using var frameReady = new ManualResetEventSlim(false);
         Direct3D11CaptureFrame? captured = null;

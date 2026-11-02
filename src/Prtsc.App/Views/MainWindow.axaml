@@ -98,6 +98,7 @@
                 <Separator />
                 <MenuItem Header="{DynamicResource L.Editor.Library}" Click="OnLibraryClick" />
                 <MenuItem Header="{DynamicResource L.Editor.CloudSettings}" Click="OnCloudSettingsClick" />
+                <MenuItem Header="{DynamicResource L.Editor.Settings}" Click="OnSettingsClick" />
               </MenuFlyout>
             </Button.Flyout>
           </Button>

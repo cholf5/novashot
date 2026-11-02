@@ -242,6 +242,13 @@ public partial class MainWindow : Window
         dialog.Show(this);
     }
 
+    /// <summary>S-1：设置中心入口。</summary>
+    private void OnSettingsClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new SettingsWindow(_configStore);
+        dialog.Show(this);
+    }
+
     /// <summary>Pin 事件 → 开贴图窗（位图所有权移交 PinnedWindow）。</summary>
     private void OnPinnedImageRequested(object? sender, PinnedImageRequestedEventArgs e)
     {

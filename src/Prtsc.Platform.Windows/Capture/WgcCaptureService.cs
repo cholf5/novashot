@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Common;
+using Prtsc.Core.Config;
 using Prtsc.Platform.Windows.Interop;
 using SkiaSharp;
 using Windows.Graphics.Capture;
@@ -20,14 +21,16 @@ public sealed class WgcCaptureService : ICaptureService, IDisposable
 
     private readonly GdiCaptureService _gdi;
     private readonly ILogger<WgcCaptureService> _logger;
+    private readonly IConfigStore _store;
     private readonly bool _wgcSupported;
     private WgcCaptureContext? _ctx;
     private readonly Lock _ctxLock = new();
 
-    public WgcCaptureService(GdiCaptureService gdi, ILogger<WgcCaptureService> logger)
+    public WgcCaptureService(GdiCaptureService gdi, ILogger<WgcCaptureService> logger, IConfigStore store)
     {
         _gdi = gdi;
         _logger = logger;
+        _store = store;
         _wgcSupported = ProbeSupported();
         _logger.LogInformation("WGC supported: {Supported}", _wgcSupported);
     }
@@ -91,7 +94,7 @@ public sealed class WgcCaptureService : ICaptureService, IDisposable
             var ctx = EnsureContext();
             var item = CreateItemForWindow(hwnd);
             var grabber = new WgcFrameGrabber(ctx, _logger);
-            var bitmap = grabber.CaptureItem(item, FrameTimeout);
+            var bitmap = grabber.CaptureItem(item, FrameTimeout, _store.Current.Capture.IncludeCursor);
             var bounds = new PixelRect(0, 0, bitmap.Width, bitmap.Height);
             return new CapturedImage(bitmap, bounds, PrimaryScale(), CaptureSource.Window);
         }
@@ -157,7 +160,7 @@ public sealed class WgcCaptureService : ICaptureService, IDisposable
         var ctx = EnsureContext();
         var item = CreateItemForMonitor(hmon);
         var grabber = new WgcFrameGrabber(ctx, _logger);
-        var bitmap = grabber.CaptureItem(item, FrameTimeout);
+        var bitmap = grabber.CaptureItem(item, FrameTimeout, _store.Current.Capture.IncludeCursor);
 
         // 期望显示器为 expectedBounds 尺寸；若不匹配（旋转/热插拔中）按实际返回
         if (bitmap.Width != expectedBounds.Width || bitmap.Height != expectedBounds.Height)

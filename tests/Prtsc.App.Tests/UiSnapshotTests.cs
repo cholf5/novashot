@@ -151,6 +151,15 @@ public class UiSnapshotTests
         Save(cloud, "21-cloud.png");
         cloud.Close();
 
+        // Settings center (S-1)：默认落 general 分区
+        var settings = new SettingsWindow(
+            Prtsc.App.AppServices.GetRequiredService<Prtsc.Core.Config.IConfigStore>(),
+            new StubAutostartService());
+        settings.Show();
+        Pump(settings);
+        Save(settings, "30-settings.png");
+        settings.Close();
+
         var canvas = new Window
         {
             Width = 264, Height = 726,

@@ -1,0 +1,278 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Prtsc.App.ViewModels"
+        mc:Ignorable="d"
+        x:Class="Prtsc.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="{DynamicResource L.Settings.Title}"
+        Width="780" Height="580"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Bg.Window}">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.flabel">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink.2}" />
+      <Setter Property="Margin" Value="0,0,0,5" />
+    </Style>
+    <!-- 预设色块（S-1）：Background 直接设元素上，不被 :pointerover 洗掉（handoff §4.1 坑4） -->
+    <Style Selector="ToggleButton.preset">
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.preset:checked">
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto">
+
+    <!-- header -->
+    <Border Grid.Row="0" Padding="18,14" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+      <TextBlock Classes="h2" Text="{DynamicResource L.Settings.Title}" />
+    </Border>
+
+    <!-- body: 左栏导航 + 右侧内容 -->
+    <Grid Grid.Row="1" ColumnDefinitions="170,*">
+
+      <Border Grid.Column="0" Padding="12,12" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0">
+        <Border Background="#26000000" CornerRadius="8" Padding="3">
+          <StackPanel Spacing="2">
+            <ToggleButton Name="NavGeneral" Classes="seg" Tag="general" IsChecked="True"
+                          Content="{DynamicResource L.Settings.Nav.General}" Click="OnNavClick" HorizontalContentAlignment="Left" />
+            <ToggleButton Name="NavHotkeys" Grid.Row="1" Classes="seg" Tag="hotkeys"
+                          Content="{DynamicResource L.Settings.Nav.Hotkeys}" Click="OnNavClick" HorizontalContentAlignment="Left" />
+            <ToggleButton Name="NavQuickSave" Classes="seg" Tag="quicksave"
+                          Content="{DynamicResource L.Settings.Nav.QuickSave}" Click="OnNavClick" HorizontalContentAlignment="Left" />
+            <ToggleButton Name="NavExport" Classes="seg" Tag="export"
+                          Content="{DynamicResource L.Settings.Nav.Export}" Click="OnNavClick" HorizontalContentAlignment="Left" />
+            <ToggleButton Name="NavEditor" Classes="seg" Tag="editor"
+                          Content="{DynamicResource L.Settings.Nav.Editor}" Click="OnNavClick" HorizontalContentAlignment="Left" />
+            <ToggleButton Name="NavCapture" Classes="seg" Tag="capture"
+                          Content="{DynamicResource L.Settings.Nav.Capture}" Click="OnNavClick" HorizontalContentAlignment="Left" />
+          </StackPanel>
+        </Border>
+      </Border>
+
+      <Panel Grid.Column="1">
+
+        <!-- 常规 -->
+        <ScrollViewer Name="GeneralHost" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="20,16" Spacing="14">
+            <CheckBox IsChecked="{Binding LaunchOnStartup}" Content="{DynamicResource L.Settings.General.LaunchOnStartup}" />
+            <CheckBox IsChecked="{Binding MinimizeToTray}" Content="{DynamicResource L.Settings.General.MinimizeToTray}" />
+            <CheckBox IsChecked="{Binding CloseToTray}" Content="{DynamicResource L.Settings.General.CloseToTray}" />
+            <CheckBox IsChecked="{Binding ShowNotification}" Content="{DynamicResource L.Settings.General.ShowNotification}" />
+            <CheckBox IsChecked="{Binding CheckOnStartup}" Content="{DynamicResource L.Settings.General.CheckUpdates}" />
+
+            <Border Height="1" Background="{DynamicResource Line}" Margin="0,4" />
+            <StackPanel Spacing="8">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.General.Language}" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <RadioButton Name="LangSystem" Classes="chip" GroupName="Lang" Tag="0"
+                             Content="{DynamicResource L.Settings.General.LangSystem}" Click="OnLangClick" />
+                <RadioButton Name="LangEn" Classes="chip" GroupName="Lang" Tag="1"
+                             Content="{DynamicResource L.Settings.General.LangEn}" Click="OnLangClick" />
+                <RadioButton Name="LangZh" Classes="chip" GroupName="Lang" Tag="2"
+                             Content="{DynamicResource L.Settings.General.LangZh}" Click="OnLangClick" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 热键 -->
+        <ScrollViewer Name="HotkeysHost" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="20,16" Spacing="14">
+            <TextBlock Classes="hint" TextWrapping="Wrap" Text="{DynamicResource L.Settings.Hotkeys.Lede}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Hotkeys.Fullscreen}" />
+              <Button Name="RecordFullscreen" Grid.Column="1" MinWidth="220" Classes="cmd"
+                      Content="{Binding HotkeyFullscreen}" Click="OnRecordClick" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Hotkeys.Region}" />
+              <Button Name="RecordRegion" Grid.Column="1" MinWidth="220" Classes="cmd"
+                      Content="{Binding HotkeyRegion}" Click="OnRecordClick" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Hotkeys.Window}" />
+              <Button Name="RecordWindow" Grid.Column="1" MinWidth="220" Classes="cmd"
+                      Content="{Binding HotkeyWindow}" Click="OnRecordClick" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- QuickSave -->
+        <ScrollViewer Name="QuickSaveHost" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="20,16" Spacing="14">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.QuickSave.Folder}" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox Margin="0,0,8,0" Text="{Binding QuickSaveFolder}" Watermark="~/Pictures/Prtsc" />
+                <Button Name="BrowseFolderButton" Grid.Column="1" Classes="ghost"
+                        Content="{DynamicResource L.Settings.QuickSave.Browse}" Click="OnBrowseFolderClick" />
+              </Grid>
+              <TextBlock Classes="hint" Text="{DynamicResource L.Settings.QuickSave.FolderHint}" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.QuickSave.Pattern}" />
+              <ComboBox MinWidth="300" HorizontalAlignment="Left" SelectedIndex="{Binding QuickSavePatternIndex}">
+                <ComboBoxItem Content="{DynamicResource L.Settings.QuickSave.PatternTimestamp}" />
+                <ComboBoxItem Content="{DynamicResource L.Settings.QuickSave.PatternDate}" />
+                <ComboBoxItem Content="{DynamicResource L.Settings.QuickSave.PatternIncrement}" />
+              </ComboBox>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 导出 -->
+        <ScrollViewer Name="ExportHost" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="20,16" Spacing="14">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Export.Format}" />
+              <ComboBox MinWidth="220" HorizontalAlignment="Left" SelectedIndex="{Binding ExportFormatIndex}">
+                <ComboBoxItem Content="{DynamicResource L.Settings.Export.Png}" />
+                <ComboBoxItem Content="{DynamicResource L.Settings.Export.Jpeg}" />
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding IsJpegQualityVisible}" Spacing="6">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Export.JpegQuality}" />
+                <TextBlock Grid.Column="1" Classes="val" Text="{Binding JpegQuality, StringFormat='{}{0:0}'}" />
+              </Grid>
+              <Slider Minimum="1" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                      Value="{Binding JpegQuality, Mode=TwoWay}" />
+            </StackPanel>
+
+            <CheckBox IsChecked="{Binding ExportIncludeBackground}" Content="{DynamicResource L.Settings.Export.IncludeBackground}" />
+            <CheckBox IsChecked="{Binding AutoCopyToClipboard}" Content="{DynamicResource L.Settings.Export.AutoCopy}" />
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 编辑器默认值 -->
+        <ScrollViewer Name="EditorHost" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="20,16" Spacing="16">
+
+            <TextBlock Classes="h2" FontSize="12.5" Text="{DynamicResource L.Settings.Editor.Canvas}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.Padding}" />
+              <TextBlock Grid.Column="1" Classes="val" Text="{Binding EditorPadding, StringFormat='{}{0:0} px'}" />
+            </Grid>
+            <Slider Minimum="0" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding EditorPadding, Mode=TwoWay}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.CornerRadius}" />
+              <TextBlock Grid.Column="1" Classes="val" Text="{Binding EditorCornerRadius, StringFormat='{}{0:0} px'}" />
+            </Grid>
+            <Slider Minimum="0" Maximum="48" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding EditorCornerRadius, Mode=TwoWay}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.Shadow}" />
+              <TextBlock Grid.Column="1" Classes="val" Text="{Binding EditorShadowSize, StringFormat='{}{0:0} px'}" />
+            </Grid>
+            <Slider Minimum="0" Maximum="96" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding EditorShadowSize, Mode=TwoWay}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.ShapeCornerRadius}" />
+              <TextBlock Grid.Column="1" Classes="val" Text="{Binding EditorShapeCornerRadius, StringFormat='{}{0:0} px'}" />
+            </Grid>
+            <Slider Minimum="0" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding EditorShapeCornerRadius, Mode=TwoWay}" />
+
+            <StackPanel Spacing="6">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.Ratio}" />
+              <ComboBox MinWidth="160" HorizontalAlignment="Left" SelectedIndex="{Binding EditorOutputRatioIndex}">
+                <ComboBoxItem Content="auto" /><ComboBoxItem Content="1:1" /><ComboBoxItem Content="4:3" />
+                <ComboBoxItem Content="3:2" /><ComboBoxItem Content="16:9" /><ComboBoxItem Content="5:3" />
+                <ComboBoxItem Content="9:16" /><ComboBoxItem Content="3:4" /><ComboBoxItem Content="2:3" />
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+              <CheckBox IsChecked="{Binding EditorShowBackground}" Content="{DynamicResource L.Settings.Editor.ShowBackground}" />
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.BackgroundColor}" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ToggleButton Classes="preset" Tag="#ffffff" Background="#ffffff" Click="OnBgPresetClick" />
+                <ToggleButton Classes="preset" Tag="#f4f4f5" Background="#f4f4f5" Click="OnBgPresetClick" />
+                <ToggleButton Classes="preset" Tag="#111827" Background="#111827" Click="OnBgPresetClick" />
+                <ToggleButton Classes="preset" Tag="#0ea5e9" Background="#0ea5e9" Click="OnBgPresetClick" />
+                <ToggleButton Classes="preset" Tag="#10b981" Background="#10b981" Click="OnBgPresetClick" />
+                <ToggleButton Classes="preset" Tag="#ef4444" Background="#ef4444" Click="OnBgPresetClick" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Editor.Custom}" />
+                <TextBox Width="200" Text="{Binding EditorBackgroundColor}" />
+              </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="{DynamicResource Line}" Margin="0,2" />
+            <TextBlock Classes="h2" FontSize="12.5" Text="{DynamicResource L.Settings.Editor.Inset}" />
+            <CheckBox IsChecked="{Binding EditorAutoBackground}" Content="{DynamicResource L.Settings.Editor.AutoBackground}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.Inset}" />
+              <TextBlock Grid.Column="1" Classes="val" Text="{Binding EditorInset, StringFormat='{}{0:0} px'}" />
+            </Grid>
+            <Slider Minimum="0" Maximum="48" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding EditorInset, Mode=TwoWay}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Editor.InsetBackgroundColor}" />
+              <TextBox Width="200" Text="{Binding EditorInsetBackgroundColor}" />
+            </StackPanel>
+
+            <Border Height="1" Background="{DynamicResource Line}" Margin="0,2" />
+            <TextBlock Classes="h2" FontSize="12.5" Text="{DynamicResource L.Settings.Editor.Border}" />
+            <CheckBox IsChecked="{Binding BorderEnabled}" Content="{DynamicResource L.Settings.Editor.BorderEnabled}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.BorderWeight}" />
+              <TextBlock Grid.Column="1" Classes="val" Text="{Binding BorderWeight, StringFormat='{}{0:0} px'}" />
+            </Grid>
+            <Slider Minimum="1" Maximum="12" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding BorderWeight, Mode=TwoWay}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.BorderOpacity}" />
+              <TextBlock Grid.Column="1" Classes="val" Text="{Binding BorderOpacity, StringFormat='{}{0:0} %'}" />
+            </Grid>
+            <Slider Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding BorderOpacity, Mode=TwoWay}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Editor.BorderColor}" />
+              <TextBox Width="200" Text="{Binding BorderColor}" />
+            </StackPanel>
+            <StackPanel Spacing="6">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Editor.BorderType}" />
+              <ComboBox MinWidth="160" HorizontalAlignment="Left" SelectedIndex="{Binding BorderTypeIndex}">
+                <ComboBoxItem Content="{DynamicResource L.Settings.Editor.BorderOutside}" />
+                <ComboBoxItem Content="{DynamicResource L.Settings.Editor.BorderCenter}" />
+                <ComboBoxItem Content="{DynamicResource L.Settings.Editor.BorderInside}" />
+              </ComboBox>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 捕获 -->
+        <ScrollViewer Name="CaptureHost" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="20,16" Spacing="10">
+            <CheckBox IsChecked="{Binding IncludeCursor}" Content="{DynamicResource L.Settings.Capture.IncludeCursor}" />
+            <TextBlock Classes="hint" TextWrapping="Wrap" MaxWidth="480"
+                       Text="{DynamicResource L.Settings.Capture.IncludeCursorHint}" />
+          </StackPanel>
+        </ScrollViewer>
+
+      </Panel>
+    </Grid>
+
+    <!-- footer -->
+    <Border Grid.Row="2" Padding="18,12" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Name="SaveHint" Classes="hint" VerticalAlignment="Center" Text="{Binding SaveHint}" />
+        <Button Name="CancelButton" Grid.Column="1" Classes="ghost" MinWidth="96" Margin="0,0,8,0"
+                Content="{DynamicResource L.Settings.Cancel}" Click="OnCancelClick" />
+        <Button Name="SaveButton" Grid.Column="2" Classes="primary" MinWidth="96"
+                Content="{DynamicResource L.Settings.Save}" Click="OnSaveClick" />
+      </Grid>
+    </Border>
+
+  </Grid>
+</Window>

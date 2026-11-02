@@ -13,6 +13,7 @@ public sealed class PrtscConfig
     public QuickSaveConfig QuickSave { get; set; } = new();
     public ExportConfig Export { get; set; } = new();
     public WindowConfig Window { get; set; } = new();
+    public CaptureConfig Capture { get; set; } = new();
     public EditorConfig Editor { get; set; } = new();
     public UpdateConfig Update { get; set; } = new();
     public CloudConfig Cloud { get; set; } = new();
@@ -57,6 +58,15 @@ public sealed class WindowConfig
 {
     public int Width { get; set; } = 1200;
     public int Height { get; set; } = 800;
+}
+
+/// <summary>
+/// 捕获行为（S-1）。IncludeCursor 仅作用于 Windows WGC；mac/Linux 平台忽略该值。
+/// </summary>
+public sealed class CaptureConfig
+{
+    /// <summary>窗口捕获是否把鼠标光标包含进画面（WGC IsCursorCaptureEnabled）。</summary>
+    public bool IncludeCursor { get; set; } = true;
 }
 
 public sealed class EditorConfig
