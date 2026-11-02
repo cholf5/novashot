@@ -29,6 +29,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly LibraryStore? _library;
     private readonly ILogger? _logger;
 
+    /// <summary>E-2：画布参数写盘防抖（内存回写在 UI 线程同步做，防抖的只是磁盘 IO）。</summary>
+    private static readonly TimeSpan ConfigSaveDebounce = TimeSpan.FromMilliseconds(500);
+    private CancellationTokenSource? _configSaveDebounceCts;
+    private bool _configDirty;
+
     public MainWindowViewModel(IClipboardService clipboard, IConfigStore? configStore = null,
         IUploadService? upload = null, LibraryStore? library = null, ILogger? logger = null)
     {
@@ -112,14 +117,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Editor?.Dispose();
         var editor = new EditorViewModel(image);
         ApplyEditorDefaults(editor);
+        editor.CompositionPanelViewModel.CanvasStateChanged = OnCanvasStateChanged;
         Editor = editor;
         Mode = MainViewMode.Editor;
         StatusText = Loc.T("Status.Captured", image.Width, image.Height, image.ScaleFactor.ToString("0.##"));
     }
 
     /// <summary>
-    /// 新编辑器按 config 初始化（G-13/G-14）：EditorConfig 的背景/padding/圆角/阴影/内衬/边框
-    /// 写入初始合成状态；IncludeBackground=false 时直接用剥离背景的派生状态。
+    /// 新编辑器按 config 初始化（G-13/G-14）：editor 段语义为「上次使用的画布参数」（E-2），
+    /// 映射下沉 Core（EditorConfigMapper.FromConfig）；IncludeBackground=false 时剥离背景板。
     /// 无 config store（单元测试）时保持 EditorState.Default。
     /// </summary>
     private void ApplyEditorDefaults(EditorViewModel editor)
@@ -128,36 +134,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             var cfg = _configStore.Current;
-            var e = cfg.Editor;
-            var state = new Prtsc.Core.Editor.EditorState
-            {
-                Background = e.BackgroundColor.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
-                    ? Prtsc.Core.Editor.BackgroundKind.Gradient
-                    : Prtsc.Core.Editor.BackgroundKind.SolidColor,
-                BackgroundColor = e.BackgroundColor.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
-                    ? default
-                    : Prtsc.Core.Editor.GradientParser.ParseColor(e.BackgroundColor) ?? default,
-                BackgroundGradient = e.BackgroundColor.StartsWith("linear-gradient", StringComparison.OrdinalIgnoreCase)
-                    ? e.BackgroundColor
-                    : null,
-                Padding = e.Padding,
-                CornerRadius = e.CornerRadius,
-                ShadowSize = e.ShadowSize,
-                InsetSize = e.Inset,
-                InsetColor = string.IsNullOrWhiteSpace(e.InsetBackgroundColor)
-                    ? null
-                    : Prtsc.Core.Editor.GradientParser.ParseColor(e.InsetBackgroundColor),
-                BorderWidth = e.BorderEnabled ? e.BorderWeight : 0f,
-                BorderColor = Prtsc.Core.Editor.GradientParser.ParseColor(e.BorderColor),
-                Border = e.BorderType switch
-                {
-                    "outside" => Prtsc.Core.Editor.BorderStyle.Outside,
-                    "inside" => Prtsc.Core.Editor.BorderStyle.Inside,
-                    _ => Prtsc.Core.Editor.BorderStyle.Center,
-                },
-            };
-            editor.CompositionState = Prtsc.Core.Editor.EditorStateStripping.StripBackground(
-                state, includeBackground: cfg.Export.IncludeBackground).Clamped();
+            editor.CompositionState = Prtsc.Core.Editor.EditorConfigMapper.FromConfig(cfg.Editor, cfg.Export.IncludeBackground);
         }
         catch (Exception ex)
         {
@@ -165,8 +142,70 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    // ---- E-2 画布参数持久化 ----
+
+    /// <summary>画布面板改动 → config 同步回写（内存，UI 线程）+ 防抖写盘。</summary>
+    private void OnCanvasStateChanged(Prtsc.Core.Editor.EditorState state)
+    {
+        if (_configStore is null) return;
+        try
+        {
+            _configStore.Update(c => Prtsc.Core.Editor.EditorConfigMapper.ApplyTo(state, c.Editor));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Canvas state persistence failed");
+            return;
+        }
+        _configDirty = true;
+        ScheduleConfigSave();
+    }
+
+    private void ScheduleConfigSave()
+    {
+        _configSaveDebounceCts?.Cancel();
+        _configSaveDebounceCts?.Dispose();
+        _configSaveDebounceCts = new CancellationTokenSource();
+        _ = SaveAfterDebounceAsync(_configSaveDebounceCts.Token);
+    }
+
+    private async Task SaveAfterDebounceAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(ConfigSaveDebounce, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return; // 新改动接管写盘 / flush 已落盘
+        }
+        if (_configStore is null) return;
+        try
+        {
+            await _configStore.SaveAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Debounced config save failed");
+            return;
+        }
+        _configDirty = false;
+    }
+
+    /// <summary>离开编辑器时 flush：取消防抖立即落盘，保证「改完后」已持久化。</summary>
+    private void FlushConfigSave()
+    {
+        _configSaveDebounceCts?.Cancel();
+        _configSaveDebounceCts?.Dispose();
+        _configSaveDebounceCts = null;
+        if (!_configDirty || _configStore is null) return;
+        _configDirty = false;
+        _ = _configStore.SaveAsync();
+    }
+
     public void ReturnToCapture()
     {
+        FlushConfigSave();
         Editor?.Dispose();
         Editor = null;
         Mode = MainViewMode.CaptureIdle;

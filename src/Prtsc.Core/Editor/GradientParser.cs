@@ -84,18 +84,34 @@ public static class GradientParser
         return true;
     }
 
-    /// <summary>解析单色 token（#RRGGBB[A]）。失败返回 null。供配置接线（EditorConfig 颜色串）复用。</summary>
+    /// <summary>解析单色 token（#rgb / #rrggbb / #rrggbbaa，CSS 顺序 alpha 在后）。失败返回 null。供配置接线（EditorConfig 颜色串）复用。</summary>
     public static SKColor? ParseColor(string? css)
     {
         if (string.IsNullOrWhiteSpace(css) || css[0] != '#') return null;
+        // SKColor.Parse 原生 8 位按 #aarrggbb（alpha 在前）读，通道会错位；#rrggbbaa 显式纠正
+        if (css.Length == 9 && TryParseCssRgba(css, out var cssRgba)) return cssRgba;
         try
         {
             return SKColor.Parse(css);
         }
-        catch (FormatException)
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
         {
             return null;
         }
+    }
+
+    private static bool TryParseCssRgba(string css, out SKColor color)
+    {
+        color = default;
+        var hex = css.AsSpan(1); // 跳过 #
+        Span<byte> channels = stackalloc byte[4];
+        for (var i = 0; i < 4; i++)
+        {
+            if (!byte.TryParse(hex.Slice(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out channels[i]))
+                return false;
+        }
+        color = new SKColor(channels[0], channels[1], channels[2], channels[3]);
+        return true;
     }
 
     private static bool TryParseColor(string token, out SKColor color)

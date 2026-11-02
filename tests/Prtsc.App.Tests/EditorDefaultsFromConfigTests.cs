@@ -77,6 +77,50 @@ public class EditorDefaultsFromConfigTests : IDisposable
         Assert.Equal(EditorState.Default, vm.Editor!.CompositionState);
     }
 
+    // ---- E-2 画布参数持久化：面板改动回写 config ----
+
+    [Fact]
+    public void CanvasPanelChange_PersistsToConfig()
+    {
+        var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        var vm = NewVm(store);
+        vm.EnterEditor(Captured());
+
+        vm.Editor!.CompositionPanelViewModel.Padding = 77;
+        vm.Editor.CompositionPanelViewModel.IsBgNone = true;
+
+        Assert.Equal(77, store.Current.Editor.Padding);
+        Assert.False(store.Current.Editor.ShowBackground);
+    }
+
+    [Fact]
+    public void CanvasParams_SurviveReturnAndReenter()
+    {
+        var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: _tempDir);
+        var vm = NewVm(store);
+        vm.EnterEditor(Captured());
+
+        vm.Editor!.CompositionPanelViewModel.Padding = 55;
+        vm.Editor.CompositionPanelViewModel.CornerRadius = 30;
+        vm.ReturnToCapture();
+
+        vm.EnterEditor(Captured());
+
+        Assert.Equal(55, vm.Editor!.CompositionState.Padding);
+        Assert.Equal(30f, vm.Editor.CompositionState.CornerRadius);
+    }
+
+    [Fact]
+    public void CanvasPanelChange_WithoutConfig_DoesNotThrow()
+    {
+        var vm = new MainWindowViewModel(new FakeClipboardService());
+        vm.EnterEditor(Captured());
+
+        vm.Editor!.CompositionPanelViewModel.Padding = 66;
+
+        Assert.Equal(EditorState.Default with { Padding = 66 }, vm.Editor.CompositionState);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, recursive: true);

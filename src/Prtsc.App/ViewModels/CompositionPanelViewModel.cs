@@ -41,9 +41,18 @@ public sealed class CompositionPanelViewModel : ObservableObject
 
     private EditorState State => Editor.CompositionState;
 
+    /// <summary>
+    /// 画布参数变更回调（E-2）：<see cref="Apply"/> 是全部参数变更的唯一咽喉点，改动即触发
+    /// （crop 走 EditorViewModel 直改路径，不经此）。MainWindowViewModel 用它把外观回写
+    /// config，下次截图恢复；无 config store 时不挂。
+    /// </summary>
+    public Action<EditorState>? CanvasStateChanged { get; set; }
+
     private void Apply(Func<EditorState, EditorState> mutate)
     {
-        Editor.CompositionState = mutate(State).Clamped();
+        var next = mutate(State).Clamped();
+        Editor.CompositionState = next;
+        CanvasStateChanged?.Invoke(next);
     }
 
     // ---- 背景 ----

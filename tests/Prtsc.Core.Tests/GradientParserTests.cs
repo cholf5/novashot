@@ -73,4 +73,22 @@ public class GradientParserTests
             Assert.True(spec.Stops.Count >= 2);
         }
     }
+
+    [Fact]
+    public void ParseColor_eight_digit_css_alpha_last()
+    {
+        // CSS #rrggbbaa 契约：alpha 在后。SKColor.Parse 原生 8 位按 #aarrggbb（alpha 在前）读，
+        // ParseColor 需自行纠正，否则 E-2 回写的带 alpha 颜色通道错位。
+        var color = GradientParser.ParseColor("#ff000080");
+        Assert.Equal(new SKColor(255, 0, 0, 128), color);
+    }
+
+    [Fact]
+    public void ParseColor_garbage_returns_null()
+    {
+        Assert.Null(GradientParser.ParseColor(null));
+        Assert.Null(GradientParser.ParseColor(""));
+        Assert.Null(GradientParser.ParseColor("red"));
+        Assert.Null(GradientParser.ParseColor("#gg0000"));
+    }
 }
