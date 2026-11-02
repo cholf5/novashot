@@ -36,3 +36,8 @@ winshot/
 # ZCode session artifacts (plan / handoff docs live under docs/handoff/)
 .zcode/
 .VSCodeCounter/
+
+# 本地临时目录（截图/草稿，不入库）
+.tmp/
+# headless 视觉快照产物
+artifacts/

@@ -16,15 +16,16 @@
 | MAC-1 | **macOS 平台层**：App 双 TFM + Prtsc.Platform.Mac（CoreGraphics 抓屏、CGWindowList 窗口、Carbon 热键、NSPasteboard 剪贴板、launchd 自启）；测试基线 506/506（Core 381 + Mac 72 + App 53×2TFM），mac 真机启动到托盘+热键注册验证通过（2026-11-01） |
 | GAP-1 | **参考项目差距全量搬运（第一批）**：反色工具(I)、序号最小未用回收、Ctrl+滚轮改序号、角度吸附(Ctrl/Shift)、Esc 取消拖拽、Backspace 删除、QuickSave 复制路径、CF_HDROP 文件粘贴、CloseToTray/MinimizeToTray、窗口尺寸持久化、编辑器默认值接线、IncludeBackground 接线、Library 删除确认+Del 键+复制路径、托盘版本号、云连接测试；测试 553/553（Core 414 + Mac 76 + App 63×2TFM）（2026-11-01） |
 | LINUX-1 | **Linux 平台层（X11）**：Prtsc.Platform.Linux（XGetImage/XRandR 抓屏含负坐标多屏拼接、EWMH 窗口枚举、XGrabKey 热键含 NumLock 变体、xclip 剪贴板、XDG Autostart）+ AppServices 运行时按 OS 分流（mac/Linux 共用裸 net10.0 TFM）；Wayland 原生会话留 LINUX-2；测试 596/596（Core 414 + Mac 76 + App 63×2TFM + Linux 44），真机冒烟 QA-L1 待领（2026-11-01） |
+| UI-1 | **视觉重设计**：主题层（Tokens/Icons/Controls ControlTheme）替掉默认 Fluent；编辑器工具栏改底部悬浮 dock（修掉溢出）、右侧面板拆 Style/Canvas；主窗口改命令列表+最近 4 张；Library/云设置/窗口选择器统一重绘；IBM Plex 随包分发；**i18n（zh-CN/en）+ 托盘切语言**；headless 视觉快照（`PRTSC_SNAPSHOT=1`）；测试 666/666（Core 414 + Mac 80 + Linux 44 + App 64×2TFM）（2026-11-02） |
 
 ## 未完成
 
 | 里程碑 | 内容 | 看板卡 | 状态 |
 |---|---|---|---|
 | M7 | Updater（等 R-1 定 Velopack 后用 vpk UpdateManager，勿自研轮询） | C-1 | 仅剩此项 |
-| M8 | 设置中心 GUI（热键录制、自启/托盘、QuickSave、导出质量滑杆、编辑器默认值、WGC 光标开关） | S-1 | 待开工 |
+| M8 | 设置中心 GUI（热键录制、自启/托盘、QuickSave、导出质量滑杆、编辑器默认值、WGC 光标开关；**语言切换入口也要搬进来**，现在只在托盘菜单） | S-1 | 待开工 |
 | M9 | 捕获增强：延时截图、屏幕取色器、Ctrl+O 导入、桌面通知 | D-1 / E-1 / I-1 / N-1 | 待开工 |
-| M10 | 分发就绪：CLI、i18n(zh-CN 首发)、Velopack 打包 | L-1 / L-2 / R-1 | 待开工 |
+| M10 | 分发就绪：CLI、i18n 收尾（UI-1 已落 zh-CN/en，剩设置页/通知文案）、Velopack 打包 | L-1 / L-2 / R-1 | 待开工 |
 | M11 | v1.0：QA-1 真机冒烟全绿 + 用户文档 + 发布 | QA-1 | 收尾门 |
 
 ### 与旧交接文档编号的映射

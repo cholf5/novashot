@@ -22,10 +22,11 @@
     </Border>
     <!-- 悬停提示条（操作说明） -->
     <Border Name="HintBar" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-            Margin="0,0,0,4" Background="#B0000000" CornerRadius="4" Padding="8,3"
+            Margin="0,0,0,6" Background="{DynamicResource Bg.Overlay}" CornerRadius="6" Padding="9,4"
+            BorderBrush="{DynamicResource Line}" BorderThickness="1"
             IsVisible="False" IsHitTestVisible="False">
-      <TextBlock Foreground="White" FontSize="11"
-                 Text="拖动移动 · 滚轮缩放 · 双击或 Esc 关闭"/>
+      <TextBlock Foreground="{DynamicResource Ink}" FontSize="10.5"
+                 Text="{DynamicResource L.Pin.Hint}"/>
     </Border>
   </Panel>
 </Window>

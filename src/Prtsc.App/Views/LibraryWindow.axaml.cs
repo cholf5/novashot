@@ -43,11 +43,11 @@ public partial class LibraryWindow : Window
         if (_vm.SelectedEntry is not { } item) return;
         if (string.IsNullOrEmpty(item.Entry.RemoteUrl))
         {
-            _vm.CountText = "该记录没有上传链接";
+            _vm.CountText = Prtsc.App.Localization.Loc.T("Library.NoLink");
             return;
         }
         if (_clipboard.TrySetText(item.Entry.RemoteUrl))
-            _vm.CountText = "链接已复制";
+            _vm.CountText = Prtsc.App.Localization.Loc.T("Library.LinkCopied");
         else
             _logger.LogWarning("Copy URL to clipboard failed");
     }
@@ -68,7 +68,7 @@ public partial class LibraryWindow : Window
             await TopLevel.GetTopLevel(this)!.Launcher.LaunchUriAsync(new Uri(entry.RemoteUrl));
             return;
         }
-        _vm.CountText = "本地文件不存在且无远程链接";
+        _vm.CountText = Prtsc.App.Localization.Loc.T("Library.FileGone");
     }
 
     private async void OnDeleteClick(object? sender, RoutedEventArgs e)
@@ -153,11 +153,11 @@ public partial class LibraryWindow : Window
         var path = item.Entry.LocalPath;
         if (string.IsNullOrEmpty(path))
         {
-            _vm.CountText = "该记录没有本地文件";
+            _vm.CountText = Prtsc.App.Localization.Loc.T("Library.NoLocalFile");
             return;
         }
         if (_clipboard.TrySetText(path))
-            _vm.CountText = "路径已复制";
+            _vm.CountText = Prtsc.App.Localization.Loc.T("Library.PathCopied");
         else
             _logger.LogWarning("Copy path to clipboard failed");
     }

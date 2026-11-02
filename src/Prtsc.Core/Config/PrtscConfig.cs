@@ -19,6 +19,9 @@ public sealed class PrtscConfig
 
     /// <summary>用户自定义背景图（data URL），最多 8 张。</summary>
     public List<string> BackgroundImages { get; set; } = new();
+
+    /// <summary>界面语言：system（跟随系统）| en | zh-CN。仅支持简体中文与英文。</summary>
+    public string Language { get; set; } = "system";
 }
 
 public sealed class HotkeyConfig

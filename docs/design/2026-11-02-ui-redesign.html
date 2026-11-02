@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prtsc · 视觉重设计 v1</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#0A0A0B;color:#ECECEF;
+    font-family:"IBM Plex Sans",Inter,-apple-system,"Helvetica Neue","Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .mono{font-family:"IBM Plex Mono","SF Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .page{max-width:1290px;margin:0 auto;padding:44px 28px 120px}
+
+  /* ---------- page chrome ---------- */
+  .intro{max-width:720px;margin:0 0 44px}
+  .intro h1{font-size:22px;font-weight:600;letter-spacing:-.01em;margin:0 0 10px}
+  .intro p{margin:0 0 8px;font-size:13.5px;line-height:1.7;color:#9B9BA3}
+  .intro code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:#C9C9CF}
+
+  .board-wrap{margin:0 0 56px}
+  .board-label{display:flex;gap:10px;align-items:baseline;margin:0 0 10px;
+    font-size:11px;letter-spacing:.04em;color:#6A6A73;text-transform:uppercase}
+  .board-label b{color:#B9B9C0;font-weight:500}
+  .board-scaler{position:relative;overflow:hidden}
+  .board{position:relative;transform-origin:top left}
+
+  /* ---------- shared window shell ---------- */
+  .win{display:flex;flex-direction:column;background:#1B1B1E;overflow:hidden;
+    border-radius:10px;box-shadow:0 32px 80px -24px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.07)}
+  .native{height:28px;flex:none;display:flex;align-items:center;padding:0 12px;gap:8px;background:#1B1B1E}
+  .tl{width:11px;height:11px;border-radius:50%}
+  .tl.r{background:#FF5F57}.tl.y{background:#FEBC2E}.tl.g{background:#28C840}
+
+  .hdr{height:48px;flex:none;display:flex;align-items:center;gap:8px;
+    padding:0 12px 0 10px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .hdr .grow{flex:1}
+  .hdr-title{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:500;color:#ECECEF}
+  .hdr-title .sub{font-size:12px;color:#6A6A73;font-weight:400}
+
+  .icon{width:28px;height:28px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:6px;border:0;background:transparent;color:#9B9BA3;cursor:default}
+  .icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .icon.hov{background:rgba(255,255,255,.07);color:#ECECEF}
+
+  .btn{height:28px;display:inline-flex;align-items:center;gap:7px;padding:0 11px;border-radius:6px;
+    font-size:12.5px;font-weight:500;color:#D9D9DE;background:transparent;
+    border:1px solid rgba(255,255,255,.13);white-space:nowrap}
+  .btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .btn.primary{background:#EDEDEF;border-color:#EDEDEF;color:#151517}
+  .btn.ghost{border-color:transparent;color:#9B9BA3}
+  .btn.quiet{border-color:transparent;background:rgba(255,255,255,.05)}
+  .btn .kc{margin-left:-2px}
+  .vr{width:1px;height:18px;background:rgba(255,255,255,.09);margin:0 3px}
+
+  /* keycap */
+  .kc{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:17px;padding:0 4px;
+    border-radius:4px;background:#2C2C31;border:1px solid rgba(255,255,255,.09);
+    box-shadow:0 1px 0 rgba(0,0,0,.45);font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-size:10px;line-height:1;color:#A8A8B0}
+  .btn.primary .kc{background:rgba(0,0,0,.09);border-color:rgba(0,0,0,.14);box-shadow:0 1px 0 rgba(0,0,0,.12);color:#4A4A4E}
+
+  /* ---------- editor: stage ---------- */
+  .body{flex:1;display:flex;min-height:0}
+  .stage{flex:1;position:relative;background:#141416;display:flex;align-items:center;justify-content:center;
+    overflow:hidden}
+
+  /* fake screenshot being annotated */
+  .shot{position:relative;width:800px;height:402px;background:#fff;border-radius:7px;overflow:hidden;
+    box-shadow:0 18px 44px -12px rgba(0,0,0,.65),0 0 0 1px rgba(0,0,0,.35)}
+  .shot-top{height:38px;background:#F2F3F5;border-bottom:1px solid #E4E6EA;display:flex;align-items:center;
+    gap:7px;padding:0 14px}
+  .shot-top i{width:9px;height:9px;border-radius:50%;background:#D8DBE0}
+  .shot-top .t{margin-left:10px;width:150px;height:8px;border-radius:4px;background:#E1E4E8}
+  .shot-main{display:flex;height:calc(100% - 38px)}
+  .shot-rail{width:52px;background:#FAFBFC;border-right:1px solid #EBEDF0;display:flex;flex-direction:column;
+    align-items:center;gap:14px;padding-top:16px}
+  .shot-rail i{width:18px;height:18px;border-radius:5px;background:#E6E9ED}
+  .shot-rail i:first-child{background:#C7D7F5}
+  .shot-content{flex:1;padding:26px 30px}
+  .bar{height:9px;border-radius:5px;background:#E9EBEF}
+  .h1{height:16px;width:290px;border-radius:6px;background:#DDE1E7;margin-bottom:12px}
+  .cards{display:flex;gap:14px;margin-top:24px}
+  .card{flex:1;height:118px;border-radius:8px;background:#F6F7F9;border:1px solid #ECEEF2;padding:14px}
+  .card .k{height:7px;width:44px;border-radius:4px;background:#DDE1E7;margin-bottom:9px}
+  .card .v{height:13px;width:66px;border-radius:5px;background:#D5DAE1}
+  .card .cap{height:7px;width:80%;border-radius:4px;background:#EDEFF3;margin-top:14px}
+  .shot-chip{position:absolute;right:30px;top:150px;width:96px;height:26px;border-radius:13px;background:#EDE9FE}
+  .ann{position:absolute;inset:0;pointer-events:none}
+
+  /* floating tool dock */
+  .dock{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;
+    gap:2px;padding:5px;border-radius:11px;background:#232328;
+    box-shadow:0 14px 34px -10px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.06)}
+  .tool{width:37px;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:2px;color:#9B9BA3}
+  .tool svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .tool .k{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:8.5px;color:#5F5F68;line-height:1}
+  .tool.sel{background:#EDEDEF;color:#151517}
+  .tool.sel .k{color:#8A8A90}
+  .tool.hov{background:rgba(255,255,255,.07);color:#ECECEF}
+  .dock .sep{width:1px;height:24px;background:rgba(255,255,255,.09);margin:0 3px}
+
+  /* ---------- editor: right panel ---------- */
+  .panel{width:264px;flex:none;background:#212125;border-left:1px solid rgba(255,255,255,.07);
+    display:flex;flex-direction:column}
+  .seg{display:flex;gap:2px;padding:3px;border-radius:8px;background:rgba(0,0,0,.25)}
+  .seg button{flex:1;height:24px;border:0;border-radius:6px;background:transparent;color:#8A8A92;
+    font-size:12px;font-weight:500;font-family:inherit}
+  .seg button.on{background:#2F2F35;color:#EDEDEF;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+  .panel-head{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .panel-body{padding:14px 12px;display:flex;flex-direction:column;gap:18px;overflow:hidden}
+
+  .sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .sec-h span:first-child{font-size:11.5px;color:#8A8A92;font-weight:500}
+  .val{font-size:11px;color:#C4C4CB}
+  .val.dim{color:#6A6A73}
+
+  .swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .sw{height:28px;border-radius:5px;position:relative}
+  .sw.on::after{content:"";position:absolute;inset:-2px;border-radius:7px;border:1.5px solid #EDEDEF}
+
+  .track{height:3px;border-radius:2px;background:rgba(255,255,255,.12);position:relative;margin:9px 0 4px}
+  .track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:#D9D9DE}
+  .track .knob{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;background:#EDEDEF;
+    transform:translate(-50%,-50%);box-shadow:0 0 0 2px #212125,0 1px 3px rgba(0,0,0,.5)}
+  .ticks{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-size:9.5px;color:#57575F;padding-right:1px}
+
+  .divider{height:1px;background:rgba(255,255,255,.07);margin:0 -12px}
+
+  .rowline{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#8A8A92}
+  .rowline b{font-weight:400;color:#D2D2D8}
+
+  .check{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#C4C4CB}
+  .box{width:15px;height:15px;border-radius:4px;border:1px solid rgba(255,255,255,.18);display:flex;
+    align-items:center;justify-content:center;flex:none}
+  .box.on{background:#EDEDEF;border-color:#EDEDEF}
+  .box.on::after{content:"";width:7px;height:4px;border-left:1.7px solid #151517;border-bottom:1.7px solid #151517;
+    transform:rotate(-45deg) translate(1px,-1px)}
+
+  .select{height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.13);display:flex;align-items:center;
+    justify-content:space-between;padding:0 9px;font-size:12px;color:#D2D2D8;background:rgba(0,0,0,.18)}
+  .select svg{width:13px;height:13px;fill:none;stroke:#7A7A82;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+  .grads{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+  .grads i{height:19px;border-radius:4px;display:block}
+  .mini{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+  .mini i{height:16px;border-radius:3px;display:block}
+
+  /* ---------- status bar ---------- */
+  .status{height:30px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;
+    border-top:1px solid rgba(255,255,255,.07);background:#1B1B1E}
+  .status .item{display:flex;align-items:center;gap:6px;font-size:11px;color:#8A8A92}
+  .status .item.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:11px;color:#B4B4BB}
+  .status .gap{flex:1}
+  .status .hint{font-size:11px;color:#5F5F68}
+  .dot{width:3px;height:3px;border-radius:50%;background:#4A4A52}
+
+  /* ---------- capture idle ---------- */
+  .idle{flex:1;display:flex;align-items:center;padding:40px 44px;gap:64px;background:#1B1B1E}
+  .idle-left{width:470px;flex:none;align-self:center}
+  .idle h2{font-size:19px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px}
+  .idle .lede{font-size:12.5px;color:#7C7C85;margin:0 0 28px}
+  .cmd{display:flex;align-items:center;gap:12px;height:46px;padding:0 10px;margin:0 -10px;border-radius:8px}
+  .cmd + .cmd{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  .cmd.hov{background:rgba(255,255,255,.05)}
+  .cmd .ic{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.05);color:#B4B4BB;flex:none}
+  .cmd .ic svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .cmd .n{flex:1;font-size:13px;color:#E4E4E8}
+  .cmd .n small{display:block;font-size:11px;color:#6A6A73;margin-top:1px}
+  .cmd .keys{display:flex;gap:3px}
+  .idle-right{flex:1;min-width:0;max-width:440px;align-self:center;margin-left:auto}
+  .idle-right .h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+  .idle-right .h span:first-child{font-size:11.5px;color:#8A8A92;font-weight:500}
+  .link{font-size:11.5px;color:#A8A8B0;text-decoration:none}
+  .thumbs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .th{border-radius:8px;overflow:hidden;background:#232328;border:1px solid rgba(255,255,255,.07)}
+  .th .ph{height:92px;background:linear-gradient(135deg,#2A2A31,#212128);display:flex;
+    align-items:center;justify-content:center}
+  .mini-shot{width:78%;height:66%;opacity:.92;background:#E8EAEF;border-radius:3px;padding:7px;
+    display:flex;flex-direction:column;gap:4px;box-shadow:0 8px 18px rgba(0,0,0,.55)}
+  .mini-shot i{display:block;height:4px;border-radius:2px;background:#C7CCD5}
+  .mini-shot i:nth-child(1){width:42%;background:#B9C6DE}
+  .mini-shot i:nth-child(2){width:72%}
+  .mini-shot i:nth-child(3){width:56%}
+  .th .meta{padding:7px 9px;font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:10px;color:#7C7C85;
+    display:flex;justify-content:space-between}
+  .empty{grid-column:1/-1;border:1px dashed rgba(255,255,255,.12);border-radius:8px;padding:22px;
+    text-align:center;font-size:11.5px;color:#6A6A73}
+
+  /* ---------- library ---------- */
+  .lib{flex:1;display:flex;flex-direction:column;background:#1B1B1E}
+  .lib-tools{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;
+    border-bottom:1px solid rgba(255,255,255,.07)}
+  .search{height:26px;width:200px;border-radius:6px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.1);
+    display:flex;align-items:center;gap:7px;padding:0 8px;font-size:11.5px;color:#6A6A73}
+  .search svg{width:13px;height:13px;fill:none;stroke:#6A6A73;stroke-width:1.7;stroke-linecap:round}
+  .lib-list{flex:1;overflow:hidden;padding:6px 8px}
+  .lrow{display:flex;align-items:center;gap:12px;height:60px;padding:0 8px;border-radius:8px;position:relative}
+  .lrow + .lrow::before{content:"";position:absolute;left:8px;right:8px;top:0;height:1px;background:rgba(255,255,255,.075)}
+  .lrow.on{background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .lrow.on::before,.lrow.on + .lrow::before{display:none}
+  .lthumb{width:56px;height:38px;border-radius:5px;background:#2A2A31;
+    border:1px solid rgba(255,255,255,.08);flex:none;display:flex;align-items:center;justify-content:center}
+  .lthumb .mini-shot{width:74%;height:64%;padding:4px;gap:3px;border-radius:2px}
+  .lthumb .mini-shot i{height:3px}
+  .lname{flex:1;min-width:0}
+  .lname .f{font-size:12.5px;color:#E4E4E8;margin-bottom:3px}
+  .lname .m{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:10.5px;color:#6A6A73}
+  .chip{height:19px;padding:0 7px;border-radius:10px;font-size:10.5px;display:inline-flex;align-items:center;
+    gap:5px;background:rgba(255,255,255,.07);color:#A8A8B0}
+  .chip.remote{background:rgba(16,185,129,.14);color:#4ADE9B}
+  .lib-foot{height:48px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;
+    border-top:1px solid rgba(255,255,255,.07)}
+  .lib-foot .gap{flex:1}
+  .danger{color:#E8837E;border-color:rgba(232,131,126,.25)}
+
+  /* ---------- tokens ---------- */
+  .tokens{display:grid;grid-template-columns:1fr 1fr;gap:32px;padding-top:34px;
+    border-top:1px solid rgba(255,255,255,.08)}
+  .tok-h{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#6A6A73;margin:0 0 14px}
+  .pal{display:flex;gap:10px;flex-wrap:wrap}
+  .pal div{width:84px}
+  .pal i{display:block;height:44px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .pal b{display:block;font-size:10.5px;color:#B4B4BB;margin-top:6px;font-weight:400}
+  .pal span{display:block;font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:9.5px;color:#5F5F68}
+  .type div{margin-bottom:12px}
+  .type .t1{font-size:19px;font-weight:600;letter-spacing:-.01em}
+  .type .t2{font-size:13px}
+  .type .t3{font-size:11.5px;color:#8A8A92}
+  .type .t4{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:11px;color:#B4B4BB}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="intro">
+    <h1>Prtsc — 视觉重设计 v1</h1>
+    <p><b>核心判断</b>：截图工具是「照片外面的画框」，UI 抢戏就毁了内容。所以整套界面压成中性灰的仪器面板：画布周围的衬底用绝对中性的灰（不带蓝调），不污染截图本身的颜色；所有数字读数用等宽字；界面上唯一鲜艳的东西，是“你等下要画上去的那个颜色”。</p>
+    <p>WinShot 那套紫青渐变玻璃我没跟——它和用户的红色标注、和截图本身都在抢注意力。这里借的是它有用的部分：玻璃浮层的层次感、图标化工具栏、底部悬浮操作条。</p>
+  </div>
+
+  <!-- ============ 01 EDITOR ============ -->
+  <div class="board-wrap">
+    <div class="board-label"><b>01</b> Editor <span>1200 × 800 — 主战场</span></div>
+    <div class="board-scaler">
+      <div class="board" style="--w:1200px;--h:800px">
+        <div class="win" style="width:1200px;height:800px">
+
+          <div class="native"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span></div>
+
+          <header class="hdr">
+            <button class="icon"><svg viewBox="0 0 24 24"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></button>
+            <div class="hdr-title">Editor<span class="sub">Untitled capture</span></div>
+            <div class="vr"></div>
+            <button class="icon"><svg viewBox="0 0 24 24"><path d="M8 6L4 10l4 4"/><path d="M4 10h8.5a5.5 5.5 0 010 11H9"/></svg></button>
+            <button class="icon" style="color:#5F5F68"><svg viewBox="0 0 24 24"><path d="M16 6l4 4-4 4"/><path d="M20 10h-8.5a5.5 5.5 0 000 11H15"/></svg></button>
+            <div class="grow"></div>
+            <button class="btn ghost">Save<span class="kc">⌘S</span></button>
+            <button class="btn primary">Copy<span class="kc">⌘C</span></button>
+            <button class="btn quiet" style="padding:0 7px"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+          </header>
+
+          <div class="body">
+            <main class="stage">
+
+              <!-- 被标注的假截图 -->
+              <div class="shot">
+                <div class="shot-top"><i></i><i></i><i></i><div class="t"></div></div>
+                <div class="shot-main">
+                  <div class="shot-rail"><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="shot-content">
+                    <div class="h1"></div>
+                    <div class="bar" style="width:420px;margin-bottom:7px"></div>
+                    <div class="bar" style="width:340px;opacity:.6"></div>
+                    <div class="cards">
+                      <div class="card"><div class="k"></div><div class="v"></div><div class="cap"></div><div class="cap" style="width:58%"></div></div>
+                      <div class="card"><div class="k"></div><div class="v"></div><div class="cap"></div><div class="cap" style="width:66%"></div></div>
+                      <div class="card"><div class="k"></div><div class="v"></div><div class="cap"></div><div class="cap" style="width:48%"></div></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="shot-chip"></div>
+
+                <!-- 用户自己画的标注：颜色 = 面板里选中的那个红 -->
+                <svg class="ann" viewBox="0 0 800 482" fill="none">
+                  <rect x="79" y="139" width="231" height="124" rx="9" stroke="#E53E3E" stroke-width="3"/>
+                  <path d="M470 338L310 284" stroke="#E53E3E" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M318 295l-8-11 13-2" stroke="#E53E3E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  <text x="484" y="344" fill="#E53E3E" font-size="15" font-weight="600" font-family="Inter,-apple-system,sans-serif">2 cols, not 3</text>
+                </svg>
+              </div>
+
+              <!-- 悬浮工具栏：15 个工具塞得下，还带热键字母 -->
+              <div class="dock">
+                <div class="tool sel"><svg viewBox="0 0 24 24"><path d="M5.5 3.5l12.5 6.6-5.6 1.5-1.5 5.6z"/></svg><span class="k">V</span></div>
+                <div class="sep"></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.5"/></svg><span class="k">R</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg><span class="k">E</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M4.5 19.5L19.5 4.5"/></svg><span class="k">L</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M4 12h13"/><path d="M12 6.5l6 5.5-6 5.5"/></svg><span class="k">A</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M4 18c4.5 0 5-10 10.5-10 3 0 4.5 2 5.5 4"/><path d="M15.5 11.5l4.5 1 .5-5"/></svg><span class="k">O</span></div>
+                <div class="sep"></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M5 6.5h14"/><path d="M12 6.5V19"/></svg><span class="k">T</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M9.5 4.5v15M14.5 4.5v15M4.5 9.5h15M4.5 14.5h15"/></svg><span class="k">N</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6L18 18M18 6l-1.4 1.4M7.4 16.6L6 18"/></svg><span class="k">S</span></div>
+                <div class="sep"></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M4 19.5l1-3.6L15.5 5.4a2 2 0 012.8 0l.3.3a2 2 0 010 2.8L8.1 19l-4.1.5z"/></svg><span class="k">P</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M13 4.5l6.5 6.5-6.5 6.5H7v-6z"/><path d="M4 20.5h9"/></svg><span class="k">H</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM10 10h4v4h-4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z" fill="currentColor" stroke="none"/></svg><span class="k">M</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="3 2.5"/></svg><span class="k">B</span></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 010 15z" fill="currentColor" stroke="none"/></svg><span class="k">I</span></div>
+                <div class="sep"></div>
+                <div class="tool"><svg viewBox="0 0 24 24"><path d="M6.5 3v15.5H22"/><path d="M2.5 6.5H18V22"/></svg><span class="k">X</span></div>
+              </div>
+            </main>
+
+            <!-- 右侧面板：Style / Canvas 两个 tab，不用滚一整列 -->
+            <aside class="panel">
+              <div class="panel-head">
+                <div class="seg"><button class="on">Style</button><button>Canvas</button></div>
+              </div>
+              <div class="panel-body">
+                <div>
+                  <div class="sec-h"><span>Colour</span><span class="val mono">E53E3E</span></div>
+                  <div class="swatches">
+                    <div class="sw on" style="background:#E53E3E"></div>
+                    <div class="sw" style="background:#F59E0B"></div>
+                    <div class="sw" style="background:#FCD34D"></div>
+                    <div class="sw" style="background:#10B981"></div>
+                    <div class="sw" style="background:#3B82F6"></div>
+                    <div class="sw" style="background:#8B5CF6"></div>
+                    <div class="sw" style="background:#F3F4F6"></div>
+                    <div class="sw" style="background:#1F2937"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="sec-h"><span>Stroke</span><span class="val mono">3 px</span></div>
+                  <div class="track"><div class="fill" style="width:18%"></div><div class="knob" style="left:18%"></div></div>
+                  <div class="ticks"><span>1</span><span>6</span><span>11</span><span>16</span></div>
+                </div>
+
+                <div>
+                  <div class="sec-h"><span>Text size</span><span class="val mono dim">—</span></div>
+                  <div class="track" style="opacity:.4"><div class="fill" style="width:34%"></div><div class="knob" style="left:34%"></div></div>
+                  <div class="ticks" style="opacity:.5"><span>12</span><span>42</span><span>72</span></div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div>
+                  <div class="sec-h"><span>Selection</span><span class="val mono dim">1 of 4</span></div>
+                  <div class="rowline" style="margin-bottom:7px"><span>Rectangle</span><b class="mono">176 × 128</b></div>
+                  <div class="rowline" style="margin-bottom:7px"><span>Position</span><b class="mono">x 79  y 215</b></div>
+                  <div class="rowline"><span>Opacity</span><b class="mono">100%</b></div>
+                </div>
+
+                <div class="divider"></div>
+
+                <p style="margin:0;font-size:11px;line-height:1.65;color:#5F5F68">
+                  Drag on the canvas to draw. Ctrl + wheel changes stroke width for the tool in hand.
+                </p>
+              </div>
+            </aside>
+          </div>
+
+          <footer class="status">
+            <div class="item mono">1400 × 961</div><div class="dot"></div>
+            <div class="item mono">1.0×</div><div class="dot"></div>
+            <div class="item">Rectangle</div>
+            <div class="gap"></div>
+            <div class="hint">Esc to cancel · Enter to copy</div>
+          </footer>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 02 CAPTURE ============ -->
+  <div class="board-wrap">
+    <div class="board-label"><b>02</b> Capture <span>1200 × 800 — 主窗口空闲态，改成一列「命令」而不是三个大按钮</span></div>
+    <div class="board-scaler">
+      <div class="board" style="--w:1200px;--h:800px">
+        <div class="win" style="width:1200px;height:800px">
+
+          <div class="native"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span></div>
+
+          <header class="hdr">
+            <div class="hdr-title" style="font-weight:600">Prtsc<span class="sub mono" style="font-size:10.5px">0.1.0</span></div>
+            <div class="grow"></div>
+            <button class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg></button>
+            <button class="btn ghost">Hide to tray</button>
+          </header>
+
+          <div class="idle">
+            <div class="idle-left">
+              <h2>Capture</h2>
+              <p class="lede">Pick a mode, or use a global hotkey from anywhere.</p>
+
+              <div class="cmd">
+                <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"/></svg></div>
+                <div class="n">Fullscreen<span></span><small>Whole virtual desktop, all displays</small></div>
+                <div class="keys"><span class="kc">Ctrl</span><span class="kc">Shift</span><span class="kc">PrtSc</span></div>
+              </div>
+
+              <div class="cmd">
+                <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"/><rect x="8" y="8" width="8" height="8" rx="1.5" stroke-dasharray="2.6 2.2"/></svg></div>
+                <div class="n">Region<small>Drag a box, then annotate</small></div>
+                <div class="keys"><span class="kc">PrtSc</span></div>
+              </div>
+
+              <div class="cmd">
+                <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg></div>
+                <div class="n">Window<small>Pick a window from a live list</small></div>
+                <div class="keys"><span class="kc">Ctrl</span><span class="kc">PrtSc</span></div>
+              </div>
+
+              <div class="cmd">
+                <div class="ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10.5 18h3"/></svg></div>
+                <div class="n">Paste an image<small>Open whatever is on the clipboard</small></div>
+                <div class="keys"><span class="kc">⌘</span><span class="kc">V</span></div>
+              </div>
+            </div>
+
+            <div class="idle-right">
+              <div class="h"><span>Recent</span><a class="link" href="#">Open library</a></div>
+              <div class="thumbs">
+                <div class="th"><div class="ph"><div class="mini-shot"><i></i><i></i><i></i></div></div><div class="meta"><span>09:42</span><span>1400×961</span></div></div>
+                <div class="th"><div class="ph"><div class="mini-shot"><i></i><i></i><i></i></div></div><div class="meta"><span>09:31</span><span>2880×1800</span></div></div>
+                <div class="th"><div class="ph"><div class="mini-shot"><i></i><i></i><i></i></div></div><div class="meta"><span>Yesterday</span><span>920×600</span></div></div>
+                <div class="th"><div class="ph"><div class="mini-shot"><i></i><i></i><i></i></div></div><div class="meta"><span>Yesterday</span><span>1200×800</span></div></div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="status">
+            <div class="item">Ready</div><div class="dot"></div>
+            <div class="item">Region capture on <span class="kc" style="margin-left:4px">PrtSc</span></div>
+            <div class="gap"></div>
+            <div class="hint">Right-click the tray icon for settings</div>
+          </footer>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 03 CANVAS PANEL ============ -->
+  <div class="board-wrap">
+    <div class="board-label"><b>03</b> Canvas tab <span>264 × 726 — 原 Composition 面板，现在有分组和标题</span></div>
+    <div class="board-scaler">
+      <div class="board" style="--w:264px;--h:726px">
+        <div class="win" style="width:264px;height:726px">
+          <div class="panel" style="border:0;width:264px;height:726px">
+            <div class="panel-head">
+              <div class="seg"><button>Style</button><button class="on">Canvas</button></div>
+            </div>
+
+            <div class="panel-body" style="gap:16px">
+              <div>
+                <div class="sec-h"><span>Background</span></div>
+                <div class="seg" style="background:rgba(0,0,0,.25);padding:3px;margin-bottom:9px">
+                  <button style="height:22px;font-size:11px">None</button>
+                  <button style="height:22px;font-size:11px">Solid</button>
+                  <button class="on" style="height:22px;font-size:11px">Gradient</button>
+                </div>
+                <div style="font-size:10px;color:#5F5F68;margin-bottom:5px">Solid</div>
+                <div class="mini" style="margin-bottom:9px">
+                  <i style="background:#E53E3E"></i><i style="background:#F59E0B"></i><i style="background:#FCD34D"></i><i style="background:#10B981"></i>
+                  <i style="background:#3B82F6"></i><i style="background:#8B5CF6"></i><i style="background:#F3F4F6"></i><i style="background:#1F2937"></i>
+                </div>
+                <div style="font-size:10px;color:#5F5F68;margin-bottom:5px">Gradient</div>
+                <div class="grads">
+                  <i style="background:linear-gradient(135deg,#f093fb,#f5576c)"></i>
+                  <i style="background:linear-gradient(135deg,#667eea,#764ba2)"></i>
+                  <i style="background:linear-gradient(135deg,#11998e,#38ef7d)"></i>
+                  <i style="background:linear-gradient(135deg,#f12711,#f5af19)"></i>
+                  <i style="background:linear-gradient(135deg,#2193b0,#6dd5ed)"></i>
+                  <i style="background:linear-gradient(135deg,#c471f5,#fa71cd)"></i>
+                  <i style="background:linear-gradient(135deg,#13547a,#80d0c7)"></i>
+                  <i style="background:linear-gradient(135deg,#5f2c82,#49a09d)"></i>
+                  <i style="background:linear-gradient(135deg,#ffecd2,#fcb69f)"></i>
+                  <i style="background:linear-gradient(135deg,#a8edea,#fed6e3)"></i>
+                  <i style="background:linear-gradient(135deg,#ff9a9e,#fecfef)"></i>
+                  <i style="background:linear-gradient(135deg,#d4fc79,#96e6a1)"></i>
+                  <i style="background:linear-gradient(135deg,#0f0c29,#302b63)"></i>
+                  <i style="background:linear-gradient(135deg,#1a1a2e,#16213e)"></i>
+                  <i style="background:linear-gradient(135deg,#000428,#004e92)"></i>
+                  <i style="background:linear-gradient(135deg,#232526,#414345)"></i>
+                  <i style="background:linear-gradient(135deg,#141e30,#243b55)"></i>
+                  <i style="background:linear-gradient(135deg,#f4c4f3,#fc67fa)"></i>
+                  <i style="background:linear-gradient(135deg,#1d976c,#93f9b9)"></i>
+                  <i style="background:linear-gradient(135deg,#9d50bb,#6e48aa)"></i>
+                  <i style="background:linear-gradient(135deg,#00f260,#0575e6)"></i>
+                  <i style="background:linear-gradient(135deg,#00c6fb,#005bea)"></i>
+                  <i style="background:linear-gradient(135deg,#ff6a88,#ff99ac)"></i>
+                </div>
+              </div>
+
+              <div class="divider" style="margin:0"></div>
+
+              <div>
+                <div class="sec-h"><span>Frame</span><span class="val mono dim">2 on</span></div>
+
+                <div class="rowline" style="margin-bottom:6px"><span>Padding</span><b class="mono">72</b></div>
+                <div class="track"><div class="fill" style="width:75%"></div><div class="knob" style="left:75%"></div></div>
+                <div class="ticks" style="margin-bottom:12px"><span>0</span><span>48</span><span>96</span></div>
+
+                <div class="rowline" style="margin-bottom:6px"><span>Corner radius</span><b class="mono">16</b></div>
+                <div class="track"><div class="fill" style="width:33%"></div><div class="knob" style="left:33%"></div></div>
+                <div class="ticks" style="margin-bottom:14px"><span>0</span><span>24</span><span>48</span></div>
+
+                <div class="check" style="margin-bottom:6px"><span class="box on"></span>Shadow<b class="mono" style="margin-left:auto;font-weight:400;color:#8A8A92;font-size:11px">24</b></div>
+                <div class="track" style="margin-bottom:14px"><div class="fill" style="width:52%"></div><div class="knob" style="left:52%"></div></div>
+
+                <div class="check" style="margin-bottom:6px"><span class="box on"></span>Border<b class="mono" style="margin-left:auto;font-weight:400;color:#8A8A92;font-size:11px">2 px</b></div>
+                <div class="track" style="margin-bottom:8px"><div class="fill" style="width:16%"></div><div class="knob" style="left:16%"></div></div>
+                <div class="select" style="margin-bottom:8px"><span>Outside</span>
+                  <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg>
+                </div>
+                <div class="mini" style="margin-bottom:12px">
+                  <i style="background:#E53E3E"></i><i style="background:#F59E0B"></i><i style="background:#FCD34D"></i><i style="background:#10B981"></i>
+                  <i style="background:#3B82F6"></i><i style="background:#8B5CF6"></i><i style="background:#F3F4F6"></i><i style="background:#1F2937"></i>
+                </div>
+                <div class="check"><span class="box"></span>Inset</div>
+              </div>
+
+              <div class="divider" style="margin:0"></div>
+
+              <div class="rowline"><span>Crop ratio</span></div>
+              <div class="select" style="margin-top:-8px"><span>Auto</span>
+                <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 04 LIBRARY ============ -->
+  <div class="board-wrap">
+    <div class="board-label"><b>04</b> Library <span>900 × 560</span></div>
+    <div class="board-scaler">
+      <div class="board" style="--w:900px;--h:560px">
+        <div class="win" style="width:900px;height:560px">
+          <div class="native"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span></div>
+
+          <header class="hdr">
+            <div class="hdr-title">Library<span class="sub mono" style="font-size:10.5px">12 shots</span></div>
+            <div class="grow"></div>
+            <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>Search filenames</div>
+            <button class="icon"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.6 5.9"/><path d="M20 5v6h-6"/></svg></button>
+          </header>
+
+          <div class="lib">
+            <div class="lib-list">
+              <div class="lrow on">
+                <div class="lthumb"><div class="mini-shot"><i></i><i></i><i></i></div></div>
+                <div class="lname"><div class="f">prtsc-20261102-094213.png</div><div class="m">2026-11-02 09:42 · 1400×961 · 412 KB</div></div>
+                <span class="chip remote">R2 · uploaded</span>
+              </div>
+              <div class="lrow">
+                <div class="lthumb"><div class="mini-shot"><i></i><i></i><i></i></div></div>
+                <div class="lname"><div class="f">prtsc-20261102-093105.png</div><div class="m">2026-11-02 09:31 · 2880×1800 · 1.8 MB</div></div>
+                <span class="chip remote">Drive · uploaded</span>
+              </div>
+              <div class="lrow">
+                <div class="lthumb"><div class="mini-shot"><i></i><i></i><i></i></div></div>
+                <div class="lname"><div class="f">prtsc-20261101-214820.png</div><div class="m">2026-11-01 21:48 · 920×600 · 96 KB</div></div>
+                <span class="chip">Local only</span>
+              </div>
+              <div class="lrow">
+                <div class="lthumb"><div class="mini-shot"><i></i><i></i><i></i></div></div>
+                <div class="lname"><div class="f">prtsc-20261101-180402.jpg</div><div class="m">2026-11-01 18:04 · 1200×800 · 224 KB</div></div>
+                <span class="chip">Local only</span>
+              </div>
+            </div>
+
+            <div class="lib-foot">
+              <button class="btn ghost danger"><svg viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg>Delete</button>
+              <div class="gap"></div>
+              <button class="btn ghost">Copy path</button>
+              <button class="btn ghost">Copy link</button>
+              <button class="btn">Open image</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ tokens ============ -->
+  <div class="tokens">
+    <div>
+      <p class="tok-h">Palette — 中性为底，颜色留给画笔画</p>
+      <div class="pal">
+        <div><i style="background:#141416"></i><b>Canvas mat</b><span>#141416</span></div>
+        <div><i style="background:#1B1B1E"></i><b>Window</b><span>#1B1B1E</span></div>
+        <div><i style="background:#212125"></i><b>Panel</b><span>#212125</span></div>
+        <div><i style="background:#2C2C31"></i><b>Keycap</b><span>#2C2C31</span></div>
+        <div><i style="background:#EDEDEF"></i><b>Ink / primary</b><span>#EDEDEF</span></div>
+        <div><i style="background:#8A8A92"></i><b>Ink 2</b><span>#8A8A92</span></div>
+        <div><i style="background:#E53E3E"></i><b>Annotation red</b><span>#E53E3E</span></div>
+      </div>
+    </div>
+    <div class="type">
+      <p class="tok-h">Type — 一套 Plex，数字全部等宽</p>
+      <div class="t1">Editor · 19/600 — 标题只在真需要时出现</div>
+      <div class="t2">界面正文 13/400，行高 1.5；按钮 12.5/500</div>
+      <div class="t3">次级说明 11.5/400 #8A8A92 — 提示、单位、条件</div>
+      <div class="t4">1400 × 961 · 72 px · 1.0× · 0.1.0 — 读数一律 mono</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const boards = [...document.querySelectorAll('.board')];
+  function fit() {
+    boards.forEach(b => {
+      const w = parseFloat(getComputedStyle(b).getPropertyValue('--w'));
+      const h = parseFloat(getComputedStyle(b).getPropertyValue('--h'));
+      const avail = b.parentElement.clientWidth;
+      const s = Math.min(1, avail / w);
+      b.style.transform = 'scale(' + s + ')';
+      b.parentElement.style.height = (h * s) + 'px';
+    });
+  }
+  addEventListener('resize', fit);
+  fit();
+</script>
+</body>
+</html>

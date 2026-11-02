@@ -2,6 +2,7 @@ using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Prtsc.App.Localization;
 using Prtsc.Core;
 using Prtsc.Core.Annotation;
 using Prtsc.Core.Capture;
@@ -48,7 +49,47 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private MainViewMode _mode = MainViewMode.CaptureIdle;
 
     [ObservableProperty]
-    private string _statusText = "Ready. Press hotkey or use toolbar to capture.";
+    private string _statusText = Loc.T("Status.Ready");
+
+    /// <summary>标题栏右侧的版本号（0.1.0）。</summary>
+    public string VersionText { get; } =
+        typeof(MainWindowViewModel).Assembly.GetName().Version is { } v
+            ? $"{v.Major}.{v.Minor}.{v.Build}"
+            : "0.0.0";
+
+    /// <summary>主窗口空闲态的「最近 4 张」（来自 Library 索引）。</summary>
+    [ObservableProperty]
+    private IReadOnlyList<LibraryEntryViewModel> _recentEntries = Array.Empty<LibraryEntryViewModel>();
+
+    public bool HasRecent => RecentEntries.Count > 0;
+
+    /// <summary>重新读 Library 索引前 4 条（启动 / 导出后 / 回到空闲态时调用）。</summary>
+    public async Task RefreshRecentAsync()
+    {
+        if (_library is null)
+        {
+            RecentEntries = Array.Empty<LibraryEntryViewModel>();
+            OnPropertyChanged(nameof(HasRecent));
+            return;
+        }
+
+        try
+        {
+            var entries = await _library.LoadAsync().ConfigureAwait(true);
+            RecentEntries = entries
+                .OrderByDescending(e => e.CreatedAt)
+                .Take(4)
+                .Select(e => new LibraryEntryViewModel(e, LibraryThumbnails.TryLoad(e)))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "Recent shots load failed");
+            RecentEntries = Array.Empty<LibraryEntryViewModel>();
+        }
+
+        OnPropertyChanged(nameof(HasRecent));
+    }
 
     /// <summary>
     /// 当前打开的编辑器（M4 起）。为 null 表示尚未进入编辑器。
@@ -73,7 +114,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ApplyEditorDefaults(editor);
         Editor = editor;
         Mode = MainViewMode.Editor;
-        StatusText = $"Captured {image.Width} x {image.Height} @ {image.ScaleFactor:0.##}x";
+        StatusText = Loc.T("Status.Captured", image.Width, image.Height, image.ScaleFactor.ToString("0.##"));
     }
 
     /// <summary>
@@ -129,7 +170,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Editor?.Dispose();
         Editor = null;
         Mode = MainViewMode.CaptureIdle;
-        StatusText = "Ready.";
+        StatusText = Loc.T("Status.Ready");
+        _ = RefreshRecentAsync();
     }
 
     // ---- M6c: clipboard round-trip + quick save ----
@@ -144,14 +186,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
             using var image = Prtsc.Core.Editor.Export.ImageExporter.Render(editor.Document, editor.CompositionState);
             using var bitmap = SKBitmap.FromImage(image);
             if (_clipboard.TrySetImage(bitmap))
-                StatusText = $"Copied {bitmap.Width} x {bitmap.Height} to clipboard";
+                StatusText = Loc.T("Status.Copied", bitmap.Width, bitmap.Height);
             else
-                StatusText = "Copy failed: clipboard busy";
+                StatusText = Loc.T("Status.CopyBusy");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Copy to clipboard failed");
-            StatusText = "Copy failed: " + ex.Message;
+            StatusText = Loc.T("Status.CopyFailed", ex.Message);
         }
     }
 
@@ -164,7 +206,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (Editor is not { } editor) return;
         if (_configStore is null)
         {
-            StatusText = "Quick save unavailable: no config store";
+            StatusText = Loc.T("Status.QuickSaveUnavailable");
             return;
         }
         try
@@ -172,12 +214,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             var path = Prtsc.Core.Clipboard.QuickSave.Save(_configStore.Current, editor.Document, editor.CompositionState);
             // G-9（winshot）：QuickSave 成功后自动复制文件路径（导出/粘贴后可直接粘进聊天）
             var copiedPath = _clipboard.TrySetText(path);
-            StatusText = copiedPath ? "Saved " + path + " (path copied)" : "Saved " + path;
+            StatusText = copiedPath ? Loc.T("Status.QuickSavedPath", path) : Loc.T("Status.QuickSaved", path);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Quick save failed");
-            StatusText = "Quick save failed: " + ex.Message;
+            StatusText = Loc.T("Status.QuickSaveFailed", ex.Message);
         }
     }
 
@@ -208,23 +250,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             if (!outcome.Ok)
             {
-                StatusText = outcome.Error ?? "上传失败";
+                StatusText = outcome.Error ?? Loc.T("Status.UploadFailed", "");
                 return;
             }
 
             if (outcome.Url is { } url && _clipboard.TrySetText(url))
-                StatusText = $"Uploaded {outcome.Entry?.FileName} — URL copied to clipboard";
+                StatusText = Loc.T("Status.UploadedUrl", outcome.Entry?.FileName, url);
             else
-                StatusText = $"Uploaded {outcome.Entry?.FileName}";
+                StatusText = Loc.T("Status.Uploaded", outcome.Entry?.FileName);
         }
         catch (OperationCanceledException)
         {
-            StatusText = "Upload canceled";
+            StatusText = Loc.T("Status.UploadCanceled");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Upload failed");
-            StatusText = "Upload failed: " + ex.Message;
+            StatusText = Loc.T("Status.UploadFailed", ex.Message);
         }
         finally
         {
@@ -263,12 +305,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             var filePath = _clipboard.TryGetImageFilePath();
             if (filePath is null)
             {
-                StatusText = "Clipboard has no image";
+                StatusText = Loc.T("Status.ClipboardEmpty");
                 return;
             }
             if (!ImportImageFile(filePath, out var failure))
             {
-                StatusText = failure ?? "Clipboard file could not be opened";
+                StatusText = failure ?? Loc.T("Status.ImportFailed", "");
                 return;
             }
             return;
@@ -289,13 +331,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (!File.Exists(path))
             {
-                failure = "File not found: " + path;
+                failure = Loc.T("Status.FileNotFound", path);
                 return false;
             }
             var bitmap = SKBitmap.Decode(path);
             if (bitmap is null)
             {
-                failure = "Unsupported image format: " + Path.GetExtension(path);
+                failure = Loc.T("Status.UnsupportedFormat", Path.GetExtension(path));
                 return false;
             }
             var captured = new CapturedImage(bitmap,
@@ -307,7 +349,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Import image file failed: {Path}", path);
-            failure = "Import failed: " + ex.Message;
+            failure = Loc.T("Status.ImportFailed", ex.Message);
             return false;
         }
     }
@@ -326,16 +368,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
             using var bitmap = SKBitmap.FromImage(image);
             if (bitmap.Width <= 0 || bitmap.Height <= 0)
             {
-                StatusText = "Pin failed: empty image";
+                StatusText = Loc.T("Status.PinFailed", "");
                 return;
             }
             PinnedImageRequested?.Invoke(this, new PinnedImageRequestedEventArgs(bitmap.Copy()));
-            StatusText = $"Pinned {bitmap.Width} x {bitmap.Height}";
+            StatusText = Loc.T("Status.Pinned", bitmap.Width, bitmap.Height);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Pin failed");
-            StatusText = "Pin failed: " + ex.Message;
+            StatusText = Loc.T("Status.PinFailed", ex.Message);
         }
     }
 

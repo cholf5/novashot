@@ -48,10 +48,14 @@ public sealed partial class CloudSettingsViewModel : ObservableObject
     public bool IsR2Visible => ProviderIndex == 1;
     public bool IsGDriveVisible => ProviderIndex == 2;
 
+    /// <summary>None 渠道时的空状态（面板不至于空一大片）。</summary>
+    public bool IsNoneVisible => ProviderIndex == 0;
+
     partial void OnProviderIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsR2Visible));
         OnPropertyChanged(nameof(IsGDriveVisible));
+        OnPropertyChanged(nameof(IsNoneVisible));
     }
 
     private void LoadFromConfig()
@@ -90,14 +94,14 @@ public sealed partial class CloudSettingsViewModel : ObservableObject
             (string.IsNullOrWhiteSpace(R2AccountId) || string.IsNullOrWhiteSpace(R2Bucket) ||
              string.IsNullOrWhiteSpace(R2AccessKeyId) || string.IsNullOrWhiteSpace(R2SecretAccessKey)))
         {
-            SaveHint = "R2 需要填写 Account ID / Bucket / Access Key ID / Secret Access Key。";
+            SaveHint = Prtsc.App.Localization.Loc.T("Cloud.MissingR2");
             return false;
         }
         if (provider == "gdrive" &&
             (string.IsNullOrWhiteSpace(GDriveClientId) || string.IsNullOrWhiteSpace(GDriveClientSecret) ||
              string.IsNullOrWhiteSpace(GDriveRefreshToken)))
         {
-            SaveHint = "Google Drive 需要填写 Client ID / Client Secret / Refresh Token。";
+            SaveHint = Prtsc.App.Localization.Loc.T("Cloud.MissingDrive");
             return false;
         }
 
@@ -117,7 +121,7 @@ public sealed partial class CloudSettingsViewModel : ObservableObject
             c.Cloud.GDrive.FolderId = GDriveFolderId.Trim();
         });
         _ = _store.SaveAsync();
-        SaveHint = "已保存。";
+        SaveHint = Prtsc.App.Localization.Loc.T("Cloud.Saved");
         return true;
     }
 

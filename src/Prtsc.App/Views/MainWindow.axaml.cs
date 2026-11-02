@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
+using Prtsc.App.Localization;
 using Prtsc.App.Controls;
 using Prtsc.App.ViewModels;
 using Prtsc.Core.Annotation.Model;
@@ -65,6 +66,10 @@ public partial class MainWindow : Window
 
         // G-16：恢复上次窗口尺寸（配置有效值才覆盖默认 1200×800）
         ApplyPersistedWindowSize();
+
+        // 标题 + 主窗口「最近 4 张」
+        ApplyLocalizedTitle();
+        _ = _vm.RefreshRecentAsync();
 
         // G-15：CloseToTray —— ✕ 隐藏到托盘而非退出；G-16：关闭时持久化尺寸
         Closing += OnMainWindowClosing;
@@ -184,6 +189,30 @@ public partial class MainWindow : Window
     private void OnMinimizeToTrayClick(object? sender, RoutedEventArgs e) => Hide();
 
     private void OnEditorBackClick(object? sender, RoutedEventArgs e) => _vm.ReturnToCapture();
+
+    /// <summary>窗口标题跟随语言（Title 是普通 string，不跟 DynamicResource）。</summary>
+    internal void ApplyLocalizedTitle() => Title = Loc.T("App.Title");
+
+    /// <summary>右侧面板切页 Style / Canvas（纯视图状态，不进 VM）。</summary>
+    private void OnPanelTabClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton { Tag: string tag }) return;
+        var showStyle = string.Equals(tag, "style", StringComparison.Ordinal);
+
+        if (this.FindControl<ToggleButton>("StyleTab") is { } styleTab) styleTab.IsChecked = showStyle;
+        if (this.FindControl<ToggleButton>("CanvasTab") is { } canvasTab) canvasTab.IsChecked = !showStyle;
+        if (this.FindControl<ScrollViewer>("StyleHost") is { } styleHost) styleHost.IsVisible = showStyle;
+        if (this.FindControl<ScrollViewer>("CanvasHost") is { } canvasHost) canvasHost.IsVisible = !showStyle;
+    }
+
+    /// <summary>点主窗口「最近」里的缩略图 → 重新载入那张图。</summary>
+    private void OnRecentShotTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not Control { DataContext: LibraryEntryViewModel entry }) return;
+        if (string.IsNullOrWhiteSpace(entry.Entry.LocalPath)) return;
+        if (_vm.ImportImageFile(entry.Entry.LocalPath, out var failure)) return;
+        if (!string.IsNullOrEmpty(failure)) _vm.StatusText = failure;
+    }
 
     private void OnExportClick(object? sender, RoutedEventArgs e) => _ = ExportCurrentAsync();
 
@@ -330,6 +359,9 @@ public partial class MainWindow : Window
             {
                 _logger.LogWarning(tex, "Thumbnail write failed for {Path}", path);
             }
+
+            // 主窗口「最近 N 张」立即刷新（回到空闲态就能看见）
+            await _vm.RefreshRecentAsync();
         }
         catch (Exception ex)
         {

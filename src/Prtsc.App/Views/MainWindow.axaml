@@ -10,218 +10,499 @@
         x:Class="Prtsc.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Prtsc"
-        MinWidth="800" MinHeight="600"
+        MinWidth="880" MinHeight="620"
         Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
 
   <Window.Resources>
-    <conv:NullToBooleanConverter x:Key="NullToBool"/>
-    <conv:EnumEqualsConverter x:Key="EnumEq"/>
+    <conv:NullToBooleanConverter x:Key="NullToBool" />
+    <conv:EnumEqualsConverter x:Key="EnumEq" />
   </Window.Resources>
 
   <Window.KeyBindings>
     <!-- Undo / Redo 只在编辑器态可用：CanExecute 由 EditorViewModel 控制 -->
-    <KeyBinding Gesture="Ctrl+Z" Command="{Binding Editor.UndoCommand}"/>
-    <KeyBinding Gesture="Ctrl+Y" Command="{Binding Editor.RedoCommand}"/>
-    <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding Editor.RedoCommand}"/>
-    <!-- M4c.1: Delete 删除当前选中；Escape 取消选择 -->
-    <KeyBinding Gesture="Delete" Command="{Binding Editor.DeleteSelectionCommand}"/>
-    <KeyBinding Gesture="Back" Command="{Binding Editor.DeleteSelectionCommand}"/>
-    <KeyBinding Gesture="Escape" Command="{Binding Editor.DeselectCommand}"/>
+    <KeyBinding Gesture="Ctrl+Z" Command="{Binding Editor.UndoCommand}" />
+    <KeyBinding Gesture="Ctrl+Y" Command="{Binding Editor.RedoCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding Editor.RedoCommand}" />
+    <KeyBinding Gesture="Delete" Command="{Binding Editor.DeleteSelectionCommand}" />
+    <KeyBinding Gesture="Back" Command="{Binding Editor.DeleteSelectionCommand}" />
+    <KeyBinding Gesture="Escape" Command="{Binding Editor.DeselectCommand}" />
   </Window.KeyBindings>
 
-  <DockPanel>
-    <!-- Title bar area (placeholder) -->
-    <Border DockPanel.Dock="Top" Height="40" Background="#22000000">
-      <Grid ColumnDefinitions="*, Auto">
-        <TextBlock Grid.Column="0"
-                   Margin="16,0" VerticalAlignment="Center"
-                   Text="Prtsc"
-                   FontWeight="SemiBold" FontSize="14" />
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0">
-          <Button Name="MinimizeToTrayButton"
-                  Content="Minimize to tray"
-                  Padding="10,4" Margin="4,0"
-                  Click="OnMinimizeToTrayClick"/>
+  <Grid RowDefinitions="48,*,30">
+
+    <!-- HEADER：原生标题栏下面就是真 header（不再有占位黑条） -->
+    <Border Grid.Row="0" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1"
+            Background="{DynamicResource Bg.Window}">
+      <Grid ColumnDefinitions="Auto,*,Auto" Margin="10,0,12,0">
+
+        <!-- 空闲态 · 左 -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                    IsVisible="{Binding IsInCaptureMode}">
+          <TextBlock Classes="h2" Text="Prtsc" VerticalAlignment="Center" />
+          <TextBlock Classes="mono dim" FontSize="10.5" Text="{Binding VersionText}"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- 编辑态 · 左 -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                    IsVisible="{Binding IsInEditorMode}">
+          <Button Classes="icon" Click="OnEditorBackClick"
+                  ToolTip.Tip="{DynamicResource L.Editor.Back}">
+            <Path Classes="glyph" Data="{DynamicResource Icon.Back}" />
+          </Button>
+          <TextBlock Classes="h2" Text="{DynamicResource L.Editor.Title}" Margin="6,0,0,0"
+                     VerticalAlignment="Center" />
+          <TextBlock Classes="dim" FontSize="12" Text="{DynamicResource L.Editor.Untitled}"
+                     Margin="8,0,0,0" VerticalAlignment="Center" />
+          <Rectangle Width="1" Height="18" Fill="{DynamicResource Line}" Margin="10,0" />
+          <Button Classes="icon" Command="{Binding Editor.UndoCommand}"
+                  ToolTip.Tip="{DynamicResource L.Editor.Undo}">
+            <Path Classes="glyph" Data="{DynamicResource Icon.Undo}" />
+          </Button>
+          <Button Classes="icon" Command="{Binding Editor.RedoCommand}"
+                  ToolTip.Tip="{DynamicResource L.Editor.Redo}">
+            <Path Classes="glyph" Data="{DynamicResource Icon.Redo}" />
+          </Button>
+        </StackPanel>
+
+        <!-- 空闲态 · 右 -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                    IsVisible="{Binding IsInCaptureMode}">
+          <Button Classes="ghost" Click="OnLibraryClick" Content="{DynamicResource L.Editor.Library}" />
+          <Button Classes="ghost" Click="OnMinimizeToTrayClick" Content="{DynamicResource L.Capture.HideToTray}" />
+        </StackPanel>
+
+        <!-- 编辑态 · 右：一个主操作，其余收进 ⋯ -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                    IsVisible="{Binding IsInEditorMode}">
+          <Button Classes="ghost" Click="OnExportClick" ToolTip.Tip="{DynamicResource L.Editor.SaveTip}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <TextBlock Text="{DynamicResource L.Editor.Save}" VerticalAlignment="Center" />
+              <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Ctrl S" />
+            </StackPanel>
+          </Button>
+          <Button Classes="primary" Command="{Binding CopyCommand}" ToolTip.Tip="{DynamicResource L.Editor.CopyTip}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <TextBlock Text="{DynamicResource L.Editor.Copy}" VerticalAlignment="Center" />
+              <controls:Keycap Theme="{StaticResource KeycapTheme}" Classes="on-accent" Content="Ctrl C" />
+            </StackPanel>
+          </Button>
+          <Button Classes="icon" ToolTip.Tip="{DynamicResource L.Editor.More}">
+            <Path Classes="glyph" Data="{DynamicResource Icon.More}" />
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Header="{DynamicResource L.Editor.QuickSave}" Command="{Binding QuickSaveCommand}" />
+                <MenuItem Header="{DynamicResource L.Editor.Upload}" Command="{Binding UploadCommand}" />
+                <MenuItem Header="{DynamicResource L.Editor.Pin}" Command="{Binding PinCommand}" />
+                <Separator />
+                <MenuItem Header="{DynamicResource L.Editor.Library}" Click="OnLibraryClick" />
+                <MenuItem Header="{DynamicResource L.Editor.CloudSettings}" Click="OnCloudSettingsClick" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
         </StackPanel>
       </Grid>
     </Border>
 
-    <!-- Status bar -->
-    <Border DockPanel.Dock="Bottom" Height="26" Background="#11000000">
-      <TextBlock Margin="12,0" VerticalAlignment="Center"
-                 FontSize="12"
-                 Text="{Binding StatusText}"/>
-    </Border>
+    <!-- BODY -->
+    <Panel Grid.Row="1">
 
-    <!-- Content: Capture toolbar OR Editor, switched by ViewModel.Mode -->
-    <Panel>
-      <!-- Capture idle view -->
-      <StackPanel IsVisible="{Binding IsInCaptureMode}"
-                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                  Spacing="16" Width="520">
-        <TextBlock Text="Capture" FontSize="28" FontWeight="Light" HorizontalAlignment="Center"/>
-        <TextBlock Text="Pick a capture mode below or use a global hotkey."
-                   Opacity="0.7" HorizontalAlignment="Center"/>
-        <UniformGrid Columns="3" Margin="0,16,0,0">
-          <Button Name="CaptureFullscreenButton"
-                  Content="Fullscreen"
-                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                  Margin="6" Padding="12"
-                  Click="OnCaptureFullscreenClick"/>
-          <Button Name="CaptureRegionButton"
-                  Content="Region"
-                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                  Margin="6" Padding="12"
-                  Click="OnCaptureRegionClick"/>
-          <Button Name="CaptureWindowButton"
-                  Content="Window"
-                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                  Margin="6" Padding="12"
-                  Click="OnCaptureWindowClick"/>
-        </UniformGrid>
-        <TextBlock Margin="0,20,0,0" FontSize="12" Opacity="0.6" HorizontalAlignment="Center"
-                   Text="Global hotkeys: PrintScreen / Ctrl+PrintScreen / Ctrl+Shift+PrintScreen"/>
-        <!-- M6c: 剪贴板粘贴 → 新编辑会话 -->
-        <Button Name="PasteFromClipboardButton"
-                Content="Paste from Clipboard (Ctrl+V)"
-                Margin="0,8,0,0" Padding="12,8"
-                HorizontalAlignment="Stretch"
-                Command="{Binding PasteFromClipboardCommand}"
-                ToolTip.Tip="Open an image from the clipboard in the editor"/>
-      </StackPanel>
+      <!-- 空闲态：一列命令 + 最近 4 张 -->
+      <Grid IsVisible="{Binding IsInCaptureMode}" ColumnDefinitions="*,Auto" Margin="44,0">
 
-      <!-- Editor view (M4b: full tool palette + Undo/Redo + SkiaCanvas) -->
-      <Grid IsVisible="{Binding IsInEditorMode}" RowDefinitions="Auto,*">
-        <Border Grid.Row="0" Height="44" Background="#18000000">
-          <StackPanel Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center" Spacing="4">
-            <Button Name="EditorBackButton" Content="← Back"
-                    Padding="10,4"
-                    Click="OnEditorBackClick"/>
-            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
-            <!-- 工具选择：RadioButton group 保证单选。tag 承载 ToolKind 值；IsChecked 单向绑定
-                 保证热键改 CurrentTool 时按钮视觉同步。M4d 加了字母热键 V R E O A L T N S。 -->
-            <RadioButton GroupName="Tool" Content="Sel"     Padding="8,4" Tag="Select"        Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Select}"
-                         ToolTip.Tip="Select / move / resize (V)"/>
-            <RadioButton GroupName="Tool" Content="Rect"    Padding="8,4" Tag="Rectangle"     Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Rectangle}"
-                         ToolTip.Tip="Rectangle (R)"/>
-            <RadioButton GroupName="Tool" Content="Ellipse" Padding="8,4" Tag="Ellipse"       Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Ellipse}"
-                         ToolTip.Tip="Ellipse (E)"/>
-            <RadioButton GroupName="Tool" Content="Line"    Padding="8,4" Tag="Line"          Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Line}"
-                         ToolTip.Tip="Line (L)"/>
-            <RadioButton GroupName="Tool" Content="Arrow"   Padding="8,4" Tag="ArrowStraight" Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=ArrowStraight}"
-                         ToolTip.Tip="Arrow (A)"/>
-            <RadioButton GroupName="Tool" Content="Curve"   Padding="8,4" Tag="ArrowCurved"   Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=ArrowCurved}"
-                         ToolTip.Tip="Curved arrow (O)"/>
-            <RadioButton GroupName="Tool" Content="Text"    Padding="8,4" Tag="Text"          Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Text}"
-                         ToolTip.Tip="Text (T)"/>
-            <RadioButton GroupName="Tool" Content="#"       Padding="8,4" Tag="Number"        Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Number}"
-                         ToolTip.Tip="Number counter (N)"/>
-            <RadioButton GroupName="Tool" Content="Spot"    Padding="8,4" Tag="Spotlight"     Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Spotlight}"
-                         ToolTip.Tip="Spotlight (S)"/>
-            <!-- M5: Flameshot 补齐工具 -->
-            <RadioButton GroupName="Tool" Content="Pen"     Padding="8,4" Tag="Pencil"        Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Pencil}"
-                         ToolTip.Tip="Pencil (P)"/>
-            <RadioButton GroupName="Tool" Content="High"    Padding="8,4" Tag="Highlighter"   Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Highlighter}"
-                         ToolTip.Tip="Highlighter (H)"/>
-            <RadioButton GroupName="Tool" Content="Mosaic"  Padding="8,4" Tag="Mosaic"        Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Mosaic}"
-                         ToolTip.Tip="Pixelate region (M) — Ctrl+Wheel adjusts block size"/>
-            <RadioButton GroupName="Tool" Content="Blur"    Padding="8,4" Tag="Blur"          Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Blur}"
-                         ToolTip.Tip="Blur region (B) — Ctrl+Wheel adjusts strength"/>
-            <RadioButton GroupName="Tool" Content="Inv"     Padding="8,4" Tag="Invert"        Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Invert}"
-                         ToolTip.Tip="Invert colors (I)"/>
-            <!-- M6d: 非破坏裁剪（X） -->
-            <RadioButton GroupName="Tool" Content="Crop"    Padding="8,4" Tag="Crop"          Click="OnToolChanged"
-                         IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Crop}"
-                         ToolTip.Tip="Crop (X) — drag a region; non-destructive"/>
-            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
-            <Button Content="Delete (Del)" Padding="10,4"
-                    Command="{Binding Editor.DeleteSelectionCommand}"/>
-            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
-            <Button Content="Undo (Ctrl+Z)" Padding="10,4"
-                    Command="{Binding Editor.UndoCommand}"/>
-            <Button Content="Redo (Ctrl+Y)" Padding="10,4"
-                    Command="{Binding Editor.RedoCommand}"/>
-            <Border Width="1" Margin="6,4" Background="#33FFFFFF"/>
-            <!-- M6a: 导出（格式由保存对话框扩展名决定：png/jpg/webp） -->
-            <Button Content="Save (Ctrl+S)" Padding="10,4"
-                    ToolTip.Tip="Export as PNG / JPEG / WebP (format follows file extension)"
-                    Click="OnExportClick"/>
-            <!-- M6c: 复制到剪贴板 / 快存（命令在主 VM 上，直接绑定根级属性） -->
-            <Button Content="Copy (Ctrl+C)" Padding="10,4"
-                    ToolTip.Tip="Copy composed image to clipboard (CF_DIBV5 + CF_DIB)"
-                    Command="{Binding CopyCommand}"/>
-            <Button Content="Quick Save (Ctrl+Q)" Padding="10,4"
-                    ToolTip.Tip="Save directly to the QuickSave folder (no dialog, follows config)"
-                    Command="{Binding QuickSaveCommand}"/>
-            <!-- M7b: 云上传 / 历史 / Pin / 云设置 -->
-            <Button Content="Upload" Padding="10,4"
-                    ToolTip.Tip="Upload to configured cloud (R2/Google Drive), URL copied (Ctrl+U)"
-                    Command="{Binding UploadCommand}"/>
-            <Button Content="Library" Padding="10,4"
-                    ToolTip.Tip="Screenshot history (Ctrl+L)"
-                    Click="OnLibraryClick"/>
-            <Button Content="Pin" Padding="10,4"
-                    ToolTip.Tip="Pin composed image to screen (Ctrl+P)"
-                    Command="{Binding PinCommand}"/>
-            <Button Content="Cloud…" Padding="10,4"
-                    ToolTip.Tip="Cloud upload settings"
-                    Click="OnCloudSettingsClick"/>
-          </StackPanel>
-        </Border>
-        <Border Grid.Row="1" Background="#0A000000">
-          <Grid ColumnDefinitions="*,Auto">
-            <!-- 画布 + 浮动 TextBox 编辑层 -->
-            <Grid Grid.Column="0">
-              <controls:SkiaCanvas x:Name="Canvas" Editor="{Binding Editor}" Margin="8"/>
-              <Canvas x:Name="TextEditLayer"
-                      IsHitTestVisible="{Binding Editor.EditingText, Converter={StaticResource NullToBool}}"
-                      Background="Transparent">
-                <TextBox x:Name="TextEditBox"
-                         IsVisible="{Binding Editor.EditingText, Converter={StaticResource NullToBool}}"
-                         Text="{Binding Editor.EditingTextValue, Mode=TwoWay}"
-                         Canvas.Left="{Binding Editor.EditingTextDipBounds.X}"
-                         Canvas.Top="{Binding Editor.EditingTextDipBounds.Y}"
-                         Width="{Binding Editor.EditingTextDipBounds.Width}"
-                         MinWidth="80"
-                         FontSize="{Binding Editor.EditingTextFontSizeDip}"
-                         AcceptsReturn="False"
-                         LostFocus="OnTextEditLostFocus">
-                  <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter"  Command="{Binding Editor.CommitTextEditCommand}"/>
-                    <KeyBinding Gesture="Escape" Command="{Binding Editor.CancelTextEditCommand}"/>
-                  </TextBox.KeyBindings>
-                </TextBox>
-              </Canvas>
+        <StackPanel Grid.Column="0" Width="470" HorizontalAlignment="Left" VerticalAlignment="Center">
+          <TextBlock Classes="h1" Text="{DynamicResource L.Capture.Title}" />
+          <TextBlock Classes="label dim" Margin="0,5,0,26" TextWrapping="Wrap"
+                     Text="{DynamicResource L.Capture.Lede}" />
+
+          <Button Classes="cmd" Click="OnCaptureFullscreenClick">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Width="28" Height="28" CornerRadius="7" Background="#12FFFFFF">
+                <Path Classes="glyph" Width="16" Height="16" Stroke="{DynamicResource Ink}"
+                      Data="{DynamicResource Icon.Fullscreen}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                <TextBlock Text="{DynamicResource L.Capture.Fullscreen}" />
+                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.FullscreenHint}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Ctrl" />
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Shift" />
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="PrtSc" />
+              </StackPanel>
             </Grid>
+          </Button>
 
-            <!-- 右侧属性面板：标注样式 + 合成外观（M6b），可滚动 -->
-            <Border Grid.Column="1" Width="240" Background="#22000000">
-              <ScrollViewer>
-                <StackPanel Spacing="10">
-                  <controls:StylePanel DataContext="{Binding Editor.StylePanel}"/>
-                  <Border Height="1" Background="#33FFFFFF" Margin="0,2"/>
-                  <controls:CompositionPanel DataContext="{Binding Editor.CompositionPanelViewModel}"/>
+          <Border Height="1" Background="{DynamicResource Line}" Margin="10,0" />
+
+          <Button Classes="cmd" Click="OnCaptureRegionClick">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Width="28" Height="28" CornerRadius="7" Background="#12FFFFFF">
+                <Path Classes="glyph" Width="16" Height="16" Stroke="{DynamicResource Ink}"
+                      Data="{DynamicResource Icon.Region}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                <TextBlock Text="{DynamicResource L.Capture.Region}" />
+                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.RegionHint}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="PrtSc" />
+              </StackPanel>
+            </Grid>
+          </Button>
+
+          <Border Height="1" Background="{DynamicResource Line}" Margin="10,0" />
+
+          <Button Classes="cmd" Click="OnCaptureWindowClick">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Width="28" Height="28" CornerRadius="7" Background="#12FFFFFF">
+                <Path Classes="glyph" Width="16" Height="16" Stroke="{DynamicResource Ink}"
+                      Data="{DynamicResource Icon.Window}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                <TextBlock Text="{DynamicResource L.Capture.Window}" />
+                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.WindowHint}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Ctrl" />
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="PrtSc" />
+              </StackPanel>
+            </Grid>
+          </Button>
+
+          <Border Height="1" Background="{DynamicResource Line}" Margin="10,0" />
+
+          <Button Classes="cmd" Command="{Binding PasteFromClipboardCommand}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Width="28" Height="28" CornerRadius="7" Background="#12FFFFFF">
+                <Path Classes="glyph" Width="16" Height="16" Stroke="{DynamicResource Ink}"
+                      Data="{DynamicResource Icon.Paste}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                <TextBlock Text="{DynamicResource L.Capture.Paste}" />
+                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.PasteHint}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Ctrl" />
+                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="V" />
+              </StackPanel>
+            </Grid>
+          </Button>
+        </StackPanel>
+
+        <!-- 最近 4 张 -->
+        <StackPanel Grid.Column="1" Width="420" Margin="56,0,0,0" VerticalAlignment="Center">
+          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <TextBlock Classes="sec" Text="{DynamicResource L.Capture.Recent}" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost" Padding="8,0" Height="24"
+                    Content="{DynamicResource L.Capture.OpenLibrary}" Click="OnLibraryClick" />
+          </Grid>
+
+          <ItemsControl ItemsSource="{Binding RecentEntries}" IsVisible="{Binding HasRecent}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Columns="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:LibraryEntryViewModel">
+                <Border Margin="0,0,10,10" CornerRadius="8" ClipToBounds="True"
+                        Background="{DynamicResource Bg.Panel}"
+                        BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                        Cursor="Hand" Tapped="OnRecentShotTapped">
+                  <StackPanel>
+                    <Border Height="88" Background="{DynamicResource Bg.Mat}">
+                      <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="6" />
+                    </Border>
+                    <TextBlock Classes="mono hint" FontSize="9.5" Margin="9,6"
+                               Text="{Binding DetailsText}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border IsVisible="{Binding !HasRecent}" CornerRadius="8" Padding="20"
+                  BorderBrush="{DynamicResource Line}" BorderThickness="1">
+            <TextBlock Classes="hint" HorizontalAlignment="Center" TextWrapping="Wrap"
+                       Text="{DynamicResource L.Capture.RecentEmpty}" />
+          </Border>
+        </StackPanel>
+      </Grid>
+
+      <!-- 编辑态 -->
+      <Grid IsVisible="{Binding IsInEditorMode}" ColumnDefinitions="*,264">
+
+        <!-- 画布 + 悬浮工具栏 -->
+        <Grid Grid.Column="0" Background="{DynamicResource Bg.Mat}">
+          <Grid Margin="12,12,12,78" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <controls:SkiaCanvas x:Name="Canvas" Editor="{Binding Editor}" />
+            <Canvas x:Name="TextEditLayer"
+                    IsHitTestVisible="{Binding Editor.EditingText, Converter={StaticResource NullToBool}}"
+                    Background="Transparent">
+              <TextBox x:Name="TextEditBox"
+                       IsVisible="{Binding Editor.EditingText, Converter={StaticResource NullToBool}}"
+                       Text="{Binding Editor.EditingTextValue, Mode=TwoWay}"
+                       Canvas.Left="{Binding Editor.EditingTextDipBounds.X}"
+                       Canvas.Top="{Binding Editor.EditingTextDipBounds.Y}"
+                       Width="{Binding Editor.EditingTextDipBounds.Width}"
+                       MinWidth="80"
+                       BorderThickness="0"
+                       Background="#0A000000"
+                       Padding="2"
+                       FontSize="{Binding Editor.EditingTextFontSizeDip}"
+                       AcceptsReturn="False"
+                       LostFocus="OnTextEditLostFocus">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding Editor.CommitTextEditCommand}" />
+                  <KeyBinding Gesture="Escape" Command="{Binding Editor.CancelTextEditCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </Canvas>
+          </Grid>
+
+          <!-- 工具坞：15 个工具，图标 + 热键字母，永远塞得下 -->
+          <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,18"
+                  Background="{DynamicResource Bg.Dock}" CornerRadius="11" Padding="5"
+                  BorderBrush="{DynamicResource Line}" BorderThickness="1">
+            <Border.BoxShadow>
+              <BoxShadows>0 14 34 -10 #CC000000</BoxShadows>
+            </Border.BoxShadow>
+            <StackPanel Orientation="Horizontal" Spacing="2">
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Select" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Select}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Select}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Select}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="V" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <Rectangle Width="1" Height="24" Fill="{DynamicResource Line}" VerticalAlignment="Center" Margin="3,0" />
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Rectangle" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Rectangle}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Rectangle}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Rect}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="R" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Ellipse" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Ellipse}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Ellipse}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Ellipse}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="E" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Line" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Line}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Line}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Line}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="L" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="ArrowStraight" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.ArrowStraight}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=ArrowStraight}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Arrow}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="A" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="ArrowCurved" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.ArrowCurved}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=ArrowCurved}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Curve}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="O" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <Rectangle Width="1" Height="24" Fill="{DynamicResource Line}" VerticalAlignment="Center" Margin="3,0" />
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Text" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Text}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Text}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Text}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="T" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Number" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Number}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Number}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Number}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="N" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Spotlight" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Spotlight}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Spotlight}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Spotlight}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="S" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <Rectangle Width="1" Height="24" Fill="{DynamicResource Line}" VerticalAlignment="Center" Margin="3,0" />
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Pencil" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Pencil}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Pencil}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Pencil}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="P" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Highlighter" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Highlighter}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Highlighter}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Highlighter}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="H" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Mosaic" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Mosaic}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Mosaic}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph solid" Width="17" Height="17" Data="{DynamicResource Icon.Mosaic}"
+                        Fill="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="M" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Blur" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Blur}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Blur}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph dash" Width="17" Height="17" Data="{DynamicResource Icon.Blur}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="B" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Invert" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Invert}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Invert}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Grid Width="17" Height="17" HorizontalAlignment="Center">
+                    <Path Classes="glyph" Data="{DynamicResource Icon.Invert.Stroke}"
+                          Stroke="{Binding $parent[RadioButton].Foreground}" />
+                    <Path Classes="glyph solid" Data="{DynamicResource Icon.Invert.Fill}"
+                          Fill="{Binding $parent[RadioButton].Foreground}" />
+                  </Grid>
+                  <TextBlock Classes="mono" FontSize="8.5" Text="I" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+              <Rectangle Width="1" Height="24" Fill="{DynamicResource Line}" VerticalAlignment="Center" Margin="3,0" />
+
+              <RadioButton Classes="tool" GroupName="Tool" Tag="Crop" Click="OnToolChanged"
+                           ToolTip.Tip="{DynamicResource L.Tool.Crop}"
+                           IsChecked="{Binding Editor.CurrentTool, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Crop}">
+                <StackPanel Spacing="1" HorizontalAlignment="Center">
+                  <Path Classes="glyph" Width="17" Height="17" Data="{DynamicResource Icon.Crop}"
+                        Stroke="{Binding $parent[RadioButton].Foreground}" HorizontalAlignment="Center" />
+                  <TextBlock Classes="mono" FontSize="8.5" Text="X" HorizontalAlignment="Center"
+                             Foreground="{Binding $parent[RadioButton].Foreground}" Opacity="0.6" />
+                </StackPanel>
+              </RadioButton>
+
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <!-- 右侧面板 -->
+        <Border Grid.Column="1" Background="{DynamicResource Bg.Panel}"
+                BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0">
+          <Grid RowDefinitions="Auto,*">
+
+            <Border Grid.Row="0" Padding="10" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+              <Border Background="#26000000" CornerRadius="8" Padding="3">
+                <Grid ColumnDefinitions="*,*">
+                  <ToggleButton Name="StyleTab" Classes="seg" Tag="style" IsChecked="True"
+                                Content="{DynamicResource L.Panel.Style}" Click="OnPanelTabClick" />
+                  <ToggleButton Name="CanvasTab" Grid.Column="1" Classes="seg" Tag="canvas"
+                                Content="{DynamicResource L.Panel.Canvas}" Click="OnPanelTabClick" />
+                </Grid>
+              </Border>
+            </Border>
+
+            <Panel Grid.Row="1">
+              <ScrollViewer Name="StyleHost" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                  <controls:StylePanel DataContext="{Binding Editor.StylePanel}" />
+                  <Border Height="1" Background="{DynamicResource Line}" Margin="12,2" />
+                  <TextBlock Classes="hint" FontSize="11" TextWrapping="Wrap" Margin="12,0,12,16"
+                             Text="{DynamicResource L.Editor.CanvasHint}" />
                 </StackPanel>
               </ScrollViewer>
-            </Border>
+
+              <ScrollViewer Name="CanvasHost" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
+                <controls:CompositionPanel DataContext="{Binding Editor.CompositionPanelViewModel}" />
+              </ScrollViewer>
+            </Panel>
           </Grid>
         </Border>
       </Grid>
     </Panel>
-  </DockPanel>
+
+    <!-- STATUS -->
+    <Border Grid.Row="2" Background="{DynamicResource Bg.Window}"
+            BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="12,0">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" FontSize="11.5" Foreground="{DynamicResource Ink.2}"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                   Text="{Binding StatusText}" />
+        <TextBlock Grid.Column="1" Classes="hint" FontSize="11" VerticalAlignment="Center"
+                   IsVisible="{Binding IsInEditorMode}" Text="{DynamicResource L.Editor.StatusHint}" />
+        <TextBlock Grid.Column="1" Classes="hint" FontSize="11" VerticalAlignment="Center"
+                   IsVisible="{Binding IsInCaptureMode}" Text="{DynamicResource L.Capture.TrayHint}" />
+      </Grid>
+    </Border>
+  </Grid>
 </Window>

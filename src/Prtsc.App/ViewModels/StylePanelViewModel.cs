@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Prtsc.App.Localization;
 using Prtsc.Core.Annotation;
 using Prtsc.Core.Annotation.Model;
 using SkiaSharp;
@@ -45,6 +46,7 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
         {
             // 选中变化会影响所有派生属性：颜色/宽/字号可用性/标签
             OnPropertyChanged(nameof(Stroke));
+            OnPropertyChanged(nameof(StrokeHex));
             OnPropertyChanged(nameof(StrokeWidth));
             OnPropertyChanged(nameof(FontSize));
             OnPropertyChanged(nameof(IsFontSizeAvailable));
@@ -61,8 +63,12 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
             if (value == Stroke) return;
             ApplyStyleChange(style => style with { Stroke = value });
             OnPropertyChanged();
+            OnPropertyChanged(nameof(StrokeHex));
         }
     }
+
+    /// <summary>#RRGGBB（面板上给用户看的色值；SKColor.ToString 是 #AARRGGBB，太长）。</summary>
+    public string StrokeHex => $"#{Stroke.Red:X2}{Stroke.Green:X2}{Stroke.Blue:X2}";
 
     public float StrokeWidth
     {
@@ -98,18 +104,21 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
 
     public string SelectionKindLabel => Editor.Selection switch
     {
-        null                       => "No selection",
-        RectangleAnnotation _      => "Rectangle",
-        EllipseAnnotation _        => "Ellipse",
-        LineAnnotation l           => l.GetType().Name.Replace("Annotation", ""),
-        TextAnnotation _           => "Text",
-        NumberAnnotation _         => "Number",
-        SpotlightAnnotation _      => "Spotlight",
-        PencilAnnotation _         => "Pencil",
-        HighlighterAnnotation _    => "Highlighter",
-        MosaicAnnotation _         => "Mosaic",
-        BlurAnnotation _           => "Blur",
-        _                          => Editor.Selection!.GetType().Name,
+        null                    => Loc.T("Kind.None"),
+        RectangleAnnotation _   => Loc.T("Kind.Rectangle"),
+        EllipseAnnotation _     => Loc.T("Kind.Ellipse"),
+        ArrowCurvedAnnotation _ => Loc.T("Kind.ArrowCurved"),
+        ArrowStraightAnnotation _ => Loc.T("Kind.ArrowStraight"),
+        LineAnnotation _        => Loc.T("Kind.Line"),
+        TextAnnotation _        => Loc.T("Kind.Text"),
+        NumberAnnotation _      => Loc.T("Kind.Number"),
+        SpotlightAnnotation _   => Loc.T("Kind.Spotlight"),
+        PencilAnnotation _      => Loc.T("Kind.Pencil"),
+        HighlighterAnnotation _ => Loc.T("Kind.Highlighter"),
+        MosaicAnnotation _      => Loc.T("Kind.Mosaic"),
+        BlurAnnotation _        => Loc.T("Kind.Blur"),
+        InvertAnnotation _      => Loc.T("Kind.Invert"),
+        _                       => Editor.Selection!.GetType().Name,
     };
 
     /// <summary>

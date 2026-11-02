@@ -34,7 +34,7 @@ public partial class CloudSettingsWindow : Window
     private async void OnTestConnectionClick(object? sender, RoutedEventArgs e)
     {
         TestConnectionButton.IsEnabled = false;
-        _vm.SaveHint = "正在测试连接…";
+        _vm.SaveHint = Prtsc.App.Localization.Loc.T("Cloud.Testing");
         try
         {
             var (ok, message) = _vm.ProviderIndex switch
@@ -47,7 +47,7 @@ public partial class CloudSettingsWindow : Window
         }
         catch (Exception ex)
         {
-            _vm.SaveHint = "✗ 连接测试异常：" + ex.Message;
+            _vm.SaveHint = "✗ " + Prtsc.App.Localization.Loc.T("Cloud.TestError", ex.Message);
         }
         finally
         {

@@ -1,0 +1,517 @@
+using System.Globalization;
+using Avalonia;
+using Avalonia.Controls;
+
+namespace Prtsc.App.Localization;
+
+/// <summary>
+/// 极简双语文案层（简体中文 / English）。
+///
+/// 用法：
+/// <list type="bullet">
+/// <item>XAML：<c>Text="{DynamicResource L.Capture.Title}"</c></item>
+/// <item>代码：<c>Loc.T("Capture.Title")</c></item>
+/// </list>
+///
+/// 切语言 = 把整张表按 <c>L.</c> 前缀重新写进 <see cref="Application.Resources"/>；
+/// DynamicResource 会自己刷新，窗口不用重建。
+/// </summary>
+public static class Loc
+{
+    public const string SystemDefault = "system";
+    public const string English = "en";
+    public const string ChineseSimplified = "zh-CN";
+
+    /// <summary>用户偏好（config 里的原值，可能为 system）。</summary>
+    public static string Preference { get; private set; } = SystemDefault;
+
+    /// <summary>实际生效的语言（en / zh-CN）。</summary>
+    public static string Current { get; private set; } = English;
+
+    /// <summary>语言变更事件（托盘菜单勾选状态等视图侧刷新用）。</summary>
+    public static event EventHandler? LanguageChanged;
+
+    /// <summary>系统语言 → 我们支持的两个之一。非中文一律英文。</summary>
+    public static string Resolve(string? preference)
+    {
+        var pref = string.IsNullOrWhiteSpace(preference) ? SystemDefault : preference!;
+        if (pref.StartsWith("zh", StringComparison.OrdinalIgnoreCase)) return ChineseSimplified;
+        if (pref.StartsWith("en", StringComparison.OrdinalIgnoreCase)) return English;
+        // system：跟随 OS
+        return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName
+            .Equals("zh", StringComparison.OrdinalIgnoreCase)
+            ? ChineseSimplified
+            : English;
+    }
+
+    /// <summary>取文案；找不到就退回英文，再找不到返回 key（开发期一眼看出漏翻）。</summary>
+    public static string T(string key)
+    {
+        var table = Current == ChineseSimplified ? Strings.Zh : Strings.En;
+        if (table.TryGetValue(key, out var value)) return value;
+        return Strings.En.TryGetValue(key, out var fallback) ? fallback : key;
+    }
+
+    /// <summary>带参数的文案（string.Format）。</summary>
+    public static string T(string key, params object?[] args) => string.Format(T(key), args);
+
+    /// <summary>启动时调用：解析偏好并写入资源字典。</summary>
+    public static void Initialize(string? preference, Application app)
+    {
+        Preference = string.IsNullOrWhiteSpace(preference) ? SystemDefault : preference!;
+        Current = Resolve(Preference);
+        Apply(app);
+    }
+
+    /// <summary>运行时切语言（托盘菜单 / 设置页）；顺带刷新窗口标题。</summary>
+    public static void SetPreference(string? preference, Application app)
+    {
+        Preference = string.IsNullOrWhiteSpace(preference) ? SystemDefault : preference!;
+        var next = Resolve(Preference);
+        if (next != Current)
+        {
+            Current = next;
+            Apply(app);
+        }
+        LanguageChanged?.Invoke(null, EventArgs.Empty);
+    }
+
+    /// <summary>把整张表写进 Application.Resources（key 带 L. 前缀）。</summary>
+    public static void Apply(Application app)
+    {
+        var table = Current == ChineseSimplified ? Strings.Zh : Strings.En;
+
+        foreach (var key in Strings.En.Keys)
+        {
+            app.Resources["L." + key] = T(key);
+        }
+
+        // 表里可能有英文没写、中文补了的键，一并覆盖
+        foreach (var key in table.Keys)
+        {
+            app.Resources["L." + key] = T(key);
+        }
+    }
+}
+
+/// <summary>文案表。key 不带 L. 前缀（Loc 统一加）。</summary>
+internal static class Strings
+{
+    public static readonly Dictionary<string, string> En = new(StringComparer.Ordinal)
+    {
+        // ---- common ----
+        ["App.Title"] = "Prtsc",
+        ["Overlay.Hint"] = "Drag to select · drag handles to adjust · Enter to confirm · Esc to cancel",
+        ["Pin.Hint"] = "Drag to move · scroll to zoom · double-click or Esc to close",
+        ["Ring.Cancel"] = "Cancel (Esc)",
+        ["Ring.Confirm"] = "Confirm (Enter)",
+
+        ["Common.Save"] = "Save",
+        ["Common.Cancel"] = "Cancel",
+        ["Common.Close"] = "Close",
+        ["Common.Refresh"] = "Refresh",
+        ["Common.Delete"] = "Delete",
+        ["Common.Copy"] = "Copy",
+        ["Common.Open"] = "Open",
+        ["Common.None"] = "None",
+        ["Common.Solid"] = "Solid",
+        ["Common.Gradient"] = "Gradient",
+        ["Common.Auto"] = "Auto",
+
+        // ---- capture / idle ----
+        ["Capture.Title"] = "Capture",
+        ["Capture.Lede"] = "Pick a mode, or use a global hotkey from anywhere.",
+        ["Capture.Fullscreen"] = "Fullscreen",
+        ["Capture.FullscreenHint"] = "Whole virtual desktop, all displays",
+        ["Capture.Region"] = "Region",
+        ["Capture.RegionHint"] = "Drag a box, then annotate",
+        ["Capture.Window"] = "Window",
+        ["Capture.WindowHint"] = "Pick a window from a live list",
+        ["Capture.Paste"] = "Paste an image",
+        ["Capture.PasteHint"] = "Open whatever is on the clipboard",
+        ["Capture.Recent"] = "Recent",
+        ["Capture.OpenLibrary"] = "Open library",
+        ["Capture.RecentEmpty"] = "Your shots show up here.",
+        ["Capture.Ready"] = "Ready",
+        ["Capture.RegionOn"] = "Region capture on",
+        ["Capture.HideToTray"] = "Hide to tray",
+        ["Capture.Settings"] = "Settings",
+        ["Capture.TrayHint"] = "Right-click the tray icon for settings",
+        ["Capture.Language"] = "Language",
+        ["Capture.LanguageSystem"] = "Follow system",
+
+        // ---- editor ----
+        ["Editor.Title"] = "Editor",
+        ["Editor.Untitled"] = "Untitled capture",
+        ["Editor.Back"] = "Back to capture",
+        ["Editor.Undo"] = "Undo",
+        ["Editor.Redo"] = "Redo",
+        ["Editor.Save"] = "Save",
+        ["Editor.SaveTip"] = "Export as PNG / JPEG / WebP (format follows the file extension)",
+        ["Editor.Copy"] = "Copy",
+        ["Editor.CopyTip"] = "Copy the composed image to the clipboard",
+        ["Editor.More"] = "More actions",
+        ["Editor.QuickSave"] = "Quick save",
+        ["Editor.Upload"] = "Upload to cloud",
+        ["Editor.Library"] = "Library",
+        ["Editor.Pin"] = "Pin to screen",
+        ["Editor.CloudSettings"] = "Cloud settings…",
+        ["Editor.Delete"] = "Delete selection",
+        ["Editor.StatusHint"] = "Esc to cancel · Enter to copy",
+        ["Editor.CanvasHint"] = "Drag on the canvas to draw. Ctrl + wheel changes stroke width for the tool in hand.",
+
+        // ---- tools ----
+        ["Tool.Select"] = "Select / move / resize (V)",
+        ["Tool.Rectangle"] = "Rectangle (R)",
+        ["Tool.Ellipse"] = "Ellipse (E)",
+        ["Tool.Line"] = "Line (L)",
+        ["Tool.ArrowStraight"] = "Arrow (A)",
+        ["Tool.ArrowCurved"] = "Curved arrow (O)",
+        ["Tool.Text"] = "Text (T)",
+        ["Tool.Number"] = "Number counter (N)",
+        ["Tool.Spotlight"] = "Spotlight (S)",
+        ["Tool.Pencil"] = "Pencil (P)",
+        ["Tool.Highlighter"] = "Highlighter (H)",
+        ["Tool.Mosaic"] = "Pixelate region (M)",
+        ["Tool.Blur"] = "Blur region (B)",
+        ["Tool.Invert"] = "Invert colors (I)",
+        ["Tool.Crop"] = "Crop (X) — non-destructive",
+
+        // ---- panel ----
+        ["Kind.None"] = "Nothing selected",
+        ["Kind.Rectangle"] = "Rectangle",
+        ["Kind.Ellipse"] = "Ellipse",
+        ["Kind.Line"] = "Line",
+        ["Kind.ArrowStraight"] = "Arrow",
+        ["Kind.ArrowCurved"] = "Curved arrow",
+        ["Kind.Text"] = "Text",
+        ["Kind.Number"] = "Number",
+        ["Kind.Spotlight"] = "Spotlight",
+        ["Kind.Pencil"] = "Pencil",
+        ["Kind.Highlighter"] = "Highlighter",
+        ["Kind.Mosaic"] = "Mosaic",
+        ["Kind.Blur"] = "Blur",
+        ["Kind.Invert"] = "Invert",
+
+        ["Panel.Style"] = "Style",
+        ["Panel.Canvas"] = "Canvas",
+        ["Panel.Colour"] = "Colour",
+        ["Panel.Stroke"] = "Stroke",
+        ["Panel.TextSize"] = "Text size",
+        ["Panel.Selection"] = "Selection",
+        ["Panel.Opacity"] = "Opacity",
+        ["Panel.Position"] = "Position",
+        ["Panel.Background"] = "Background",
+        ["Panel.BackgroundAuto"] = "Auto (edge colour)",
+        ["Panel.BackgroundAutoTip"] = "Use the dominant colour along the image edges",
+        ["Panel.Frame"] = "Frame",
+        ["Panel.Padding"] = "Padding",
+        ["Panel.Radius"] = "Corner radius",
+        ["Panel.Shadow"] = "Shadow",
+        ["Panel.Border"] = "Border",
+        ["Panel.Inset"] = "Inset",
+        ["Panel.Outside"] = "Outside",
+        ["Panel.Center"] = "Center",
+        ["Panel.Inside"] = "Inside",
+        ["Panel.CropRatio"] = "Crop ratio",
+        ["Panel.NoSelection"] = "Nothing selected",
+
+        // ---- library ----
+        ["Library.NoLink"] = "That record has no upload link",
+        ["Library.LinkCopied"] = "Link copied",
+        ["Library.FileGone"] = "The local file is gone and there is no link",
+        ["Library.NoLocalFile"] = "That record has no local file",
+        ["Library.PathCopied"] = "Path copied",
+
+        ["Library.Title"] = "Library",
+        ["Library.Search"] = "Search filenames",
+        ["Library.Empty"] = "No shots yet. Press PrtSc and they land here.",
+        ["Library.CopyLink"] = "Copy link",
+        ["Library.CopyPath"] = "Copy path",
+        ["Library.OpenImage"] = "Open image",
+        ["Library.Delete"] = "Delete",
+        ["Library.LocalOnly"] = "Local only",
+        ["Library.Uploaded"] = "{0} · uploaded",
+        ["Library.CountOne"] = "1 shot",
+        ["Library.CountMany"] = "{0} shots",
+        ["Library.DeleteConfirm"] = "Delete this record? The image file stays on disk.",
+
+        // ---- cloud settings ----
+        ["Cloud.NoneTitle"] = "Nothing is uploaded",
+        ["Cloud.NoneHint"] = "Shots stay on this machine. Pick a provider above to upload and copy a link.",
+        ["Cloud.Testing"] = "Testing the connection…",
+        ["Cloud.TestError"] = "Connection test failed: {0}",
+        ["Cloud.MissingR2"] = "R2 needs Account ID, Bucket, Access Key ID and Secret Access Key.",
+        ["Cloud.MissingDrive"] = "Google Drive needs Client ID, Client Secret and Refresh Token.",
+        ["Cloud.Saved"] = "Saved.",
+
+        ["Cloud.Title"] = "Cloud upload",
+        ["Cloud.Lede"] = "Shots can be uploaded to Cloudflare R2 (S3-compatible) or Google Drive; the link is copied after upload. Credentials are stored in plain text in config.json on this machine and never leave it.",
+        ["Cloud.Test"] = "Test connection",
+        ["Cloud.TestTip"] = "Send one connection test with the current credentials (R2 = HeadBucket; Drive = token refresh)",
+        ["Cloud.Provider"] = "Provider",
+        ["Cloud.ProviderNone"] = "Don't upload",
+        ["Cloud.AutoUpload"] = "Upload automatically after saving",
+        ["Cloud.Save"] = "Save",
+        ["Cloud.R2Hint"] = "Create a token in Cloudflare → R2 → Manage API Tokens, and note the Account ID.",
+        ["Cloud.AccountId"] = "Account ID",
+        ["Cloud.Bucket"] = "Bucket",
+        ["Cloud.AccessKey"] = "Access Key ID",
+        ["Cloud.SecretKey"] = "Secret Access Key",
+        ["Cloud.PublicUrl"] = "Public URL (optional)",
+        ["Cloud.PublicUrlHint"] = "Used to build the link, e.g. https://img.example.com",
+        ["Cloud.Directory"] = "Upload directory (optional)",
+        ["Cloud.GDriveHint"] = "Create an OAuth Desktop client in Google Cloud Console, then exchange an offline refresh_token.",
+        ["Cloud.ClientId"] = "Client ID",
+        ["Cloud.ClientSecret"] = "Client Secret",
+        ["Cloud.RefreshToken"] = "Refresh token",
+        ["Cloud.FolderId"] = "Target folder ID (optional)",
+        ["Cloud.FolderIdHint"] = "Leave empty for My Drive root",
+
+        // ---- status bar ----
+        ["Status.Ready"] = "Ready",
+        ["Status.Captured"] = "Captured {0} × {1} @ {2}×",
+        ["Status.Copied"] = "Copied {0} × {1} to the clipboard",
+        ["Status.CopyBusy"] = "Copy failed: the clipboard is busy",
+        ["Status.CopyFailed"] = "Copy failed: {0}",
+        ["Status.QuickSaveUnavailable"] = "Quick save needs a config file",
+        ["Status.QuickSaved"] = "Saved {0}",
+        ["Status.QuickSavedPath"] = "Saved {0} — path copied",
+        ["Status.QuickSaveFailed"] = "Quick save failed: {0}",
+        ["Status.UploadFailed"] = "Upload failed: {0}",
+        ["Status.UploadedUrl"] = "Uploaded {0} — URL copied",
+        ["Status.Uploaded"] = "Uploaded {0}",
+        ["Status.UploadCanceled"] = "Upload canceled",
+        ["Status.ClipboardEmpty"] = "The clipboard has no image",
+        ["Status.ImportFailed"] = "Could not open that image: {0}",
+        ["Status.FileNotFound"] = "File not found: {0}",
+        ["Status.UnsupportedFormat"] = "Unsupported image format: {0}",
+        ["Status.Pinned"] = "Pinned {0} × {1}",
+        ["Status.PinFailed"] = "Pin failed: {0}",
+
+        // ---- tray ----
+        ["Tray.Show"] = "Show Prtsc",
+        ["Tray.CaptureFullscreen"] = "Capture fullscreen",
+        ["Tray.CaptureRegion"] = "Capture region",
+        ["Tray.CaptureWindow"] = "Capture window",
+        ["Tray.Library"] = "Library…",
+        ["Tray.CloudSettings"] = "Cloud settings…",
+        ["Tray.Language"] = "Language",
+        ["Tray.Quit"] = "Quit",
+
+        // ---- window picker ----
+        ["Picker.Title"] = "Capture a window",
+        ["Picker.Lede"] = "Pick the window to capture. Double-click to grab it.",
+        ["Picker.Capture"] = "Capture",
+        ["Picker.Empty"] = "No capturable windows found.",
+    };
+
+    public static readonly Dictionary<string, string> Zh = new(StringComparer.Ordinal)
+    {
+        // ---- common ----
+        ["App.Title"] = "Prtsc",
+        ["Overlay.Hint"] = "拖动创建选框 · 拖角/边调整 · Enter 确认 · Esc 取消",
+        ["Pin.Hint"] = "拖动移动 · 滚轮缩放 · 双击或 Esc 关闭",
+        ["Ring.Cancel"] = "取消 (Esc)",
+        ["Ring.Confirm"] = "确认 (Enter)",
+
+        ["Common.Save"] = "保存",
+        ["Common.Cancel"] = "取消",
+        ["Common.Close"] = "关闭",
+        ["Common.Refresh"] = "刷新",
+        ["Common.Delete"] = "删除",
+        ["Common.Copy"] = "复制",
+        ["Common.Open"] = "打开",
+        ["Common.None"] = "无",
+        ["Common.Solid"] = "纯色",
+        ["Common.Gradient"] = "渐变",
+        ["Common.Auto"] = "自动",
+
+        // ---- capture / idle ----
+        ["Capture.Title"] = "截图",
+        ["Capture.Lede"] = "选一个模式，或在任意界面按全局热键。",
+        ["Capture.Fullscreen"] = "全屏",
+        ["Capture.FullscreenHint"] = "整个虚拟桌面，含所有显示器",
+        ["Capture.Region"] = "区域",
+        ["Capture.RegionHint"] = "拖一个框，然后标注",
+        ["Capture.Window"] = "窗口",
+        ["Capture.WindowHint"] = "从实时列表里选一个窗口",
+        ["Capture.Paste"] = "粘贴图片",
+        ["Capture.PasteHint"] = "把剪贴板里的图直接打开",
+        ["Capture.Recent"] = "最近",
+        ["Capture.OpenLibrary"] = "打开历史",
+        ["Capture.RecentEmpty"] = "截图会出现在这里。",
+        ["Capture.Ready"] = "就绪",
+        ["Capture.RegionOn"] = "区域截图热键",
+        ["Capture.HideToTray"] = "收进托盘",
+        ["Capture.Settings"] = "设置",
+        ["Capture.TrayHint"] = "右键托盘图标打开设置",
+        ["Capture.Language"] = "语言",
+        ["Capture.LanguageSystem"] = "跟随系统",
+
+        // ---- editor ----
+        ["Editor.Title"] = "编辑器",
+        ["Editor.Untitled"] = "未命名截图",
+        ["Editor.Back"] = "返回截图",
+        ["Editor.Undo"] = "撤销",
+        ["Editor.Redo"] = "重做",
+        ["Editor.Save"] = "保存",
+        ["Editor.SaveTip"] = "导出为 PNG / JPEG / WebP（格式跟随扩展名）",
+        ["Editor.Copy"] = "复制",
+        ["Editor.CopyTip"] = "把合成后的图片复制到剪贴板",
+        ["Editor.More"] = "更多操作",
+        ["Editor.QuickSave"] = "快速保存",
+        ["Editor.Upload"] = "上传到云端",
+        ["Editor.Library"] = "截图历史",
+        ["Editor.Pin"] = "贴到屏幕",
+        ["Editor.CloudSettings"] = "云上传设置…",
+        ["Editor.Delete"] = "删除选中",
+        ["Editor.StatusHint"] = "Esc 取消 · Enter 复制",
+        ["Editor.CanvasHint"] = "在画布上拖动即可绘制。Ctrl + 滚轮调整当前工具的粗细。",
+
+        // ---- tools ----
+        ["Tool.Select"] = "选择 / 移动 / 缩放 (V)",
+        ["Tool.Rectangle"] = "矩形 (R)",
+        ["Tool.Ellipse"] = "椭圆 (E)",
+        ["Tool.Line"] = "直线 (L)",
+        ["Tool.ArrowStraight"] = "箭头 (A)",
+        ["Tool.ArrowCurved"] = "曲线箭头 (O)",
+        ["Tool.Text"] = "文字 (T)",
+        ["Tool.Number"] = "序号 (N)",
+        ["Tool.Spotlight"] = "聚光灯 (S)",
+        ["Tool.Pencil"] = "铅笔 (P)",
+        ["Tool.Highlighter"] = "荧光笔 (H)",
+        ["Tool.Mosaic"] = "马赛克 (M)",
+        ["Tool.Blur"] = "模糊 (B)",
+        ["Tool.Invert"] = "反色 (I)",
+        ["Tool.Crop"] = "裁剪 (X) — 非破坏性",
+
+        // ---- panel ----
+        ["Kind.None"] = "未选中",
+        ["Kind.Rectangle"] = "矩形",
+        ["Kind.Ellipse"] = "椭圆",
+        ["Kind.Line"] = "直线",
+        ["Kind.ArrowStraight"] = "箭头",
+        ["Kind.ArrowCurved"] = "曲线箭头",
+        ["Kind.Text"] = "文字",
+        ["Kind.Number"] = "序号",
+        ["Kind.Spotlight"] = "聚光灯",
+        ["Kind.Pencil"] = "铅笔",
+        ["Kind.Highlighter"] = "荧光笔",
+        ["Kind.Mosaic"] = "马赛克",
+        ["Kind.Blur"] = "模糊",
+        ["Kind.Invert"] = "反色",
+
+        ["Panel.Style"] = "样式",
+        ["Panel.Canvas"] = "画布",
+        ["Panel.Colour"] = "颜色",
+        ["Panel.Stroke"] = "粗细",
+        ["Panel.TextSize"] = "字号",
+        ["Panel.Selection"] = "选中",
+        ["Panel.Opacity"] = "不透明度",
+        ["Panel.Position"] = "位置",
+        ["Panel.Background"] = "背景",
+        ["Panel.BackgroundAuto"] = "自动（边缘取色）",
+        ["Panel.BackgroundAutoTip"] = "取图片边缘的主色作为背景",
+        ["Panel.Frame"] = "外框",
+        ["Panel.Padding"] = "内边距",
+        ["Panel.Radius"] = "圆角",
+        ["Panel.Shadow"] = "阴影",
+        ["Panel.Border"] = "边框",
+        ["Panel.Inset"] = "内衬",
+        ["Panel.Outside"] = "外侧",
+        ["Panel.Center"] = "居中",
+        ["Panel.Inside"] = "内侧",
+        ["Panel.CropRatio"] = "裁剪比例",
+        ["Panel.NoSelection"] = "未选中任何标注",
+
+        // ---- library ----
+        ["Library.NoLink"] = "该记录没有上传链接",
+        ["Library.LinkCopied"] = "链接已复制",
+        ["Library.FileGone"] = "本地文件不存在，也没有远程链接",
+        ["Library.NoLocalFile"] = "该记录没有本地文件",
+        ["Library.PathCopied"] = "路径已复制",
+
+        ["Library.Title"] = "截图历史",
+        ["Library.Search"] = "搜索文件名",
+        ["Library.Empty"] = "还没有截图。按下 PrtSc 就会出现在这里。",
+        ["Library.CopyLink"] = "复制链接",
+        ["Library.CopyPath"] = "复制路径",
+        ["Library.OpenImage"] = "打开图片",
+        ["Library.Delete"] = "删除",
+        ["Library.LocalOnly"] = "仅本地",
+        ["Library.Uploaded"] = "{0} · 已上传",
+        ["Library.CountOne"] = "1 条记录",
+        ["Library.CountMany"] = "{0} 条记录",
+        ["Library.DeleteConfirm"] = "删除这条记录？图片文件仍保留在磁盘上。",
+
+        // ---- cloud settings ----
+        ["Cloud.NoneTitle"] = "当前不上传",
+        ["Cloud.NoneHint"] = "截图只保存到本机。选择上面的渠道即可上传并复制链接。",
+        ["Cloud.Testing"] = "正在测试连接…",
+        ["Cloud.TestError"] = "连接测试异常：{0}",
+        ["Cloud.MissingR2"] = "R2 需要填写 Account ID / Bucket / Access Key ID / Secret Access Key。",
+        ["Cloud.MissingDrive"] = "Google Drive 需要填写 Client ID / Client Secret / Refresh Token。",
+        ["Cloud.Saved"] = "已保存。",
+
+        ["Cloud.Title"] = "云上传",
+        ["Cloud.Lede"] = "截图可上传到 Cloudflare R2（S3 兼容）或 Google Drive，上传后链接自动复制。凭据明文保存在本机 config.json，不会外传。",
+        ["Cloud.Test"] = "测试连接",
+        ["Cloud.TestTip"] = "用当前表单凭据发一次连接测试（R2 = HeadBucket；Drive = 换 token）",
+        ["Cloud.Provider"] = "渠道",
+        ["Cloud.ProviderNone"] = "不上传",
+        ["Cloud.AutoUpload"] = "保存后自动上传",
+        ["Cloud.Save"] = "保存",
+        ["Cloud.R2Hint"] = "在 Cloudflare 控制台 → R2 → Manage API Tokens 创建 Token，并记录 Account ID。",
+        ["Cloud.AccountId"] = "Account ID",
+        ["Cloud.Bucket"] = "Bucket",
+        ["Cloud.AccessKey"] = "Access Key ID",
+        ["Cloud.SecretKey"] = "Secret Access Key",
+        ["Cloud.PublicUrl"] = "公开访问域名（可选）",
+        ["Cloud.PublicUrlHint"] = "用于生成链接，如 https://img.example.com",
+        ["Cloud.Directory"] = "上传目录（可选）",
+        ["Cloud.GDriveHint"] = "在 Google Cloud Console 创建 OAuth Desktop 客户端，换取离线 refresh_token。",
+        ["Cloud.ClientId"] = "Client ID",
+        ["Cloud.ClientSecret"] = "Client Secret",
+        ["Cloud.RefreshToken"] = "Refresh Token",
+        ["Cloud.FolderId"] = "目标文件夹 ID（可选）",
+        ["Cloud.FolderIdHint"] = "留空 = 我的云端硬盘根目录",
+
+        // ---- status bar ----
+        ["Status.Ready"] = "就绪",
+        ["Status.Captured"] = "已截取 {0} × {1} @ {2}×",
+        ["Status.Copied"] = "已复制 {0} × {1} 到剪贴板",
+        ["Status.CopyBusy"] = "复制失败：剪贴板被占用",
+        ["Status.CopyFailed"] = "复制失败：{0}",
+        ["Status.QuickSaveUnavailable"] = "快速保存需要配置文件",
+        ["Status.QuickSaved"] = "已保存 {0}",
+        ["Status.QuickSavedPath"] = "已保存 {0} — 路径已复制",
+        ["Status.QuickSaveFailed"] = "快速保存失败：{0}",
+        ["Status.UploadFailed"] = "上传失败：{0}",
+        ["Status.UploadedUrl"] = "已上传 {0} — 链接已复制",
+        ["Status.Uploaded"] = "已上传 {0}",
+        ["Status.UploadCanceled"] = "上传已取消",
+        ["Status.ClipboardEmpty"] = "剪贴板里没有图片",
+        ["Status.ImportFailed"] = "打不开这张图片：{0}",
+        ["Status.FileNotFound"] = "找不到文件：{0}",
+        ["Status.UnsupportedFormat"] = "不支持的图片格式：{0}",
+        ["Status.Pinned"] = "已贴图 {0} × {1}",
+        ["Status.PinFailed"] = "贴图失败：{0}",
+
+        // ---- tray ----
+        ["Tray.Show"] = "显示 Prtsc",
+        ["Tray.CaptureFullscreen"] = "全屏截图",
+        ["Tray.CaptureRegion"] = "区域截图",
+        ["Tray.CaptureWindow"] = "窗口截图",
+        ["Tray.Library"] = "截图历史…",
+        ["Tray.CloudSettings"] = "云上传设置…",
+        ["Tray.Language"] = "语言",
+        ["Tray.Quit"] = "退出",
+
+        // ---- window picker ----
+        ["Picker.Title"] = "选择要截取的窗口",
+        ["Picker.Lede"] = "选一个窗口，双击直接截取。",
+        ["Picker.Capture"] = "截取",
+        ["Picker.Empty"] = "没找到可截取的窗口。",
+    };
+}

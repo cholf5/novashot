@@ -18,7 +18,7 @@ public sealed partial class LibraryEntryViewModel : ObservableObject
     public Bitmap? Thumbnail => _thumbnail;
     public string FileName => Entry.FileName;
     public bool HasRemote => !string.IsNullOrEmpty(Entry.RemoteUrl);
-    public string ProviderText => HasRemote ? $"[{Entry.Provider}] 已上传" : "";
+    public string ProviderText => HasRemote ? Localization.Loc.T("Library.Uploaded", Entry.Provider) : "";
     public string DetailsText =>
         $"{Entry.CreatedAt.LocalDateTime:yyyy-MM-dd HH:mm}  ·  {Entry.Width}×{Entry.Height}  ·  {FormatSize(Entry.SizeBytes)}";
 
@@ -78,24 +78,17 @@ public sealed partial class LibraryViewModel : ObservableObject
         Entries = new System.Collections.ObjectModel.ObservableCollection<LibraryEntryViewModel>(
             entries
                 .OrderByDescending(e => e.CreatedAt)
-                .Select(e => new LibraryEntryViewModel(e, TryLoadThumbnail(e))));
+                .Select(e => new LibraryEntryViewModel(e, LibraryThumbnails.TryLoad(e))));
         Selected = Entries.FirstOrDefault();
-        CountText = Entries.Count == 0 ? "暂无记录" : $"{Entries.Count} 条记录";
+        CountText = FormatCount(Entries.Count);
     }
 
-    private Bitmap? TryLoadThumbnail(LibraryEntry entry)
+    private static string FormatCount(int count) => count switch
     {
-        try
-        {
-            var path = System.IO.Path.Combine(_thumbsDirectory, $"thumb_{entry.Id}.png");
-            return System.IO.File.Exists(path) ? new Bitmap(path) : null;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogDebug(ex, "Thumbnail load failed for {Id}", entry.Id);
-            return null;
-        }
-    }
+        0 => Localization.Loc.T("Library.Empty"),
+        1 => Localization.Loc.T("Library.CountOne"),
+        _ => Localization.Loc.T("Library.CountMany", count),
+    };
 
     public async Task<bool> DeleteAsync(LibraryEntryViewModel item)
     {
@@ -103,7 +96,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         if (ok)
         {
             Entries.Remove(item);
-            CountText = Entries.Count == 0 ? "暂无记录" : $"{Entries.Count} 条记录";
+            CountText = FormatCount(Entries.Count);
         }
         return ok;
     }

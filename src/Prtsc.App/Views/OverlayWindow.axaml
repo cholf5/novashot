@@ -27,10 +27,11 @@
 
     <!-- 底部 hint -->
     <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,40"
-            Background="#B0000000" CornerRadius="6" Padding="14,8"
+            Background="{DynamicResource Bg.Overlay}" CornerRadius="8" Padding="14,8"
+            BorderBrush="{DynamicResource Line}" BorderThickness="1"
             IsHitTestVisible="False">
-      <TextBlock Foreground="#EEFFFFFF" FontSize="12"
-                 Text="拖动创建选框 · 拖角/边调整 · Enter/双击 确认 · Esc 取消"/>
+      <TextBlock Foreground="{DynamicResource Ink}" FontSize="11.5"
+                 Text="{DynamicResource L.Overlay.Hint}"/>
     </Border>
   </Panel>
 </Window>
