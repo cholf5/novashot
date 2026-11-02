@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Prtsc.App.Localization;
 using Prtsc.App.ViewModels;
 using Prtsc.Core.Autostart;
 using Prtsc.Core.Config;
@@ -98,7 +99,7 @@ public class SettingsViewModelTests
         vm.HotkeyFullscreen = "Ctrl+";
 
         Assert.False(vm.Save());
-        Assert.False(string.IsNullOrEmpty(vm.SaveHint));
+        Assert.Equal(Loc.T("Settings.Hint.HotkeyInvalid"), vm.SaveHint);
         Assert.Equal("PrintScreen", store.Current.Hotkeys.Fullscreen);
         Assert.Equal(0, fake.EnableCalls);
     }
@@ -111,7 +112,7 @@ public class SettingsViewModelTests
         vm.HotkeyRegion = "Ctrl+P";
 
         Assert.False(vm.Save());
-        Assert.False(string.IsNullOrEmpty(vm.SaveHint));
+        Assert.Equal(Loc.T("Settings.Hint.HotkeyDuplicate"), vm.SaveHint); // 专属提示，不能报成“热键无效”（review I1）
         Assert.Equal("Ctrl+PrintScreen", store.Current.Hotkeys.Region);
     }
 

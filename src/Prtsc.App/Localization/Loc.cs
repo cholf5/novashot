@@ -76,6 +76,17 @@ public static class Loc
         LanguageChanged?.Invoke(null, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// S-1：把 config 持久化的语言偏好应用为当前语言（设置保存 → store.Changed → 这里）。
+    /// 只接受三个合法值，且与当前不同才切换；托盘手改的旧链路继续走 SetPreference。
+    /// </summary>
+    public static void ApplyStoredPreference(string? stored, Application app)
+    {
+        if (stored is not (SystemDefault or English or ChineseSimplified)) return;
+        if (string.Equals(Preference, stored, StringComparison.Ordinal)) return;
+        SetPreference(stored, app);
+    }
+
     /// <summary>把整张表写进 Application.Resources（key 带 L. 前缀）。</summary>
     public static void Apply(Application app)
     {
@@ -336,7 +347,7 @@ internal static class Strings
         ["Settings.Export.IncludeBackground"] = "Include background",
         ["Settings.Export.AutoCopy"] = "Copy to clipboard after export",
         ["Settings.Capture.IncludeCursor"] = "Include mouse cursor (Windows)",
-        ["Settings.Capture.IncludeCursorHint"] = "Applies to window capture on Windows; macOS and Linux ignore this.",
+        ["Settings.Capture.IncludeCursorHint"] = "Applies to captures on Windows (window and fullscreen); macOS and Linux ignore this.",
         ["Settings.Editor.Canvas"] = "Canvas",
         ["Settings.Editor.Padding"] = "Padding",
         ["Settings.Editor.CornerRadius"] = "Corner radius",
@@ -611,7 +622,7 @@ internal static class Strings
         ["Settings.Export.IncludeBackground"] = "包含背景",
         ["Settings.Export.AutoCopy"] = "导出后自动复制到剪贴板",
         ["Settings.Capture.IncludeCursor"] = "包含鼠标光标（Windows）",
-        ["Settings.Capture.IncludeCursorHint"] = "仅作用于 Windows 窗口捕获；macOS 与 Linux 忽略此项。",
+        ["Settings.Capture.IncludeCursorHint"] = "仅 Windows 生效（窗口与全屏捕获）；macOS 与 Linux 忽略此项。",
         ["Settings.Editor.Canvas"] = "画布",
         ["Settings.Editor.Padding"] = "边距",
         ["Settings.Editor.CornerRadius"] = "圆角",

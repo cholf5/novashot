@@ -74,6 +74,11 @@ internal sealed class FakeXLibApi : IXLibApi
         return true;
     }
 
+    public List<(nint Window, uint Modifiers, uint Keycode)> UngrabbedKeys { get; } = new();
+
+    public void UngrabKey(nint eventWindow, uint modifiers, uint keycode)
+        => UngrabbedKeys.Add((eventWindow, modifiers, keycode));
+
     public (uint Keycode, uint Modifiers)? NextKeyEvent(CancellationToken ct)
     {
         // Fake 不走 self-pipe：直接从注入队列取（取消时抛 OperationCanceled 由上层处理）

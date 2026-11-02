@@ -53,6 +53,12 @@ public sealed class LinuxHotkeyService : IHotkeyService
         if (!_started)
             throw new InvalidOperationException("Start() must be called before RegisterAll");
 
+        // S-1（review I3）：会有多次 RegisterAll——先解上一轮的抓键，否则旧组合继续触发
+        var eventWindow = _api.EventWindowHandle;
+        foreach (var (keycode, mods) in _bindings.Keys)
+            _api.UngrabKey(eventWindow, mods, keycode);
+        _bindings.Clear();
+
         var specs = new (string Spec, HotkeyAction Action)[]
         {
             (fullscreen, HotkeyAction.Fullscreen),
@@ -102,6 +108,8 @@ public sealed class LinuxHotkeyService : IHotkeyService
         _pump = null;
         _cts?.Dispose();
         _cts = null;
+        foreach (var (keycode, mods) in _bindings.Keys)
+            _api.UngrabKey(_api.EventWindowHandle, mods, keycode);
         _bindings.Clear();
         _started = false;
     }

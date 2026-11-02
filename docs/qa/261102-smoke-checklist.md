@@ -77,7 +77,7 @@
 
 - [ ] 设置中心语言分段（跟随系统 / English / 简体中文）选中态显示正确；保存前全局文案不变（草稿语义）
 - [ ] 保存后跟随刷新：主窗口标题（ApplyLocalizedTitle）、状态栏、双面板、Library、云设置、WindowPicker、overlay/贴图提示条
-- [ ] **切换时已打开的其它窗口**标题/文案是否跟随 ⚑(§8.3 未逐一验证；设置窗自身文案不热刷，重开生效——已知项)
+- [ ] **切换时已打开的其它窗口**标题/文案是否跟随 ⚑(§8.3 未逐一验证；DynamicResource 文案会热刷，普通 string 标题不热刷——已知项)
 - [ ] `config.json.language` 持久化：重启后语言保持
 - [ ] 中文观感：mac=PingFang 行高/字重 ⚑(§8.4)；UI 无中英混排残留
 
@@ -87,5 +87,10 @@
 - [ ] 前台启动跑一遍 **A 段 P0 快速版**
 - [ ] 微软雅黑回退观感：字号/行高/字重是否要调 ⚑(§8.4)
 - [ ] Fluent 原样控件（ScrollBar/TextBox 内边/ComboBox）在 Win 上的深色观感
-- [ ] 设置 → 捕获 → 取消勾选「包含鼠标光标」→ 保存 → 窗口捕获画面无光标（`Capture.IncludeCursor` → WGC `IsCursorCaptureEnabled` 管道无 headless 覆盖，只能真机验）
+- [ ] 设置 → 捕获 → 取消勾选「包含鼠标光标」→ 保存 → 截图画面无光标（`Capture.IncludeCursor` → WGC `IsCursorCaptureEnabled` 管道无 headless 覆盖，只能真机验）
 - [ ] 设置中心自启开关真机验证（Win 注册表 Run 项 / mac launchd LaunchAgent 真的写入）
+- [ ] 设置保存两次（**不改热键**）→ 热键仍工作；改热键保存 → 新键生效（Windows 泵侧重注册竞态 C1 修复的真机验证）
+
+## J. Linux 真机段
+
+- [ ] 设置里改热键保存 → 旧组合不再触发、新组合生效（XUngrabKey 修复，I3）

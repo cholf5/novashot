@@ -264,6 +264,20 @@ public sealed unsafe class XLibApi : IXLibApi
         return ok == 0;
     }
 
+    public void UngrabKey(nint eventWindow, uint modifiers, uint keycode)
+    {
+        if (_display == nint.Zero || eventWindow == nint.Zero || keycode == 0) return;
+        // 与 GrabKey 对称：base 必解；仅当当初抓过 NumLock/CapsLock 变体时才多解三个
+        XUngrabKey(_display, keycode, modifiers, eventWindow);
+        if (modifiers is not (0 or Mod2Mask or LockMask))
+        {
+            XUngrabKey(_display, keycode, modifiers | Mod2Mask, eventWindow);
+            XUngrabKey(_display, keycode, modifiers | LockMask, eventWindow);
+            XUngrabKey(_display, keycode, modifiers | Mod2Mask | LockMask, eventWindow);
+        }
+        XFlush(_display);
+    }
+
     public (uint Keycode, uint Modifiers)? NextKeyEvent(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)

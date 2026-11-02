@@ -30,6 +30,13 @@ public sealed class HotkeyConfig
     public string Fullscreen { get; set; } = "PrintScreen";
     public string Region { get; set; } = "Ctrl+PrintScreen";
     public string Window { get; set; } = "Ctrl+Shift+PrintScreen";
+
+    /// <summary>三条规格（逐字）是否相同。App 层用它跳过无变化的重注册（任何 store.Update 都会触发 Changed）。</summary>
+    public bool SameSpecsAs(HotkeyConfig? other)
+        => other is not null
+           && Fullscreen == other.Fullscreen
+           && Region == other.Region
+           && Window == other.Window;
 }
 
 public sealed class StartupConfig
@@ -61,11 +68,11 @@ public sealed class WindowConfig
 }
 
 /// <summary>
-/// 捕获行为（S-1）。IncludeCursor 仅作用于 Windows WGC；mac/Linux 平台忽略该值。
+/// 捕获行为（S-1）。IncludeCursor 仅作用于 Windows 捕获（窗口与全屏都走 WGC）；mac/Linux 平台忽略该值。
 /// </summary>
 public sealed class CaptureConfig
 {
-    /// <summary>窗口捕获是否把鼠标光标包含进画面（WGC IsCursorCaptureEnabled）。</summary>
+    /// <summary>截图是否把鼠标光标包含进画面（WGC IsCursorCaptureEnabled；仅 Windows 生效）。</summary>
     public bool IncludeCursor { get; set; } = true;
 }
 

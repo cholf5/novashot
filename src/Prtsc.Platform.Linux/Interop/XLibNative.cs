@@ -205,6 +205,9 @@ internal static unsafe class XLibNative
         bool ownerEvents, int pointerMode, int keyboardMode);
 
     [DllImport(LibX11)]
+    internal static extern int XUngrabKey(nint display, uint keycode, uint modifiers, nint window);
+
+    [DllImport(LibX11)]
     internal static extern int XDisplayKeycodes(nint display, out int minKeycodeReturn, out int maxKeycodeReturn);
 
     [DllImport(LibX11)]

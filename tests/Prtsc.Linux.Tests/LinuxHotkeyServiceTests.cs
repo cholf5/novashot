@@ -94,4 +94,27 @@ public class LinuxHotkeyServiceTests
         Assert.Equal(HotkeyAction.Fullscreen, action);
         svc.Dispose();
     }
+
+/// <summary>
+/// S-1（review I3）：设置保存会二次 RegisterAll——必须先解上一轮 XGrabKey，
+/// 否则旧组合继续触发（重复截图 + 全局吞键到进程退出）。
+/// </summary>
+[Fact]
+public void RegisterAll_Twice_UngrabsPreviousBindings()
+{
+    var (svc, api) = Make();
+    svc.Start();
+    api.KeysymToKeycode[0xFF61] = 107;
+
+    svc.RegisterAll("PrintScreen", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+    var grabsAfterFirst = api.GrabbedKeys.Count;
+
+    api.KeysymToKeycode[0xFFC6] = 115; // XK_F9 也要在 fake keymap 里
+    svc.RegisterAll("F9", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+
+    Assert.True(api.UngrabbedKeys.Count >= grabsAfterFirst,
+        $"第二次 RegisterAll 必须先解上一轮 {grabsAfterFirst} 个抓键，实际解了 {api.UngrabbedKeys.Count}");
+    Assert.All(api.UngrabbedKeys, u => Assert.Equal(107u, u.Keycode));
+    svc.Dispose();
+}
 }

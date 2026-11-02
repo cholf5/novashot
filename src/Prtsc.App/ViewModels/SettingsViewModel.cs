@@ -121,9 +121,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>校验 → 自启 → 一次 Update 写全部字段（Changed 触发 App 层热键/语言副作用）。失败时 config 不动。</summary>
     public bool Save()
     {
-        if (!ValidateHotkeys())
+        var hotkeyError = ValidateHotkeys();
+        if (hotkeyError is not null)
         {
-            SaveHint = Loc.T("Settings.Hint.HotkeyInvalid");
+            SaveHint = Loc.T(hotkeyError);
             return false;
         }
 
@@ -177,20 +178,20 @@ public sealed partial class SettingsViewModel : ObservableObject
         return true;
     }
 
-    /// <summary>三条热键各自可解析且 (modifiers, vk) 互异。</summary>
-    private bool ValidateHotkeys()
+    /// <summary>三条热键各自可解析且 (modifiers, vk) 互异；失败返回对应的提示 key。</summary>
+    private string? ValidateHotkeys()
     {
         var parsed = new List<(uint mods, uint vk)>(3);
         foreach (var spec in new[] { HotkeyFullscreen, HotkeyRegion, HotkeyWindow })
         {
             if (string.IsNullOrWhiteSpace(spec) || !HotkeyParser.TryParse(spec, out var mods, out var vk))
-                return false;
+                return "Settings.Hint.HotkeyInvalid";
             if (parsed.Contains((mods, vk)))
-                return false;
+                return "Settings.Hint.HotkeyDuplicate";
             parsed.Add((mods, vk));
         }
 
-        return true;
+        return null;
     }
 
     private static int MapTo(string[] table, string value)

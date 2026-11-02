@@ -99,6 +99,9 @@ public interface IXLibApi : IDisposable
     /// <summary>XGrabKey（any owner events=false, async grab）。False = 键已被占。</summary>
     bool GrabKey(nint eventWindow, uint modifiers, uint keycode);
 
+    /// <summary>XUngrabKey（与 GrabKey 对称：连 NumLock/CapsLock 修饰变体一起解）。</summary>
+    void UngrabKey(nint eventWindow, uint modifiers, uint keycode);
+
     /// <summary>阻塞取下一个事件；返回 keycode 与 modifiers，取消等待时返回 null。</summary>
     (uint Keycode, uint Modifiers)? NextKeyEvent(CancellationToken ct);
 

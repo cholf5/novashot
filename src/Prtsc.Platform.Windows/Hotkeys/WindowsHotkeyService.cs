@@ -19,6 +19,10 @@ public sealed class WindowsHotkeyService : IHotkeyService
 
     private readonly ILogger<WindowsHotkeyService> _logger;
     private readonly ConcurrentDictionary<int, HotkeyAction> _idToAction = new();
+    // 仅泵线程（WndProc）读写：真正拿到 OS 注册成功的 id 集合。
+    // C1（review 2026-11-02）：解绑必须以此为准——_idToAction 在调用线程被 Clear/重建，
+    // 泵侧若按它解绑会把旧注册永久留在 OS 里，新 RegisterHotKey 全部撞 "already registered"。
+    private readonly HashSet<int> _registeredIds = new();
     private readonly SynchronizationContext? _syncContext;
     private Thread? _thread;
     private nint _hwnd;
@@ -140,7 +144,7 @@ public sealed class WindowsHotkeyService : IHotkeyService
         {
             if (_hwnd != nint.Zero)
             {
-                foreach (var id in _idToAction.Keys)
+                foreach (var id in _registeredIds)
                     User32.UnregisterHotKey(_hwnd, id);
                 User32.DestroyWindow(_hwnd);
             }
@@ -170,15 +174,16 @@ public sealed class WindowsHotkeyService : IHotkeyService
                     }
                     else
                     {
+                        _registeredIds.Add(id);
                         _logger.LogInformation("Hotkey registered id={Id} mods={Mods:X} vk={Vk:X}", id, mods, vk);
                     }
                     return 0;
                 }
 
             case WM_APP_UNREGISTER_ALL:
-                foreach (var id in _idToAction.Keys)
+                foreach (var id in _registeredIds)
                     User32.UnregisterHotKey(hWnd, id);
-                _idToAction.Clear();
+                _registeredIds.Clear();
                 return 0;
 
             case WM_APP_QUIT:

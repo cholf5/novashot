@@ -18,6 +18,7 @@ public partial class App : Application
     private TrayIcon? _tray;
     private MainWindow? _mainWindow;
     private IHotkeyService? _hotkeys;
+    private HotkeyConfig? _lastHotkeys; // 同规格不重注册（C1 防线）：关窗写尺寸等 Update 也会走 Changed
     private ILogger<App>? _logger;
 
     public override void Initialize()
@@ -196,9 +197,11 @@ public partial class App : Application
     private void ReapplyHotkeys(HotkeyConfig cfg)
     {
         if (_hotkeys is null) return;
+        if (cfg.SameSpecsAs(_lastHotkeys)) return; // 未变不重注册：Windows 泵侧重注册有真实成本，只在真变更时走
         try
         {
             _hotkeys.RegisterAll(cfg.Fullscreen, cfg.Region, cfg.Window);
+            _lastHotkeys = new HotkeyConfig { Fullscreen = cfg.Fullscreen, Region = cfg.Region, Window = cfg.Window };
         }
         catch (Exception ex)
         {
