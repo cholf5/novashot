@@ -75,8 +75,9 @@ public sealed class CliCaptureExecutor
 
         try
         {
-            if (command.DelaySeconds > 0)
-                await _delay(command.DelaySeconds, ct).ConfigureAwait(false);
+            // null = 命令行省略 --delay → headless 无延时（flameshot 语义）；显式 >0 才等待（终审 I-1）
+            if (command.DelaySeconds is > 0)
+                await _delay(command.DelaySeconds.Value, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

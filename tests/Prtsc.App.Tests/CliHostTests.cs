@@ -48,6 +48,39 @@ public class CliRequestRouterTests
     }
 
     [Fact]
+    public async Task RegionWithoutGeometry_DelayOmitted_PassesNullToInteractiveTrigger()
+    {
+        // 终审 I-1：转发 ≡ 本地触发——省略 --delay（null）必须透传给咽喉点走 config 默认，
+        // 不能被合并成显式 0（那会压过 config 默认延时，与本地热键不一致）
+        HotkeyAction? action = null;
+        int? delay = 99; // 预置非 null，断言确实被写成了 null
+        var router = NewRouter(trigger: (a, d) => { action = a; delay = d; });
+
+        await router.HandleAsync(new CliCommand { Mode = CliCaptureMode.Region });
+
+        Assert.Equal(HotkeyAction.Region, action);
+        Assert.Null(delay);
+    }
+
+    [Fact]
+    public async Task RegionWithGeometry_DelayOmitted_HeadlessWithoutDelayIntent()
+    {
+        // headless 路径：省略 --delay（null）= 无延时直抓（flameshot 语义），executor 判定
+        CliCommand? received = null;
+        var router = NewRouter(headless: (cmd, _) =>
+        {
+            received = cmd;
+            return Task.FromResult(CliPipeResponse.Success("ok"));
+        });
+
+        await router.HandleAsync(new CliCommand { Mode = CliCaptureMode.Region, Geometry = new PixelRect(0, 0, 10, 10) });
+
+        Assert.NotNull(received);
+        Assert.Null(received!.DelaySeconds);
+        Assert.True(received.IsHeadlessExport);
+    }
+
+    [Fact]
     public async Task WindowCommand_TriggersInteractiveWindow()
     {
         HotkeyAction? action = null;

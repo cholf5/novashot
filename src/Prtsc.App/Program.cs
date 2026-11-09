@@ -29,15 +29,12 @@ internal static class Program
             // L-1 CLI 分流（关键约束：捕获命令绝不进入 Avalonia 运行时）：
             // 纯函数解析 → CLI 命令走 CliApplication（转发/headless）后直接返回退出码；
             // gui / 无参数走现行 GUI 路径。
-            // 日志形态（review M-7 去重，单次 Configure）：
-            // - CLI 捕获命令（含 --help / 解析失败）= file-only（stdout/stderr 是脚本契约，不漏 Serilog 行）；
-            // - gui / 无参数 = 不预配置（转发客户端本身不产生日志），LaunchGui 后唯一一次 Configure(console+file)。
+            // 日志形态（终审必修③）：所有进程一律先 file-only——stdout/stderr 是脚本契约，
+            // 且 gui 转发路径的意外异常必须落日志（此前 gui 不预配置 → Log.Fatal 落 SilentLogger，
+            // exit 1 且 stderr/日志全空）；真启动 GUI 时再 re-Configure 回 console+file
+            //（代价是 GUI 启动日志多一对 "Prtsc starting"，终审明确接受，压过 batch7 M-7 观感项）。
             var parse = CliArgs.Parse(args);
-            var isCliCapture = !parse.Success
-                               || parse.Command is { Help: true }
-                               || parse.Command!.Mode != CliCaptureMode.Gui;
-            if (isCliCapture)
-                LoggingSetup.Configure(configDir, consoleSink: false);
+            LoggingSetup.Configure(configDir, consoleSink: false);
 
             var run = CliApplication.Run(parse, args, configDir);
             if (run.Outcome == CliRunOutcome.LaunchGui)
@@ -51,6 +48,7 @@ internal static class Program
         catch (Exception ex)
         {
             Log.Fatal(ex, "Application terminated unexpectedly");
+            Console.Error.WriteLine($"prtsc: {ex.Message}"); // 终审必修③兜底：日志不可用/被吞时 stderr 至少有一行
             return 1;
         }
         finally

@@ -18,7 +18,7 @@ public class CliArgsTests
         var r = CliArgs.Parse([]);
         Assert.True(r.Success);
         Assert.Equal(CliCaptureMode.Gui, r.Command!.Mode);
-        Assert.Equal(0, r.Command.DelaySeconds);
+        Assert.Null(r.Command.DelaySeconds);
         Assert.False(r.Command.Clipboard);
         Assert.Equal(ExportFormat.Png, r.Command.Format);
         Assert.Null(r.Command.Geometry);
@@ -101,6 +101,32 @@ public class CliArgsTests
         var r = CliArgs.Parse(["full", "-d", "3"]);
         Assert.True(r.Success);
         Assert.Equal(3, r.Command!.DelaySeconds);
+    }
+
+    [Fact]
+    public void Parse_DelayOmitted_Null()
+    {
+        // 终审 I-1：省略 --delay ≠ 显式 0——null 让转发交互路径走 config 默认（转发 ≡ 本地触发）
+        var r = CliArgs.Parse(["region"]);
+        Assert.True(r.Success);
+        Assert.Null(r.Command!.DelaySeconds);
+    }
+
+    [Fact]
+    public void Parse_DelayZero_ExplicitZero_NotNull()
+    {
+        // 显式 --delay 0 = 用户明确「立即抓」，压过 config 默认
+        var r = CliArgs.Parse(["region", "--delay", "0"]);
+        Assert.True(r.Success);
+        Assert.Equal(0, r.Command!.DelaySeconds);
+    }
+
+    [Fact]
+    public void Parse_EmptyArgs_DelayOmitted_Null()
+    {
+        var r = CliArgs.Parse([]);
+        Assert.True(r.Success);
+        Assert.Null(r.Command!.DelaySeconds);
     }
 
     [Fact]

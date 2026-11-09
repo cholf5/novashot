@@ -1,8 +1,10 @@
 namespace Prtsc.Core.Capture;
 
 /// <summary>
-/// D-1：延时截图秒数合法值表（0 = 不延时）。托盘子菜单、设置页下拉、Capture Launcher、L-1 CLI
-/// <c>--delay</c> 都以这份表为准；config 里出现非法值时钳到最近合法值。
+/// D-1：延时截图秒数合法值表（0 = 不延时）。托盘子菜单、设置页下拉、Capture Launcher 以这份表为准；
+/// config 里出现非法值时钳到最近合法值。注意 L-1 CLI <c>--delay</c> 是独立语义（0-60 简单延时钳制、
+/// 不走本表——见 CliArgs.MinDelaySeconds/MaxDelaySeconds）；转发交互模式省略 --delay 时经
+/// <see cref="Resolve"/> 取 config 默认（config 值仍钳到本表）。
 /// </summary>
 public static class CaptureDelayOptions
 {

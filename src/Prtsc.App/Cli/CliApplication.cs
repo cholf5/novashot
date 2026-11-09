@@ -50,8 +50,20 @@ public static class CliApplication
         var connectTimeoutMs = parse.Command.Mode == CliCaptureMode.Gui
             ? CliPipeClient.GuiConnectTimeoutMs
             : CliPipeClient.DefaultConnectTimeoutMs;
-        var forward = CliPipeClient.TryForwardAsync(CliPipeNames.ForCurrentUser(), args, connectTimeoutMs)
-            .GetAwaiter().GetResult();
+        CliForwardResult forward;
+        try
+        {
+            forward = CliPipeClient.TryForwardAsync(CliPipeNames.ForCurrentUser(), args, connectTimeoutMs)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            // 终审必修③：连接成功后的 write/read IOException 等传输异常不再裸抛——
+            // 记日志（gui/无参也已预配置 file-only logger）+ stderr 一行，统一转失败退出码
+            Log.Error(ex, "CLI forwarding failed for mode {Mode}", parse.Command.Mode);
+            Console.Error.WriteLine($"prtsc: forwarding to the running instance failed: {ex.Message}");
+            return CliRunResult.With(CliExitCodes.Failure);
+        }
         if (forward.Connected)
         {
             if (forward.ExitCode == CliExitCodes.Success)

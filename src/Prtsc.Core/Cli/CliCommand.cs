@@ -22,8 +22,13 @@ public sealed record CliCommand
 {
     public CliCaptureMode Mode { get; init; } = CliCaptureMode.Gui;
 
-    /// <summary>抓帧前的延时秒数（简单延时语义，非 D-1 倒计时状态机）；0-60 之外已钳制。</summary>
-    public int DelaySeconds { get; init; }
+    /// <summary>
+    /// 抓帧前的延时秒数（简单延时语义，非 D-1 倒计时状态机）；0-60 之外已钳制。
+    /// null = 命令行省略 --delay：headless 无延时；转发交互模式传 null 给咽喉点 →
+    /// <see cref="Prtsc.Core.Capture.CaptureDelayOptions.Resolve"/> 取 config 默认（转发 ≡ 本地触发，终审 I-1）。
+    /// 显式 <c>--delay 0</c> = 直抓（压过 config 默认）。
+    /// </summary>
+    public int? DelaySeconds { get; init; }
 
     /// <summary>region 模式的物理像素矩形（虚拟桌面坐标，X/Y 可负）。缺省 = 交互选区（仅 GUI 接收方可用）。</summary>
     public Prtsc.Core.Common.PixelRect? Geometry { get; init; }

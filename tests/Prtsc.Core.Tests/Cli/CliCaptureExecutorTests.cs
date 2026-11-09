@@ -237,6 +237,20 @@ public class CliCaptureExecutorTests : IDisposable
     // ---------- 延时 / 取消 ----------
 
     [Fact]
+    public async Task DelayOmitted_Null_NoDelayInvoked()
+    {
+        // 终审 I-1：省略 --delay（null）= headless 无延时直抓（flameshot 语义）；显式 >0 才等待
+        var delays = new List<int>();
+        var executor = CreateExecutor(delay: (s, _) => { delays.Add(s); return Task.CompletedTask; });
+
+        var result = await executor.ExecuteAsync(new CliCommand { Mode = CliCaptureMode.Full, Clipboard = true });
+
+        Assert.True(result.Success);
+        Assert.Empty(delays);
+        Assert.NotNull(_capture.LastSource);
+    }
+
+    [Fact]
     public async Task Delay_InvokedBeforeCapture_WithClampedSeconds()
     {
         var delays = new List<int>();

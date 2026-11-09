@@ -124,3 +124,39 @@
 - [ ] **文本编辑保护**：Text 工具编辑文字时 Ctrl+O 不触发对话框（不抢输入）
 - [ ] **HDROP 回归（G-11）**：资源管理器复制图片文件 → Ctrl+V 仍能粘进编辑器（判定真值改共用 `ImageFileTypes` 后的行为回归）
 - [ ] 双语：语言切 English → 菜单项/对话框标题/类型过滤名全英文
+
+## M. D-1/G-26 延时截图 + Capture Launcher 真机段（2026-11-10 终审补录；素材源 handoff 261110-d1 §3/§4）
+
+> 倒计时状态机/轮次裁决/settle 间隙均有 Core 单测（含「去实现必挂」回归用例）；本段全是真机项。
+
+- [ ] **macOS 延时 3s 抓下拉菜单**：设置默认延时 3s（或托盘「延时截图 3s」）→ 倒计时期间展开一个下拉菜单 → 到点抓帧，菜单完整入框
+- [ ] **热键取消即时性**：倒计时期间按任意截图热键 → 本轮取消（角标提示 + 主窗状态栏「已取消」），不启动新一轮
+- [ ] **角标不入快照**：倒计时角标在抓帧前已关（250ms 间隙），快照/overlay 画面里无角标残留；Region 模式「倒计时结束才开 overlay」时序确认
+- [ ] **托盘/启动器再触发 = 取消旧轮按新意图**：倒计时中再点托盘延时子项 → 重启倒计时；Launcher 选 0 秒 → 直接抓
+- [ ] **混合 DPI 角标居中**：多屏不同缩放下角标顶部居中精度（EstimatedWidthDip=150 估算，可能略偏，功能无碍）
+- [ ] **Windows**：托盘「延时截图」子菜单形态（NativeMenuItem 嵌套）；WGC 抓帧时角标真的不在画面里（250ms 对 DWM 合成是否足够）；倒计时期间全局热键可达性
+- [ ] **G-26 启动器**：X/Y/W/H 越界钳制（负坐标/超桌面）、多屏负坐标布局真机确认
+
+## N. E-1 屏幕取色器真机段（2026-11-10 终审补录；素材源 handoff 261110-e1）
+
+> 取色/放大镜/浮签布局有 headless 单测；真机只能验像素取值与观感。
+
+- [ ] **macOS 128/192 dpi 取色精度**：对比 Digital Colour Meter（注意其默认 sRGB 显示配置）逐像素核对 HEX/RGB
+- [ ] **2x Retina 屏放大镜观感**：11×11 网格 + 中心高亮在 2x 下的清晰度/网格对齐
+- [ ] **多屏边缘浮签避让**：光标贴近屏幕边缘时 HEX/RGB 浮签翻转不裁切
+- [ ] **复制 HEX → 粘贴**：取色点击复制 → 输入框粘贴出 `#RRGGBB`；Stroke 路径（先选中形状再 C 取色）生效
+- [ ] **历史行再取色**：StylePanel 会话历史行点击 → 色值回填
+- [ ] **Windows**：CF_UNICODETEXT 粘贴到任意输入框
+- [ ] **Linux**：xclip 缺失时取色模式仍可用（复制静默失败、色值入历史，不崩）
+
+## O. L-1 CLI 真机段（2026-11-10 终审补录；素材源 handoff 261110-l1 §4/§5 + 终审威胁边界）
+
+> macOS 实弹已全通（headless/转发/退出码电池，见 handoff §5/§7）；本段是 Windows/Linux 腿 + 打包共存。
+
+- [ ] **Windows CLI 实弹**：`prtsc full --clipboard` 无实例 headless（<2s、剪贴板实有图）、CLI 进程内 Win32 剪贴板可用性、WGC headless 抓帧（`ProbeSupported` 构造期探测在 CLI 进程的行为）
+- [ ] **Windows 管道威胁边界**：同机另一用户会话 `\\.\pipe\prtsc-cli-<tag>` 可连接/可抢注（无 ACL）——后果记录：可向 GUI 发命令触发截图/activate、可让 GUI 建流失败（吞异常 → 转发永久失效）、CLI argv（含 --path）会发给抢注者；后续考虑 PipeSecurity 限当前用户 SID
+- [ ] **Linux CLI**：无实例 headless 全链；自定义超长 TMPDIR 下管道名超 104 字符退化（预期「永远 headless、不炸」）；Linux 剪贴板在 CLI 进程可用性
+- [ ] **macOS 权限拒绝文案**：屏幕录制未授权时 `full` 的 stderr 指引文案（设计内失败 UX，exit 1 不崩）
+- [ ] **`--delay 60` 满额等待**：端到端耗等一次（含转发路径服务端串行执行的上界）
+- [ ] **vpk 共存实弹**：安装版（开始菜单）CLI 与 Velopack 更新重启共存——重启目标落入 gui 分支、argv 干净；Portable/未打包下的单实例转发
+- [ ] **转发交互延时语义（终审 I-1 修复回归）**：config 默认延时 3s 时——本地热键 region 与 `prtsc region`（转发、省略 --delay）都出现 3s 倒计时；`prtsc region --delay 0` 立即开 overlay（显式压过默认）

@@ -18,8 +18,8 @@ public sealed class CliRequestRouter
     /// <summary>激活主窗口（App 注入 ShowMainWindow；其内部自行 Post UI 线程）。</summary>
     public delegate void ActivateHandler();
 
-    /// <summary>交互捕获触发（App 注入 TriggerCaptureAsync；action 仅 Region/Window，delaySeconds 为 CLI 显式值）。</summary>
-    public delegate void InteractiveTriggerHandler(HotkeyAction action, int delaySeconds);
+    /// <summary>交互捕获触发（App 注入 TriggerCaptureAsync；action 仅 Region/Window，delaySeconds=null = CLI 省略 --delay → 走 config 默认，终审 I-1 转发 ≡ 本地触发）。</summary>
+    public delegate void InteractiveTriggerHandler(HotkeyAction action, int? delaySeconds);
 
     /// <summary>headless 导出（App 注入 DI 构造的 CliCaptureExecutor 执行）。</summary>
     public delegate Task<CliPipeResponse> HeadlessExecutorHandler(CliCommand command, CancellationToken ct);

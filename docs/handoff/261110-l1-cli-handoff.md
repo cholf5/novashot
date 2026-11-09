@@ -9,7 +9,7 @@
 - **退出码约定**：0 成功 / 1 一般失败 / 2 用法错误（stderr 报错，stdout 只出结果行）。
 - **单实例**：命名管道 `System.IO.Pipes`，服务端 GUI 全程 host（App 启动起、退出停，吞异常）；客户端先廉价存在性闸门（无实例 0 等待，review I-1）再连接（捕获模式 500ms / gui 模式 100ms 超时），连接成功即转发原始 argv（JSON 数组行式帧）并等执行结果；**plain `gui` 也转发**（接收方映射为 activate：主窗口 Show+Activate，对齐 winshot）。
 - **headless 执行器**：Core `CliCaptureExecutor`（注入 ICaptureService/IConfigStore/IClipboardService，零 Avalonia）——抓帧 → `ImageExporter.Encode`（无标注 AnnotationDocument = 原图直出，不加编辑器 padding/背景，对齐 flameshot CLI）→ `--path` 落盘（文件名走 `FilenamePatterns` 既有模式 + config.QuickSave.Pattern，目录自动创建）/ `--clipboard`（`IClipboardService.TrySetImage` 快照）；两者可并存。CLI 进程与 GUI 接收方共用同一执行器。
-- **--delay 与 D-1 的复用边界**（PM 裁决）：CLI 语境 = 简单延时（`Task.Delay` + CancellationToken，Ctrl+C 取消），**不复用** `DelayedCaptureCountdown`/`CountdownOrchestrator`——那是 UI 倒计时状态机（角标/取消热键/settle 间隙语义），headless 硬套没有意义；秒数钳制 0-60（与 D-1 的 {0,3,5} 合法值表无关）。转发到 GUI 的 region/window 交互模式则走 `TriggerCaptureAsync` 既有倒计时（CLI 显式 delay 透传，显式值覆盖 config 默认）。
+- **--delay 与 D-1 的复用边界**（PM 裁决 + 终审 I-1 修订）：CLI 语境 = 简单延时（`Task.Delay` + CancellationToken，Ctrl+C 取消），**不复用** `DelayedCaptureCountdown`/`CountdownOrchestrator`——那是 UI 倒计时状态机（角标/取消热键/settle 间隙语义），headless 硬套没有意义；秒数钳制 0-60（与 D-1 的 {0,3,5} 合法值表无关）。转发到 GUI 的 region/window 交互模式则走 `TriggerCaptureAsync` 既有倒计时：省略 `--delay` = **null** 透传走 config 默认（转发 ≡ 本地触发），显式值（含 0）压过默认。
 - **CLI 输出 en，不经 Loc 表**（PM 裁决）：help/错误/结果文案都是英文字面量（`CliArgs.HelpText` + stderr），脚本契约不受语言设置影响。
 - **日志形态分流**：CLI 进程（含 gui 转发客户端）一律 file-only sink（stdout/stderr 是脚本契约，Serilog 不许往 console 漏行）；真启动 GUI 时 re-configure 回 console+file（`LoggingSetup.Configure` 重复调用安全，替换前 Dispose 旧 logger）。
 - 实弹（本机 macOS 26.5.2 / M2）全通，见 §5；测试 1160/1160 全绿；`dotnet build Prtsc.slnx` 0 Error。
@@ -58,7 +58,7 @@ kanban/issues/L-1-m10-cli.md                           Done + Verification
 4. **`prtsc gui` 的 stdout 污染**：console sink 的开合不能按「parse 出的 mode」决定——`gui` 既可能是 LaunchGui 也可能是转发客户端。最终方案：CLI 进程一律 file-only，`LaunchGui` 返回后再 re-configure console（Configure 重复调用安全）。首次实弹抓到（stdout 混入 Serilog 行），已修并有回归验证。
 5. **显示器休眠 ≠ 权限问题**：实弹首跑 `CGGetActiveDisplayList` 返回 0、CVDisplayLink 报 -6661（kCVReturnInvalidDisplay），差点误判成「屏幕录制权限未授予」。caffeinate -u 唤醒后全通。以后 mac 上跑 GUI/抓帧类验证，先确认显示器 awake。GUI 从 agent 后台上下文直接 `nohup` 启动在休眠态也会炸 AvaloniaNative RenderTimer（同源）。
 6. **`--delay` 值含负号**：`TryReadValue` 只拒绝以 `--` 开头的值（下一个选项），`--delay -3` 是合法值（钳到 0）——负数值不能一刀切拒绝。
-7. **GUI 接收交互模式的 delay 语义**：CLI 显式 delay 直接透传 `TriggerCaptureAsync(delaySeconds:)`——`CaptureDelayOptions.Resolve` 对显式值不钳 {0,3,5}（`Math.Max(0, explicit ?? Clamp(configured))`），所以 CLI `--delay 7` 在 GUI 倒计时里就是 7s。这是有意的（CLI 是显式意图）；如未来要统一合法值表，改 Resolve 即可。
+7. **GUI 接收交互模式的 delay 语义（终审 I-1 后修订）**：`CliCommand.DelaySeconds` 是 `int?`——**省略 `--delay` = null**，Router 透传 null 给 `TriggerCaptureAsync` → `CaptureDelayOptions.Resolve(null, config)` 走 **config 默认延时**（转发 ≡ 本地触发；设默认 3s 后 `prtsc region` 与本地热键一样有 3s 倒计时）；**显式 `--delay 0` = 0**，压过 config 默认立即抓；显式 `>0` 直接透传（`Resolve` 对显式值不钳 {0,3,5}，CLI `--delay 7` 就是 7s 倒计时——有意保留，统一合法值表需改 Resolve）。**headless 路径（full / region+geometry）省略 = 无延时直抓**（flameshot 语义，不跟 config 默认——终审裁决范围仅转发交互路径）。实现三处：CliCommand（int?）/CliArgs.Parse（省略 null、显式钳 0-60）/CliCaptureExecutor（`is > 0` 才等待）。
 8. **`AnnotationDocument` 不实现 IDisposable**（Source 非拥有）：执行器里不能 `using`——位图生命周期归 `CapturedImage`（finally Dispose），文档本身即用即弃。
 
 ## 4. 已知影响 / 边界
@@ -120,7 +120,32 @@ kanban/issues/L-1-m10-cli.md                           Done + Verification
 - **1170/1170 全绿**（Core 705 + App 168×2TFM + Mac 83 + Linux 46；1160 → +10：Core +9 = 协议版本 3 + 闸门/计时 4 + M-1 两例，Mac +1 = 并发 hammer）；`dotnet build Prtsc.slnx` 0 Error。
 - 实弹复验（本机 macOS，无回归）：headless `full --clipboard` **1.23s** exit 0（< 2s，stale socket 残留场景下含 500ms 捕获模式探测——审查已定性为 headless 必要成本；无残留文件时闸门 0 等待）；GUI 存活转发 full/gui 全通；杀 GUI 后 headless 回退 + 退出码电池（window=1 / format=2 / `-p -c`=2 即 M-1 实弹生效）全对；GUI 冷启动到首条日志 **0.13s**（修复前 ≥0.5s）。
 
-## 8. 下一步
+## 8. Final review pass（2026-11-10 全分支终审「可合入」后修复，`fix(app): final review pass` commit）
+
+终审（`/tmp/prtsc-sdd/final-review-findings.md`，全分支 24 commits）结论「可合入」，必修 3 项本批全修 + 终审 Important-I2 文档缺口一并补录；留守 backlog 不动。
+
+### I-1（PM 裁决方案 a）：转发交互命令省略 `--delay` 压过 config 默认 → 转发 ≡ 本地触发
+
+- **修复**：`CliCommand.DelaySeconds` 改 `int?`（省略 = null；显式 `--delay 0` 仍是 0，两种意图在 parse 层重新可区分）→ `CliArgs.Parse` 省略时不赋值 → `CliRequestRouter.InteractiveTriggerHandler` 第二参改 `int?`，转发交互（region 缺 geometry / window）**null 透传** `TriggerCaptureAsync` → `CaptureDelayOptions.Resolve(null, config)` 走 **config 默认延时**。修复前：设默认 3s 后本地热键 region 有倒计时、`prtsc region` 立即开 overlay（不一致且 handoff §3-7 从未写明省略行为）。
+- **边界（有意保留）**：headless 路径（full / region+geometry）省略 = 无延时直抓（flameshot 语义，不跟 config 默认——终审裁决范围仅转发交互）；显式 `>0` 仍不钳 {0,3,5}（CLI `--delay 7` = 7s，`Resolve` 既有行为）。
+- **顺手（终审留-24/M-A）**：`CaptureDelayOptions` 类注释「L-1 CLI --delay 都以这份表为准」与实现不符（CLI 钳 0-60），改注释对齐现实。
+- **测试**：parse 层「省略 vs 显式 0」两用例（`Parse_DelayOmitted_Null` / `Parse_DelayZero_ExplicitZero_NotNull`）+ 空参 null；Router 层 null 透传用例（预置 99 断言被写成 null）；executor 层 null 不触发延时注入用例。
+
+### 必修③：gui 转发路径异常双静默
+
+- **修复**（终审修法采纳）：① `Program.Main` 对 **gui/无参也预配置 file-only 日志**（此前 Log.Fatal 落 SilentLogger → 转发传输异常 exit 1 且 stderr/日志全空；代价是 GUI 启动日志多一对 "Prtsc starting"——终审明确接受，**压过 batch7 M-7 观感项**）；② `CliApplication.Run` 的 `TryForwardAsync` 调用加 try-catch：`Log.Error` + stderr 一行 + 统一转 exit 1（不再裸抛）；③ Program.Main catch 里补 `Console.Error.WriteLine` 兜底（日志不可用时 stderr 至少有一行）。`CliRequestRouter` 侧无需再加：headless 分支自有 catch 回响应，activate/interactive 触发为 fire-and-forget（`TriggerCaptureAsync`/`DispatchCaptureAsync` 内部已有 catch 兜底，见 D-1 handoff 坑 28）。
+
+### I-2/必修①（文档）：QA-1 补 D-1/E-1/L-1 三段 + board 一句改准
+
+- `docs/qa/261102-smoke-checklist.md` 追加 **§M（D-1/G-26）**（延时抓菜单/热键取消/角标不入快照/混合 DPI/Windows 托盘子菜单与 WGC 250ms/G-26 越界钳制）、**§N（E-1）**（128/192dpi 对比 Digital Colour Meter/2x 观感/边缘浮签/粘贴 HEX/历史行/Windows 粘贴/Linux xclip 缺失降级）、**§O（L-1）**（Windows CLI 实弹/管道威胁边界后果/Linux TMPDIR 退化/macOS 权限文案/--delay 60 耗等/vpk 共存/转发交互延时回归项）——素材源 = 各 handoff 诚实清单 + 终审 §4 汇总。
+- `kanban/board.md` D-1 行「真机待验项入 handoff 261110 §3 与 QA-1」此前 QA-1 半边不实 → 现补录后改指 QA-1 **§M**（终审授权的唯一 board 改动）。
+
+### Final review pass 后测试与实弹
+
+- 测试 1170 → **1174 全绿**（Core 709 + App 170×2TFM + Mac 83 + Linux 46；+4：Core +4 = parse 两例/空参一例/executor 一例…实际 Core 705→709，App 168→170 = Router null 透传 + headless 判定两例）；`dotnet build Prtsc.slnx` 0 Error。
+- 实弹复验（本机 macOS）：`full --clipboard` headless **1.2s 级** exit 0（< 2s，无回归）；config 默认延时 0 下 `prtsc region` 转发行为不变（转发启动即回、行为与修复前一致——修复只改变「config 默认 >0 时的语义」，默认 0 时两者等价，单测钉死 null 透传）。
+
+## 9. 下一步
 
 - QA-1 真机冒烟补 L-1 段：Linux（管道名长上限/剪贴板）、Windows（Win32 管道 ACL、CLI 进程内 Win32 剪贴板、WGC headless 抓帧）、macOS 权限拒绝文案。
 - 可选后续（未排期）：`--screen <n>` 单屏导出、`--clipboard-only` 输出静音模式、CLI 输出 JSON `--out json`。

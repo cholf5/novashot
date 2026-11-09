@@ -61,7 +61,8 @@ public static class CliArgs
         var mode = CliCaptureMode.Gui;
         var modeSeen = false;
         var help = false;
-        var delay = 0;
+        // null = 省略 --delay（与显式 --delay 0 的「立即抓」是两种意图，终审 I-1 后必须可区分）
+        int? delay = null;
         PixelRect? geometry = null;
         string? path = null;
         var clipboard = false;
