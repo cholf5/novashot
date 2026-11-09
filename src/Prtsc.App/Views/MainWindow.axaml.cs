@@ -308,9 +308,10 @@ public partial class MainWindow : Window
             await RecordLibraryAfterExportAsync(path, editor);
 
             // M6c: Auto-copy —— 导出成功后按 config 自动复制到剪贴板
+            // N-1 review I-1：管线内自动复制不弹复制 toast（CopySilently），导出 toast 即本次操作唯一反馈
             if (IsAutoCopyEnabled())
             {
-                _vm.CopyCommand.Execute(null);
+                _vm.CopySilently();
                 _vm.StatusText = Loc.T("Status.ExportedCopied", path);
             }
 

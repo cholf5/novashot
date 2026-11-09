@@ -18,8 +18,9 @@
 - **mac/Linux**：本卡装配 `NullNotificationService`（静默）——UNUserNotificationCenter /
   AppIndicator 通知未排期（如实记录，见「诚实清单」）。
 
-测试基线只增不减：Core 558→**578**，App 142→**154**×2TFM，Mac 80→**82**，Linux 45→**46**，
-合计 **1014 全绿**，build 0 Error（windows TFM 在 mac 上 EnableWindowsTargeting 交叉编译通过）。
+测试基线只增不减：Core 558→**578**，App 142→**157**×2TFM，Mac 80→**82**，Linux 45→**46**，
+合计 **1020 全绿**（review pass 后终态，见文末 Review pass 段），build 0 Error（windows TFM 在 mac 上
+EnableWindowsTargeting 交叉编译通过）。
 
 ## 文件地图
 
@@ -41,7 +42,7 @@
 | `tests/Prtsc.Core.Tests/Notifications/NotificationPolicyTests.cs` | 决策表 4×2 + 全枚举×开关守卫 + 枚举 4 值钉死（共 10） |
 | `tests/Prtsc.Core.Tests/Notifications/NotificationServiceTests.cs` | Null 服务可调用/不抛/Instance 同引用（3） |
 | `tests/Prtsc.Core.Tests/Notifications/ToastXmlTests.cs` | XML 合法性/双文本/launch 属性/特殊字符转义 round-trip/ToastGeneric（7） |
-| `tests/Prtsc.App.Tests/NotificationWiringTests.cs` | 四处接线：成功通知、关开关零调用、无服务不炸、Null 服务 headless 不炸、服务抛异常不扰主流程（11） |
+| `tests/Prtsc.App.Tests/NotificationWiringTests.cs` | 四处接线：成功通知、关开关零调用、无服务不炸、Null 服务 headless 不炸、服务抛异常不扰主流程、I-1 导出管线单 toast 钉死、上传 fallback 正文退文件名（14） |
 | `tests/Prtsc.App.Tests/NotificationAssemblyTests.cs` | TFM 分腿装配矩阵：windows→Toast、net10.0→Null（`#if WIN_PLATFORM`） |
 | `tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj` | 新增 windows TFM 的 `WIN_PLATFORM` DefineConstants（与 App 同款） |
 | `tests/Prtsc.Mac.Tests/MacServiceCollectionTests.cs`、`tests/Prtsc.Linux.Tests/LinuxServiceCollectionTests.cs` | 装配钉 Null（含 Core 先行的完整顺序）（+2 / +1） |
@@ -65,9 +66,11 @@
    服务实现自身也自吞（双保险）。调用点零 try-catch、零 if-else 长链。
 6. **上传通知分支**：简报指明「outcome.Url 分支，正文带 URL」；实现为 outcome.Ok 两个成功分支都通知
    （URL 复制成功 → 正文 URL；URL 缺失/复制失败 → 正文退文件名）——上传成功是同一事件，少一个静默死角。
-7. **复制通知的自动复制路径**：导出默认 `Export.AutoCopyToClipboard=true` → 一次导出会先后弹
-   Exported + Copied 两条 toast（都过 policy）。简报裁决触发面明确含「自动复制」，按其执行；
-   观感若嫌吵（Windows 右侧堆叠）后续可在 per-event 决策表里单关 Copied（Core 已留扩展位，一行改动）。
+7. **复制通知的自动复制路径**（review I-1 已修）：导出默认 `Export.AutoCopyToClipboard=true`。
+   初版自动复制同走 `Copy` 命令 → 双 toast（配 AutoUpload 三条）；review 判定违背验收精神，已拆
+   `Copy(bool notifyCopied)`——管线自动复制走 `CopySilently()` 不通知，手动复制（Copy 命令/Ctrl+C）仍通知；
+   抑制点在调用侧而非 `NotificationPolicy`（全局关 Copied 会误伤手动复制）。回归钉
+   `ExportPipeline_WithAutoCopy_ExactlyOneToast` / `CopySilently_DoesNotNotify_ManualCopyStillDoes`。
 8. **设置项 hint 复查**：`Settings.General.ShowNotification` 勾选框双语标签在册（"Show capture
    notifications"/"截图完成通知"），与实际行为（保存/复制/上传成功通知）一致；本分区其它 CheckBox
    均无 hint 样式，未新增。
@@ -89,5 +92,29 @@
 ## 下一步
 
 1. Windows 真机/VM 跑 QA-1 §K（可并入 R-1 的 VM 安装冒烟一趟做完）。
-2. 观感裁决：导出+自动复制双 toast 是否要合一条或默认关 Copied（per-event 扩展位已留）。
-3. mac/Linux 原生通知开卡（Core 接口已备好，只差平台实现 + 装配替换）。
+2. mac/Linux 原生通知开卡（Core 接口已备好，只差平台实现 + 装配替换）。
+
+## Review pass（2026-11-10 独立审查后跟进）
+
+独立审查结论「需修复（轻）」，1 Important + 3 个一行级 Minor 随本轮清掉（发现清单
+`/tmp/prtsc-sdd/batch5-review-findings.md`，commit `fix(app): N-1 review pass`）：
+
+- **I-1（必修）**：默认配置一次导出确定性弹 2 条 toast（AutoUpload 时 3 条），自动复制 toast 零新信息，
+  违背「系统级反馈」的验收精神。按审查方案修：`MainWindowViewModel.Copy` 拆 `Copy(bool notifyCopied)`
+  （RelayCommand 走 `true`）+ 公开 `CopySilently()`；`MainWindow.ExportCurrentAsync` 的自动复制改调
+  `CopySilently()`，手动复制（工具栏/Ctrl+C，同一命令）不变仍通知。**未动 `NotificationPolicy`**
+  （全局关 Copied 会误伤手动复制；per-event 扩展位留给未来设置页 per-event 开关的正当需求）。
+  补 wiring 测试钉死：`ExportPipeline_WithAutoCopy_ExactlyOneToast`（导出+自动复制 → 恰好 1 条、
+  且是导出那条带路径）、`CopySilently_DoesNotNotify_ManualCopyStillDoes`（静默不炸 + 手动复制反馈保住）。
+- **M-1**：上传 fallback 分支（PublicUrl 空 → Url=null → 正文退文件名）补接线测试
+  `Upload_Success_NoUrl_NotifiesWithFileName`（断言正文无 http、以 .png 文件名结尾）。
+- **M-2**：复制通知正文断言 `Assert.Contains("8", …)` 过弱（匹配任何含 8 的文案）。实测踩坑：
+  复制的是**合成结果**（默认 padding 40 → 88×86），不是原始抓帧 8×6，审查建议的字面 "8 × 6" 同样不成立
+  ——改为与 VM 同管线渲染取尺寸后断言 `$"{image.Width} × {image.Height}"`（钉真实宽高对且不随画布默认值变脆）。
+- **M-4**：QA-1 §K toast 数量预期 2 条 → **1 条**（注明双弹已抑制、2 条 = 回归；AutoUpload 时 2 条）。
+- M-3（导出 View 调用点无 headless 自动化）/ M-5（fallback 空串纯防御，实际到不了）由 PM 记录，本卡不改。
+- 审查通过项（未改）：触发点全部成功路径触发、ToastXml 转义/模板、WinRT 线程安全与降级、
+  explorer /select 转义、policy 纯函数、三腿装配、Loc 双语、上传双分支偏差判定「合理，接受」。
+
+测试：1014 → **1020 全绿**（App +3×2TFM：I-1 两例 + M-1 一例；Core/Mac/Linux 不变），build 0 Error。
+已知 flake 不涉本卡：SettingsWindowXamlTests（并行偶发，重跑即绿，本轮实遇一次）。

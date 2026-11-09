@@ -68,7 +68,10 @@ public class NotificationWiringTests : IDisposable
         var call = Assert.Single(spy.Calls);
         Assert.Equal(Loc.T("Notify.Copied.Title"), call.Title);
         Assert.Null(call.FilePath); // 复制无落盘路径
-        Assert.Contains("8", call.Message);
+        // review M-2：正文带的是被复制位图的真实宽高对（合成含默认 padding，非原始抓帧 8×6）；
+        // 与 VM 同管线渲染一遍取尺寸，默认画布参数变更时不脆
+        using var image = Prtsc.Core.Editor.Export.ImageExporter.Render(vm.Editor!.Document, vm.Editor.CompositionState);
+        Assert.Contains($"{image.Width} × {image.Height}", call.Message);
     }
 
     [Fact]
@@ -154,6 +157,36 @@ public class NotificationWiringTests : IDisposable
         Assert.Null(call.FilePath); // 上传无本地文件可打开
     }
 
+    /// <summary>review M-1：URL 缺失（PublicUrl 空 → Url=null）走 fallback——正文退文件名，仍通知。</summary>
+    [Fact]
+    public async Task Upload_Success_NoUrl_NotifiesWithFileName()
+    {
+        var store = CreateStore(c =>
+        {
+            c.Cloud.Provider = "r2";
+            c.Cloud.R2.AccountId = "acc";
+            c.Cloud.R2.Bucket = "bkt";
+            c.Cloud.R2.AccessKeyId = "AK";
+            c.Cloud.R2.SecretAccessKey = "SK";
+            c.Cloud.R2.PublicUrl = ""; // 无公开链接 → outcome.Url = null → fallback 分支
+        });
+        var spy = new SpyNotificationService();
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var vm = new MainWindowViewModel(
+            new FakeClipboardService(), store,
+            new ConfigUploadService(store, new HttpClient(handler)),
+            new LibraryStore(NullLogger<LibraryStore>.Instance, _tempDir),
+            notifications: spy);
+        vm.EnterEditor(Captured());
+
+        await vm.UploadCommand.ExecuteAsync(null);
+
+        var call = Assert.Single(spy.Calls);
+        Assert.Equal(Loc.T("Notify.Uploaded.Title"), call.Title);
+        Assert.DoesNotContain("http", call.Message); // 正文无 URL
+        Assert.EndsWith(".png", call.Message); // 退文件名（timestamp 模式 .png）
+    }
+
     [Fact]
     public async Task Upload_NotificationOff_ServiceNotCalled()
     {
@@ -208,6 +241,44 @@ public class NotificationWiringTests : IDisposable
         vm.NotifyExported(@"C:\pics\a.png");
 
         Assert.Empty(spy.Calls);
+    }
+
+    // —— review I-1：导出管线内自动复制不弹复制 toast（默认配置下双/三弹是确定性噪音） ——
+
+    /// <summary>导出 + 导出内自动复制 → 全管线恰好 1 条 toast（导出那条，带路径）。
+    /// VM 层钉接线函数组合；View 调用点（CopySilently 替换 CopyCommand）靠 QA-1 真机。</summary>
+    [Fact]
+    public void ExportPipeline_WithAutoCopy_ExactlyOneToast()
+    {
+        var spy = new SpyNotificationService();
+        var vm = new MainWindowViewModel(new FakeClipboardService(), CreateStore(), notifications: spy);
+        vm.EnterEditor(Captured());
+
+        // 模拟导出管线顺序：落盘通知 + 自动复制（MainWindow.ExportCurrentAsync 的两步）
+        vm.NotifyExported(@"C:\pics\prtsc-001.png");
+        vm.CopySilently();
+
+        var call = Assert.Single(spy.Calls); // 恰好 1 条——自动复制零通知
+        Assert.Equal(Loc.T("Notify.Exported.Title"), call.Title);
+        Assert.Equal(@"C:\pics\prtsc-001.png", call.FilePath);
+    }
+
+    /// <summary>CopySilently 本身零通知；随后的手动 Copy 命令仍通知（I-1 不得误伤手动复制）。</summary>
+    [Fact]
+    public void CopySilently_DoesNotNotify_ManualCopyStillDoes()
+    {
+        var spy = new SpyNotificationService();
+        var vm = new MainWindowViewModel(new FakeClipboardService(), CreateStore(), notifications: spy);
+        vm.EnterEditor(Captured());
+
+        vm.CopySilently();
+        Assert.Empty(spy.Calls); // 管线自动复制静默
+        Assert.Contains("Copied", vm.StatusText); // 剪贴板主流程照常
+
+        vm.CopyCommand.Execute(null); // 手动复制（工具栏/Ctrl+C 同一命令）
+
+        var call = Assert.Single(spy.Calls);
+        Assert.Equal(Loc.T("Notify.Copied.Title"), call.Title); // 手动复制反馈保住
     }
 
     // —— 失败不扰 / headless 不炸 ——

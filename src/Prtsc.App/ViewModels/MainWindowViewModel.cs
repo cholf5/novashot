@@ -298,9 +298,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // ---- M6c: clipboard round-trip + quick save ----
 
-    /// <summary>复制当前合成结果（含 CompositionState）到剪贴板（工具栏 Copy / Ctrl+C）。</summary>
+    /// <summary>复制当前合成结果（含 CompositionState）到剪贴板（工具栏 Copy / Ctrl+C）。手动触发 → 通知。</summary>
     [RelayCommand(CanExecute = nameof(CanCopy))]
-    private void Copy()
+    private void Copy() => CopyToClipboard(notifyCopied: true);
+
+    /// <summary>
+    /// N-1 review I-1：导出管线内的自动复制入口——<b>不弹复制通知</b>（导出 toast 已带路径，
+    /// 自动复制的 toast 零新信息，默认配置下确定性双弹是噪音）；手动复制（Copy 命令/Ctrl+C）仍通知。
+    /// 抑制点在调用侧而非 NotificationPolicy（全局关 Copied 会误伤手动复制的合法反馈）。
+    /// </summary>
+    public void CopySilently() => CopyToClipboard(notifyCopied: false);
+
+    private void CopyToClipboard(bool notifyCopied)
     {
         if (Editor is not { } editor) return;
         try
@@ -310,7 +319,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (_clipboard.TrySetImage(bitmap))
             {
                 StatusText = Loc.T("Status.Copied", bitmap.Width, bitmap.Height);
-                NotifyCopied(bitmap.Width, bitmap.Height); // N-1：手动 Copy 与导出后自动复制同走这里
+                if (notifyCopied)
+                    NotifyCopied(bitmap.Width, bitmap.Height); // N-1：手动复制（自动复制走 CopySilently）
             }
             else
                 StatusText = Loc.T("Status.CopyBusy");
