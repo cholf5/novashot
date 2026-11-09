@@ -18,7 +18,7 @@ src/Prtsc.Core/Editor/ColorFormatter.cs          ToHex（#rrggbb 小写，对齐
 src/Prtsc.Core/Editor/ColorHistory.cs            会话历史：容量 10、去重上浮、Changed 事件、快照语义（Colors 返回副本）
 src/Prtsc.App/Controls/ColorMagnifier.cs         取色放大镜自绘控件（Control.Render，同 SelectionAdorner 风格）：121 色块 + 网格线 + 中心高亮 + 浮签；ICustomHitTest 整面接输入；CopiedFlash 态
 src/Prtsc.App/Controls/MagnifierLayout.cs        摆放纯几何：网格以光标为中心（不贴边搬移，保「中心格=光标像素」不变量），浮签下→上翻转 + 安全边距钳制
-src/Prtsc.App/Views/OverlayWindow.axaml(.cs)     +ColorMagnifier 层（盖在 ToolRingLayer 上）+ PickerHint 提示条；C 键切换；EnterPickMode/ExitPickMode/OnPickColor；Closed 时摘位图引用
+src/Prtsc.App/Views/OverlayWindow.axaml(.cs)     +ColorMagnifier 层（盖在 ToolRingLayer 上）+ PickerHint 提示条；C 键切换（review I-1 起绑 KeyUp，见 §2.3）；EnterPickMode/ExitPickMode/OnPickColor；Closed 时摘位图引用
 src/Prtsc.App/Controls/SelectionAdorner.cs       静态画笔迁 Immutable 变体（见 §2.2b，cross-thread compositor 偶发炸点）
 src/Prtsc.App/ViewModels/MainWindowViewModel.cs  +PendingStrokeColor（ObservableProperty）；EnterEditor 末尾 ApplyPendingStroke（经 StylePanel.Stroke 既有路径，消费即清空）；ctor +colorHistory 参数
 src/Prtsc.App/ViewModels/EditorViewModel.cs      ctor +colorHistory 透传给 StylePanelViewModel
@@ -26,7 +26,7 @@ src/Prtsc.App/ViewModels/StylePanelViewModel.cs  +HistoryColors/HasColorHistory�
 src/Prtsc.App/Controls/StylePanel.axaml(.cs)     +历史行（5 列小色块，ToolTip 显示色值，点=设描边色走 OnSwatchClick 既有路径）；RefreshSwatchStates 覆盖历史行
 src/Prtsc.App/Themes/Controls.axaml              +swatch.small 变体（36×20）
 src/Prtsc.App/AppServices.cs                     +ColorHistory 单例注册；MainWindowViewModel 工厂传入
-src/Prtsc.App/Views/MainWindow.axaml.cs          region overlay 构造时传 clipboard + colorHistory；StrokePicked → PendingStrokeColor；OnAnyCancelled 清挂起色
+src/Prtsc.App/Views/MainWindow.axaml.cs          region overlay 构造时传 clipboard + colorHistory；StrokePicked → PendingStrokeColor；OnAnyCancelled 清挂起色；displayShots 释放延一跳 Background（review I-2）
 src/Prtsc.App/Localization/Loc.cs                +Overlay.PickerHint / Overlay.PickerCopied / Panel.History（×2 语言表）
 tests/Prtsc.Core.Tests/Editor/                   ColorSamplerTests(12) + ColorFormatterTests(8) + ColorHistoryTests(11) = 31
 tests/Prtsc.App.Tests/MagnifierLayoutTests.cs    7（摆放几何）
@@ -38,15 +38,15 @@ kanban/issues/E-1-m9-color-picker.md             Done + Verification
 
 ## 2. 关键坑（新会话必读）
 
-1. **SKBitmap 生命周期 = 渲染线程 SIGSEGV（本批最大坑）**：`ColorMagnifier.Source` 持有 overlay 抓帧位图的**非所有权引用**。旧测试/新测试都习惯「构造完 overlay 立刻 `bmp.Dispose()`」——旧代码构造时已 PNG 往返复制（`SkiaAvaloniaConvert.ToAvaloniaBitmap`）所以安全；放大镜改为直接持引用后，位图提前释放 + 渲染线程带着 dirty 标记进来 = macOS `sk_bitmap_get_info` SIGSEGV（headless 实测复现，6GB crash dump 钉死）。三道防线：
-   - 测试里位图与 overlay 同寿（`overlay.Closed += (_,_) => bmp.Dispose()`），与生产一致（MainWindow 在 Confirm/Cancel 后才 Dispose displayShots）；
+1. **SKBitmap 生命周期 = 渲染线程 SIGSEGV（本批最大坑，review I-2 后表述收敛）**：`ColorMagnifier.Source` 持有 overlay 抓帧位图的**非所有权引用**。旧测试/新测试都习惯「构造完 overlay 立刻 `bmp.Dispose()`」——旧代码构造时已 PNG 往返复制（`SkiaAvaloniaConvert.ToAvaloniaBitmap`）所以安全；放大镜改为直接持引用后，位图提前释放 + 渲染线程带着 dirty 标记进来 = macOS `sk_bitmap_get_info` SIGSEGV（headless 实测复现，6GB crash dump 钉死）。防线（review 后如实表述）：**确定性可达路径已堵死**——
+   - 测试里位图与 overlay 同寿（`overlay.Closed += (_,_) => bmp.Dispose()`），与生产一致（MainWindow 在 Confirm/Cancel 后 Dispose displayShots，且 review I-2 起再推迟一跳 `DispatcherPriority.Background`，给 compositor 一个完整周期回收在途帧）；
    - `ColorMagnifier.Render`/`OnPointerMoved`/`OnPointerPressed`/`HitTest` 全部先查 `IsVisible` + 判空 + 零尺寸；
-   - `OverlayWindow.Closed` 时 `_magnifier.Source = null`（掐掉生产里「Close 后位图立刻被 Dispose」的窗口期竞态）。
-   **以后任何给 overlay 加自绘采样控件的，都必须走这三道**。
+   - `OverlayWindow.Closed` 时 `_magnifier.Source = null`（先于 posted Dispose ≥1 个 dispatcher hop）。
+   **残余窗口如实声明**：若某后端在非 UI 线程调用 `Control.Render`，理论上仍存在「已过 IsVisible 检查的在途帧 × 位图释放」的 µs 级窗口（SIGSEGV 非托管异常）——Background 优先级延一跳把它压到实践不可达，但不是逻辑上的绝对封死。**以后任何给 overlay 加自绘采样控件的，都必须走这套防线**。
 2. **Avalonia 12 渲染线程会对 IsVisible=false 的控件触发 Render（dirty 残留时）**——别信「不可见就不渲染」的直觉，自绘控件 Render 第一行永远 `if (!IsVisible) return;`。
 2b. **自绘控件的静态渲染资源必须用 Immutable 变体**（`ImmutableSolidColorBrush`/`ImmutablePen`，`Avalonia.Media.Immutable`）：mutable Brush/Pen 是 AvaloniaObject（线程仿亲），第一个碰到它的线程成为 owner；headless 多 session / 多窗口 compositor 在别的线程 AddRef 时炸「The calling thread cannot access this object」（ColorPickerOverlayTests 偶发 7 连炸实测钉死，8 连跑全绿验证修复）。每帧新建的画刷（放大镜 121 色块）同样用 Immutable——顺带避免 compositor 资源累积。SelectionAdorner 的静态画笔本次一并迁移。
-3. **C 键空闲已核实**：OverlayWindow 选框阶段原来只绑 Esc/Enter，C 无冲突；编辑器阶段无关（本功能只在 overlay）。
-4. **Avalonia 12 headless 输入 API 变了**：`KeyPress` 现签名是 `(Key, RawKeyModifiers, PhysicalKey, string? keySymbol)`，physicalKey 与 keySymbol 都必填（`overlay.KeyPress(Key.C, RawInputModifiers.None, PhysicalKey.C, null)`）；`Window` 不再 IDisposable（别 `using var`）。
+3. **C 键空闲已核实 + 触发时机（review I-1）**：OverlayWindow 选框阶段原来只绑 Esc/Enter，C 无冲突；编辑器阶段无关（本功能只在 overlay）。开关绑在 **KeyUp** 而非 KeyDown——Avalonia 12 的 `KeyEventArgs` 无 `IsRepeat`/`Timestamp`（12.1.0 反编译核实），平台自动重复只连发 KeyDown，绑 KeyUp 后长按 C 只翻转一次、不闪屏不落随机态。交互含义：按住 C 时模式不变，松开才切换（用户可感知差异极小）。
+4. **Avalonia 12 headless 输入 API 变了**：`KeyPress` 现签名是 `(Key, RawKeyModifiers, PhysicalKey, string? keySymbol)`，physicalKey 与 keySymbol 都必填，且 **`KeyPress` 只发 KeyDown，KeyUp 是独立的 `KeyRelease`**（12.1.0 反编译核实）——模拟完整按键要两个都调（测试 helper `TapKey`）；`Window` 不再 IDisposable（别 `using var`）。
 5. **PendingStrokeColor 的语义**：进编辑器时应用（此时必无选中标注 → 落 CurrentStyle，与预设色点击同语义）；消费即清空；`OnAnyCancelled` 显式清空防泄漏进下一次会话。若用户取色后不确认也不取消（直接再按热键开新捕获），挂起色会留给下一次 EnterEditor——边缘场景，真机体验再定。
 6. **放大镜网格刻意不贴边搬移**：网格永远以光标为中心（中心格 = 光标所指像素），出界部分由 overlay 裁剪（flameshot 同款）；贴边搬移会让「中心格高亮」与实际采样点脱节。避让只做在浮签上（下→上翻转 + 横向钳 8px 安全边距，`MagnifierLayout` 纯函数有测试）。
 7. **HEX 大小写**：`ColorFormatter.ToHex` 小写 `#rrggbb`（对齐 Core `ToCssColor` 既有 config 风格，简报指定）；StylePanel 的 `StrokeHex` 显示仍是既有大写——两处各自内部一致，剪贴板内容 = 浮签所见。
@@ -62,7 +62,21 @@ kanban/issues/E-1-m9-color-picker.md             Done + Verification
 5. 取色模式下工具环隐藏、选框 hint 与取色 hint 互斥切换（两个 Border 按模式显隐）——切语言中途的刷新依赖 DynamicResource，覆盖没问题。
 6. `PRTSC_SNAPSHOT=1 artifacts/ui/50-overlay-picker.png` 是直接驱动放大镜属性的视觉态（模式接线由 headless 测试锁定），不是完整模式态截图。
 
-## 4. 下一步
+## 4. Review pass（2026-11-10 独立审查，发现清单见 /tmp/prtsc-sdd/batch4-review-findings.md）
+
+审查结论：通过，无 Critical；2 Important + 9 Minor。本批随交付清掉 I-1/I-2 与 M-1/2/3/4/7/8，M-5/M-6/M-9 由 PM 记录不修（M-5 会话级实为进程级、M-6 多屏取色模式互不同步、M-9 挂起色边缘场景——均已在 §2/§3 有据可查）。
+
+- **I-1（C 键长按自动重复）**：Avalonia 12 `KeyEventArgs` 无 `IsRepeat`/`Timestamp`（反编译核实，审查建议二选一里 Timestamp 不可用）→ 落地 **KeyUp 触发**：`OnKeyUp` 处理 `Key.C`，自动重复只连发 KeyDown 故长按只翻转一次；`OnKeyDown` 的 C 分支删除。钉住场景的新测试 `C_AutoRepeatKeyDownBurst_TogglesOnlyOnKeyUp`（RaiseEvent 直灌 5 连发 KeyDown 不翻转、每次 KeyUp 恰好翻转一次）。
+- **I-2（位图释放加固一跳）**：`MainWindow.CaptureRegionAsync` 的 displayShots 释放从 `Dispatcher.UIThread.Post` 再推迟一跳到 `DispatcherPriority.Background`（新局部函数 `DisposeShotsAfterRenderSettles`，confirm/cancel/setup-fail 三条路径统一走它），给 compositor 完整周期回收在途帧；§2.1 措辞已从「杜绝」收敛为如实描述（确定性路径堵死 + µs 级残余窗口压到实践不可达）。
+- **M-1**：放大镜浮签文字每帧整形一次（`BuildLabel` 产 `LabelVisual`，Size 测量与 Draw 共用同一组 FormattedText，原来 ×4 现在 ×2 且不再重复建）。
+- **M-2**：网格线粗细注释改准（1 DIP，2x 屏即 2 设备像素；PM 裁决保持 DIP 语义不动实现）。
+- **M-3**：`ClickInPickMode_SamplesExactPhysicalPixel_AtNonUnitScale` Theory（1.5/2.0）钉住 `round(dip × ScaleFactor)` 映射——1.5 下 (334,268)DIP → (501,402) 物理，2.0 下 (250,200)→(500,400)。
+- **M-4**：`EnterInPickMode_ExitsPickMode_AndConfirmsSelection` 直接钉 Enter 分支（退取色态 + 确认整屏 region）。
+- **M-7**：旧测试 `OverlayWindowInputTests.NewOverlay` 位图改 Closed 同寿（三道防线规矩回溯到既有测试）。
+- **M-8**：删无消费方的 `OverlayWindow.IsPicking`。
+- 测试 959 → **963 全绿**（Core 558 / App 142×2TFM / Mac 80 / Linux 45；App net10.0 连跑 6 次 + 本批全量两轮全绿）。
+
+## 5. 下一步
 
 - QA-1 真机冒烟补 E-1 项：128/192 dpi 对比系统取色器；复制 HEX 粘贴进输入框；历史行再取色。
 - L-1 CLI 若做 `--pick-color`，复用点：`ColorSampler`/`ColorFormatter`（纯 Core，无 UI 依赖），放大镜 UI 不可复用（overlay 专属）。

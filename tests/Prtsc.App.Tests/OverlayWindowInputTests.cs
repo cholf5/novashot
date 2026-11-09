@@ -88,7 +88,9 @@ public class OverlayWindowInputTests
             new PixelRect(0, 0, 1000, 800), 1.0, IsPrimary: true);
         var bmp = TestBitmaps.MakeSolid(1000, 800);
         var overlay = new OverlayWindow(bmp, display);
-        bmp.Dispose();
+        // review M-7：位图与 overlay 同寿（handoff §2.1 规矩）——overlay 现持有放大镜的位图引用，
+        // 构造后立刻 Dispose 会让任何后续点亮放大镜的改动踩渲染线程 SIGSEGV
+        overlay.Closed += (_, _) => bmp.Dispose();
         overlay.Show();
         overlay.UpdateLayout();
         adorner = overlay.FindControl<SelectionAdorner>("Adorner");

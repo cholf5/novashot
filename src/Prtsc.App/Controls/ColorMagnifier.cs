@@ -39,6 +39,7 @@ public sealed class ColorMagnifier : Control, ICustomHitTest
     private static readonly IBrush LabelBgBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD9, 0x10, 0x10, 0x14));
     private static readonly IBrush LabelFgBrush  = Brushes.White;
     private static readonly IBrush CopiedBrush   = new ImmutableSolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
+    // 网格线 1 DIP 粗（2x 屏即 2 设备像素）；review M-2 按裁决保持 DIP 语义、注释改准
     private static readonly IPen GridPen         = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0xB4, 0, 0, 0)), 1);
     private static readonly IPen CenterPenOuter  = new ImmutablePen(Brushes.Black, 2);
     private static readonly IPen CenterPenInner  = new ImmutablePen(Brushes.White, 1);
@@ -162,8 +163,8 @@ public sealed class ColorMagnifier : Control, ICustomHitTest
         var centerColor = colors[radius * (2 * radius + 1) + radius];
 
         var surface = new Size(Math.Max(1, Bounds.Width), Math.Max(1, Bounds.Height));
-        var labelSize = MeasureLabel(centerColor);
-        var placement = MagnifierLayout.ComputePlacement(cursor, new Size(side, side), labelSize, surface);
+        var label = BuildLabel(centerColor); // review M-1：文字整形每帧一次，测量与绘制共用
+        var placement = MagnifierLayout.ComputePlacement(cursor, new Size(side, side), label.Size, surface);
 
         // 网格：最近邻色块
         var origin = placement.Grid.TopLeft;
@@ -177,7 +178,7 @@ public sealed class ColorMagnifier : Control, ICustomHitTest
             }
         }
 
-        // 网格线（1 设备像素粗）
+        // 网格线（1 DIP 粗；2x 屏为 2 设备像素）
         var gridRect = placement.Grid;
         var halfLine = 1.0 / EffectiveScale / 2;
         for (int i = 1; i < 2 * radius + 1; i++)
@@ -196,46 +197,63 @@ public sealed class ColorMagnifier : Control, ICustomHitTest
         ctx.DrawRectangle(null, CenterPenInner, center);
 
         // 浮签
-        DrawLabel(ctx, placement.Label, centerColor);
+        label.Draw(ctx, placement.Label);
     }
 
     /// <summary>色块画刷：每帧新建但用 Immutable 变体（无线程仿亲，compositor 并发引用安全）。</summary>
     private static IBrush CellBrush(SKColor c)
         => new ImmutableSolidColorBrush(Color.FromArgb(c.Alpha, c.Red, c.Green, c.Blue));
 
-    private Size MeasureLabel(SKColor color)
+    /// <summary>review M-1：一帧内文字只整形一次——测量（MagnifierLayout 用 Size）与绘制共用同一组 FormattedText。</summary>
+    private LabelVisual BuildLabel(SKColor color)
     {
         if (CopiedFlash)
-        {
-            var t = MakeText(_copiedText!, CopiedBrush, 12);
-            return new Size(t.Width + 2 * LabelTextPadding, t.Height + 2 * LabelTextPadding);
-        }
-        var hex = MakeText(ColorFormatter.ToHex(color), LabelFgBrush, 12);
-        var rgb = MakeText(ColorFormatter.ToRgb(color), LabelFgBrush, 11);
-        return new Size(
-            Math.Max(hex.Width, rgb.Width) + 2 * LabelTextPadding,
-            hex.Height + rgb.Height + 3 * LabelTextPadding - 2);
+            return new LabelVisual(Copied: MakeText(_copiedText!, CopiedBrush, 12), Hex: null, Rgb: null);
+        return new LabelVisual(
+            Copied: null,
+            Hex: MakeText(ColorFormatter.ToHex(color), LabelFgBrush, 12),
+            Rgb: MakeText(ColorFormatter.ToRgb(color), LabelFgBrush, 11));
     }
 
-    private void DrawLabel(DrawingContext ctx, Rect labelRect, SKColor color)
+    /// <summary>浮签视觉（已复制单行 或 HEX/RGB 双行）。构造即整形，Size 与 Draw 不得再新建文本。</summary>
+    private readonly struct LabelVisual
     {
-        ctx.DrawRectangle(LabelBgBrush, null, labelRect);
+        private readonly FormattedText? _copied;
+        private readonly FormattedText? _hex;
+        private readonly FormattedText? _rgb;
 
-        if (CopiedFlash)
+        public LabelVisual(FormattedText? Copied, FormattedText? Hex, FormattedText? Rgb)
         {
-            var t = MakeText(_copiedText!, CopiedBrush, 12);
-            ctx.DrawText(t, new Point(
-                labelRect.X + LabelTextPadding,
-                labelRect.Y + labelRect.Height / 2 - t.Height / 2));
-            return;
+            _copied = Copied;
+            _hex = Hex;
+            _rgb = Rgb;
         }
 
-        var hex = MakeText(ColorFormatter.ToHex(color), LabelFgBrush, 12);
-        var rgb = MakeText(ColorFormatter.ToRgb(color), LabelFgBrush, 11);
-        ctx.DrawText(hex, new Point(labelRect.X + LabelTextPadding, labelRect.Y + LabelTextPadding));
-        ctx.DrawText(rgb, new Point(
-            labelRect.X + LabelTextPadding,
-            labelRect.Y + LabelTextPadding + hex.Height + LabelTextPadding - 2));
+        public Size Size => _copied is not null
+            ? new Size(_copied.Width + 2 * LabelTextPadding, _copied.Height + 2 * LabelTextPadding)
+            : new Size(
+                Math.Max(_hex!.Width, _rgb!.Width) + 2 * LabelTextPadding,
+                _hex.Height + _rgb.Height + 3 * LabelTextPadding - 2);
+
+        public void Draw(DrawingContext ctx, Rect labelRect)
+        {
+            ctx.DrawRectangle(LabelBgBrush, null, labelRect);
+
+            if (_copied is { } t)
+            {
+                ctx.DrawText(t, new Point(
+                    labelRect.X + LabelTextPadding,
+                    labelRect.Y + labelRect.Height / 2 - t.Height / 2));
+                return;
+            }
+
+            var hex = _hex!;
+            var rgb = _rgb!;
+            ctx.DrawText(hex, new Point(labelRect.X + LabelTextPadding, labelRect.Y + LabelTextPadding));
+            ctx.DrawText(rgb, new Point(
+                labelRect.X + LabelTextPadding,
+                labelRect.Y + LabelTextPadding + hex.Height + LabelTextPadding - 2));
+        }
     }
 
     /// <summary>浮签文字（Typeface 与 SelectionAdorner 尺寸标签一致）。</summary>

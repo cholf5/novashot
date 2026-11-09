@@ -523,6 +523,16 @@ public partial class MainWindow : Window
         var overlays = new List<OverlayWindow>();
         var displayShots = new List<CapturedImage>();
 
+        // E-1 M9 review I-2：抓帧位图的释放再推迟一跳（Background 优先级）——overlay 关闭时
+        // compositor 可能还有引用放大镜/背景位图的在途帧，本 hop 先让渲染管线回收完，
+        // 下一 hop 才 Dispose，堵住「在途帧 × 提前 Dispose」的 SIGSEGV 窗口（毫秒级延迟换确定性）。
+        void DisposeShotsAfterRenderSettles()
+        {
+            Dispatcher.UIThread.Post(
+                () => { foreach (var s in displayShots) s.Dispose(); },
+                DispatcherPriority.Background);
+        }
+
         try
         {
             var displays = _capture.EnumerateDisplays();
@@ -561,8 +571,7 @@ public partial class MainWindow : Window
                     }
                     finally
                     {
-                        // 显示器抓帧位图释放
-                        foreach (var s in displayShots) s.Dispose();
+                        DisposeShotsAfterRenderSettles(); // 显示器抓帧位图释放（延迟一跳）
                     }
                     Show();
                     Activate();
@@ -576,7 +585,7 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(() =>
                 {
                     CloseAll();
-                    foreach (var s in displayShots) s.Dispose();
+                    DisposeShotsAfterRenderSettles();
                     _vm.PendingStrokeColor = null; // E-1 M9：取色后取消捕获，挂起色不泄漏进下一次会话
                     if (wasVisible) { Show(); Activate(); }
                 });
@@ -609,7 +618,7 @@ public partial class MainWindow : Window
         {
             _logger.LogError(ex, "Region capture setup failed");
             foreach (var o in overlays) { try { o.Close(); } catch { } }
-            foreach (var s in displayShots) s.Dispose();
+            DisposeShotsAfterRenderSettles(); // 同 I-2：部分 overlay 可能已显示，位图释放同样延一跳
             if (wasVisible) Show();
         }
     }

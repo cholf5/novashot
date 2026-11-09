@@ -29,3 +29,4 @@ flameshot 最显眼的交互：截图时鼠标处放大镜 + 实时色值，点�
 - **测试**：880 → 959 全绿（Core 558 + App 138×2TFM + Mac 80 + Linux 45；Mac 曾见 1 例已知偶发，重跑全绿）。
 - **快照**：`PRTSC_SNAPSHOT=1` 新增 `artifacts/ui/50-overlay-picker.png`（放大镜 + 浮签视觉核对）。
 - **真机待办**（进 handoff 诚实清单）：128/192 dpi 屏对比系统取色器；剪贴板粘贴；放大镜在 2x 屏的观感。
+- **Review pass（2026-11-10，独立审查通过）**：I-1 C 键自动重复——Avalonia 12 无 IsRepeat/Timestamp，开关改绑 KeyUp（长按只翻转一次，headless 连发测试钉住）；I-2 抓帧位图释放再延一跳 `DispatcherPriority.Background`（compositor 回收在途帧）；M-1 浮签文字每帧整形一次、M-2 网格线注释改准、M-3 补 scale=1.5/2.0 映射断言、M-4 补 Enter 分支测试、M-7 旧测试位图同寿、M-8 删死代码 IsPicking；M-5/6/9 由 PM 记录不修。测试 959 → 963 全绿。

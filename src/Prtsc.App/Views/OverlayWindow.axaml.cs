@@ -44,8 +44,7 @@ public partial class OverlayWindow : Window
     /// <summary>E-1 M9：取色点击（含复制/历史记账之后的收尾通知）。外层把该色挂到编辑器描边色。</summary>
     public event EventHandler<SKColor>? StrokePicked;
 
-    /// <summary>取色模式开关（C 键切换）。</summary>
-    public bool IsPicking => _picking;
+    /// <summary>取色模式开关（C 键切换；显隐以放大镜 IsVisible 为准）。</summary>
     private bool _picking;
 
     public OverlayWindow() : this(null!, default!) { }
@@ -115,6 +114,7 @@ public partial class OverlayWindow : Window
             TryGetPlatformHandle()?.Handle ?? 0, _display);
 #endif
         KeyDown += OnKeyDown;
+        KeyUp += OnKeyUp;
         // 多屏时 overlay 间切换会触发 Deactivated；不再用它取消。用户只能通过 Esc/工具环取消。
 
         // E-1 M9：关闭时立刻摘掉放大镜对抓帧位图的引用——上位者（MainWindow）确认/取消后马上
@@ -171,13 +171,19 @@ public partial class OverlayWindow : Window
                 TryConfirmSelection();
                 e.Handled = true;
                 break;
-
-            case Key.C:
-                // E-1 M9：C 空闲（已核实 OverlayWindow 现只绑 Esc/Enter）→ 取色模式开关
-                TogglePickMode();
-                e.Handled = true;
-                break;
         }
+    }
+
+    /// <summary>
+    /// E-1 M9 + review I-1：取色模式开关绑 KeyUp 而非 KeyDown。
+    /// Avalonia 12 的 KeyEventArgs 无 IsRepeat/Timestamp（反编译 12.1.0 核实），平台自动重复
+    /// （长按 C，~30Hz）只连发 KeyDown——绑 KeyUp 后每次物理释放恰好翻转一次，长按不闪屏。
+    /// </summary>
+    private void OnKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.C) return;
+        TogglePickMode(); // C 空闲（已核实 OverlayWindow 现只绑 Esc/Enter）→ 取色模式开关
+        e.Handled = true;
     }
 
     // ------------------------------------------------------------------------
