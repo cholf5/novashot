@@ -172,7 +172,7 @@ public class DelayedCaptureCountdownTests
         Assert.Equal(3, countdown.TotalSeconds);
         Assert.Equal(3, countdown.RemainingSeconds);
         Assert.Equal(0, cancelled);
-        Assert.Single(scheduler.Tokens.Where(t => !t.IsDisposed)); // 旧 token 已销毁
+        Assert.Single(scheduler.Tokens, t => !t.IsDisposed); // 旧 token 已销毁（xUnit2031：用带谓词的重载）
 
         ticks.Clear(); // 只看新轮的 Tick 序列
         scheduler.FirePending();
@@ -215,5 +215,68 @@ public class DelayedCaptureCountdownTests
 
         Assert.Equal([3, 2, 1], remaining);
         Assert.Equal(1, countdown.RemainingSeconds);
+    }
+
+    // ---- 轮次号（review C-1：Completed 携带轮次，供 App 绑定 pending 意图） ----
+
+    [Fact]
+    public void Round_IncrementsPerStart_IncludingZeroPassThrough()
+    {
+        var (countdown, _) = Create();
+        Assert.Equal(0, countdown.Round); // 初始无轮
+
+        countdown.Start(3);
+        Assert.Equal(1, countdown.Round);
+        countdown.Start(0); // 零秒直通也算一轮
+        Assert.Equal(2, countdown.Round);
+        countdown.Start(2);
+        Assert.Equal(3, countdown.Round);
+    }
+
+    [Fact]
+    public void Completed_CarriesItsOwnRoundNumber()
+    {
+        var (countdown, scheduler) = Create();
+        var rounds = new List<long>();
+        countdown.Completed += (_, round) => rounds.Add(round);
+
+        countdown.Start(2);
+        scheduler.FirePending();
+        scheduler.FirePending();
+        Assert.Equal([1L], rounds);
+
+        countdown.Start(2);
+        scheduler.FirePending();
+        scheduler.FirePending();
+        Assert.Equal([1L, 2L], rounds);
+    }
+
+    [Fact]
+    public void ZeroPassThrough_CompletedCarriesRound()
+    {
+        var (countdown, _) = Create();
+        var rounds = new List<long>();
+        countdown.Completed += (_, round) => rounds.Add(round);
+
+        countdown.Start(0);
+        Assert.Equal([1L], rounds);
+    }
+
+    [Fact]
+    public void Start_Override_OldRoundNeverFiresCompleted()
+    {
+        var (countdown, scheduler) = Create();
+        var rounds = new List<long>();
+        countdown.Completed += (_, round) => rounds.Add(round);
+
+        countdown.Start(5);      // round 1
+        scheduler.FirePending(); // 旧轮 tick
+        countdown.Start(3);      // round 2：覆盖，旧 token 销毁，旧轮 Completed 永不到来
+
+        scheduler.FirePending();
+        scheduler.FirePending();
+        scheduler.FirePending();
+
+        Assert.Equal([2L], rounds); // 只有 round 2 完成；round 1 无 Completed
     }
 }

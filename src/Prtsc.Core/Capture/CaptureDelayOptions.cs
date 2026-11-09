@@ -30,4 +30,11 @@ public static class CaptureDelayOptions
         var index = Array.IndexOf(AllowedSeconds, clamped);
         return index < 0 ? 0 : index;
     }
+
+    /// <summary>
+    /// 咽喉点的延时解析（review M-2 抽出的纯函数）：显式意图（托盘延时子项 / Launcher）优先；
+    /// 未显式给值时取 config 默认并钳制。结果必为合法值（0 = 不延时）。
+    /// </summary>
+    public static int Resolve(int? explicitSeconds, int configuredSeconds)
+        => Math.Max(0, explicitSeconds ?? Clamp(configuredSeconds));
 }

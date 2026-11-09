@@ -28,10 +28,9 @@ public partial class App : Application
     private ILogger<App>? _logger;
     private IConfigStore? _store;
 
-    // D-1：延时截图倒计时（单实例；pending 意图挂在字段上，Completed 后走统一咽喉点）
-    private DelayedCaptureCountdown? _countdown;
+    // D-1：延时截图倒计时（Core Orchestrator 持有 pending 意图与轮次裁决；App 只做 marshal 与角标 UI）
+    private CountdownOrchestrator<CaptureIntent>? _countdown;
     private CountdownBadgeWindow? _countdownBadge;
-    private (HotkeyAction Action, PixelRect? Region)? _pendingCapture;
 
     /// <summary>角标关闭到抓帧的间隙（对齐既有 Hide+Delay(200) 防残影做法，取 250ms）。</summary>
     private const int CountdownToCaptureGapMs = 250;
@@ -274,14 +273,13 @@ public partial class App : Application
         if (_mainWindow == null) return;
         await Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            var delay = Math.Max(0, delaySeconds
-                ?? (_store is { } cfgStore
-                    ? CaptureDelayOptions.Clamp(cfgStore.Current.Capture.DelaySeconds)
-                    : 0));
+            // 延时解析（Core 纯函数，review M-2）：显式意图优先，否则 config 默认钳制
+            var delay = CaptureDelayOptions.Resolve(delaySeconds,
+                _store?.Current.Capture.DelaySeconds ?? 0);
 
             if (_countdown is { IsRunning: true })
             {
-                CancelCountdown();
+                _countdown.Cancel(); // 停状态机 + 清 pending + 关角标
                 if (source == CaptureTriggerSource.Hotkey)
                 {
                     // 唯一明确的取消手段（角标上有提示文案），本轮到此为止
@@ -291,12 +289,12 @@ public partial class App : Application
             }
             else
             {
-                _pendingCapture = null; // 清残留 pending（倒计时完成后 250ms 间隙内的新触发）
+                _countdown?.ClearPending(); // 清残留意图（finisher 尚在 250ms settle 间隙时的新触发；轮次裁决兜底）
             }
 
             if (delay > 0)
             {
-                StartCountdown(action, delay, region);
+                EnsureCountdown().Start(new CaptureIntent(action, region), delay);
                 return;
             }
 
@@ -332,42 +330,29 @@ public partial class App : Application
         }
     }
 
-    // ---- D-1：倒计时 + 角标窗（事件全部 marshal 回 UI 线程；Core 状态机单线程语义） ----
+    // ---- D-1：倒计时编排 + 角标窗（App 只做线程 marshal 与 UI；pending/轮次/settle 裁决都在 Core Orchestrator） ----
 
-    private void StartCountdown(HotkeyAction action, int seconds, PixelRect? region)
+    /// <summary>
+    /// 构建倒计时编排器（单实例）。线程接线：Start/Cancel/OnCompletedAsync 全部发生在 UI 线程
+    /// （Completed 由下面这行订阅 marshal 过去）；Started 在 Start 调用线程（=UI）同步触发，
+    /// Tick 在调度器线程触发故需 Post；dispatch 由 OnCompletedAsync 在 UI 线程调用。
+    /// </summary>
+    private CountdownOrchestrator<CaptureIntent> EnsureCountdown()
     {
-        EnsureCountdown();
-        _pendingCapture = (action, region);
-        _countdown!.Start(seconds); // Started 事件同步触发角标显示
-    }
-
-    private void CancelCountdown()
-    {
-        _countdown?.Cancel();
-        _pendingCapture = null;
-        CloseCountdownBadge();
-    }
-
-    private void EnsureCountdown()
-    {
-        if (_countdown is not null) return;
-        _countdown = new DelayedCaptureCountdown(CountdownScheduler.Instance);
-        _countdown.Started += (_, totalSeconds) =>
-            Dispatcher.UIThread.Post(() => ShowCountdownBadge(totalSeconds));
-        _countdown.Tick += (_, remainingSeconds) =>
-            Dispatcher.UIThread.Post(() => _countdownBadge?.UpdateRemaining(remainingSeconds));
-        _countdown.Completed += (_, _) => Dispatcher.UIThread.Post(() => _ = FinishCountdownAndCapture());
-    }
-
-    /// <summary>倒计时到点：先关角标，等 ≥250ms 让桌面合成器把角标撤干净，再走既有捕获流程（快照不含倒计时 UI）。</summary>
-    private async Task FinishCountdownAndCapture()
-    {
-        CloseCountdownBadge();
-        await Task.Delay(CountdownToCaptureGapMs);
-        var intent = _pendingCapture;
-        _pendingCapture = null;
-        if (intent is not { } pending || _mainWindow is null) return;
-        await DispatchCaptureAsync(pending.Action, pending.Region);
+        if (_countdown is not null) return _countdown;
+        var countdown = new DelayedCaptureCountdown(CountdownScheduler.Instance);
+        var orchestrator = new CountdownOrchestrator<CaptureIntent>(
+            countdown,
+            intent => _ = DispatchCaptureAsync(intent.Action, intent.Region),
+            settleDelay: TimeSpan.FromMilliseconds(CountdownToCaptureGapMs),
+            onStarted: ShowCountdownBadge,
+            onTick: remainingSeconds =>
+                Dispatcher.UIThread.Post(() => _countdownBadge?.UpdateRemaining(remainingSeconds)),
+            onBadgeClose: CloseCountdownBadge);
+        countdown.Completed += (_, round) =>
+            Dispatcher.UIThread.Post(() => _ = orchestrator.OnCompletedAsync(round));
+        _countdown = orchestrator;
+        return orchestrator;
     }
 
     private void ShowCountdownBadge(int totalSeconds)
@@ -420,3 +405,6 @@ public partial class App : Application
         return asm.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.1";
     }
 }
+
+/// <summary>D-1：一轮延时捕获的意图（绑定轮次号挂在 Core CountdownOrchestrator 上，C-1 裁决用）。</summary>
+internal readonly record struct CaptureIntent(HotkeyAction Action, PixelRect? Region);

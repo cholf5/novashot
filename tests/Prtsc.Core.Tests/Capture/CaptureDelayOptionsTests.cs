@@ -46,4 +46,18 @@ public class CaptureDelayOptionsTests
         Assert.Equal(0, CaptureDelayOptions.IndexOf(-7)); // 非法值钳到 0 → 下标 0
         Assert.Equal(2, CaptureDelayOptions.IndexOf(99));
     }
+
+    // —— Resolve（review M-2：咽喉点延时解析抽成 Core 纯函数） ——
+
+    [Theory]
+    [InlineData(3, 0, 3)]    // 显式意图优先（托盘延时子项 / Launcher）
+    [InlineData(0, 3, 0)]    // 显式 0 = 不延时，覆盖 config 默认
+    [InlineData(null, 3, 3)] // 无显式 → config 默认
+    [InlineData(null, 99, 5)] // config 非法值钳制
+    [InlineData(null, -1, 0)]
+    [InlineData(-2, 3, 0)]   // 显式负数归 0（防御，正常路径不出现）
+    public void Resolve_ExplicitWinsOtherwiseClampedConfig(int? explicitSeconds, int configured, int expected)
+    {
+        Assert.Equal(expected, CaptureDelayOptions.Resolve(explicitSeconds, configured));
+    }
 }
