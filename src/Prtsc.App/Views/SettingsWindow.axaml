@@ -257,6 +257,18 @@
             <CheckBox IsChecked="{Binding IncludeCursor}" Content="{DynamicResource L.Settings.Capture.IncludeCursor}" />
             <TextBlock Classes="hint" TextWrapping="Wrap" MaxWidth="480"
                        Text="{DynamicResource L.Settings.Capture.IncludeCursorHint}" />
+
+            <Border Height="1" Background="{DynamicResource Line}" Margin="0,4" />
+            <StackPanel Spacing="6">
+              <TextBlock Classes="flabel" Text="{DynamicResource L.Settings.Capture.Delay}" />
+              <ComboBox MinWidth="220" HorizontalAlignment="Left" SelectedIndex="{Binding CaptureDelayIndex}">
+                <ComboBoxItem Content="{DynamicResource L.Settings.Capture.Delay0}" />
+                <ComboBoxItem Content="{DynamicResource L.Settings.Capture.Delay3}" />
+                <ComboBoxItem Content="{DynamicResource L.Settings.Capture.Delay5}" />
+              </ComboBox>
+              <TextBlock Classes="hint" TextWrapping="Wrap" MaxWidth="480"
+                         Text="{DynamicResource L.Settings.Capture.DelayHint}" />
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
 

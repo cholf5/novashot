@@ -74,6 +74,12 @@ public sealed class CaptureConfig
 {
     /// <summary>截图是否把鼠标光标包含进画面（WGC IsCursorCaptureEnabled；仅 Windows 生效）。</summary>
     public bool IncludeCursor { get; set; } = true;
+
+    /// <summary>
+    /// 延时截图秒数（D-1）。合法值 0/3/5（0 = 不延时）；历史 config 里出现其他值时
+    /// 读取侧用 <see cref="Prtsc.Core.Capture.CaptureDelayOptions.Clamp"/> 钳到最近合法值。
+    /// </summary>
+    public int DelaySeconds { get; set; } = 0;
 }
 
 public sealed class EditorConfig

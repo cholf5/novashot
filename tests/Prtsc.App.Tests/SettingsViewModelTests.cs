@@ -40,6 +40,7 @@ public class SettingsViewModelTests
         vm.ExportIncludeBackground = false;
         vm.AutoCopyToClipboard = false;
         vm.IncludeCursor = false;
+        vm.CaptureDelayIndex = 2;
         vm.EditorPadding = 55;
         vm.EditorCornerRadius = 18;
         vm.EditorShadowSize = 30;
@@ -75,6 +76,7 @@ public class SettingsViewModelTests
         Assert.False(c.Export.IncludeBackground);
         Assert.False(c.Export.AutoCopyToClipboard);
         Assert.False(c.Capture.IncludeCursor);
+        Assert.Equal(5, c.Capture.DelaySeconds); // D-1：默认延时（下标 2 → 5 秒）
         Assert.Equal(55, c.Editor.Padding);
         Assert.Equal(18, c.Editor.CornerRadius);
         Assert.Equal(30, c.Editor.ShadowSize);
@@ -169,6 +171,19 @@ public class SettingsViewModelTests
         Assert.True(vm.IsJpegQualityVisible);
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 3)]
+    [InlineData(2, 5)]
+    public void Save_MapsCaptureDelayIndex(int index, int expectedSeconds)
+    {
+        var (vm, store, _) = Create();
+        vm.CaptureDelayIndex = index;
+
+        Assert.True(vm.Save());
+        Assert.Equal(expectedSeconds, store.Current.Capture.DelaySeconds);
+    }
+
     [Fact]
     public void LoadFromConfig_ReflectsCurrentValues()
     {
@@ -184,6 +199,7 @@ public class SettingsViewModelTests
             c.Editor.OutputRatio = "4:3";
             c.Editor.BorderType = "outside";
             c.Capture.IncludeCursor = false;
+            c.Capture.DelaySeconds = 3;
         });
 
         var vm = new SettingsViewModel(store, new StubAutostartService());
@@ -195,5 +211,6 @@ public class SettingsViewModelTests
         Assert.Equal(2, vm.EditorOutputRatioIndex);
         Assert.Equal(0, vm.BorderTypeIndex);
         Assert.False(vm.IncludeCursor);
+        Assert.Equal(1, vm.CaptureDelayIndex); // D-1：3 秒 → 下标 1
     }
 }

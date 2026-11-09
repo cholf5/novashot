@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Prtsc.App.Localization;
 using Prtsc.Core.Autostart;
+using Prtsc.Core.Capture;
 using Prtsc.Core.Config;
 using Prtsc.Core.Hotkeys;
 
@@ -53,6 +54,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     // —— 捕获 ——
     [ObservableProperty] private bool _includeCursor = true;
 
+    /// <summary>D-1 默认延时选择下标（0/1/2 → 0/3/5 秒，见 CaptureDelayOptions.AllowedSeconds）。</summary>
+    [ObservableProperty] private int _captureDelayIndex;
+
     // —— 编辑器默认值 ——
     [ObservableProperty] private int _editorPadding = 40;
     [ObservableProperty] private int _editorCornerRadius = 12;
@@ -101,6 +105,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         ExportIncludeBackground = c.Export.IncludeBackground;
         AutoCopyToClipboard = c.Export.AutoCopyToClipboard;
         IncludeCursor = c.Capture.IncludeCursor;
+        CaptureDelayIndex = CaptureDelayOptions.IndexOf(c.Capture.DelaySeconds); // 历史 config 的非法值钳回合法下标
         EditorPadding = c.Editor.Padding;
         EditorCornerRadius = c.Editor.CornerRadius;
         EditorShadowSize = c.Editor.ShadowSize;
@@ -157,6 +162,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             c.Export.IncludeBackground = ExportIncludeBackground;
             c.Export.AutoCopyToClipboard = AutoCopyToClipboard;
             c.Capture.IncludeCursor = IncludeCursor;
+            c.Capture.DelaySeconds = CaptureDelayOptions.AllowedSeconds[
+                Math.Clamp(CaptureDelayIndex, 0, CaptureDelayOptions.AllowedSeconds.Length - 1)];
             c.Editor.Padding = EditorPadding;
             c.Editor.CornerRadius = EditorCornerRadius;
             c.Editor.ShadowSize = EditorShadowSize;

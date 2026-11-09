@@ -605,6 +605,39 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// D-1/G-26：截取指定矩形（Capture Launcher 预置区域的路径）。
+    /// 物理像素、虚拟桌面坐标；调用方（App）已做钳界。主窗口隐藏 → 等残影消失 → 抓帧 → 编辑器。
+    /// </summary>
+    public async Task CapturePresetRegionAsync(PixelRect region)
+    {
+        _logger.LogInformation("Capture preset region {Rect} requested", region);
+        if (region.IsEmpty) return;
+
+        var wasVisible = IsVisible;
+        if (wasVisible)
+        {
+            Hide();
+            await Task.Delay(200);
+        }
+        try
+        {
+            var img = _capture.CaptureRegion(region);
+            _vm.EnterEditor(img);
+            Show();
+            Activate();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Preset region capture failed for {Rect}", region);
+            _vm.StatusText = Loc.T("Status.RegionFailed", ex.Message);
+            if (wasVisible) Show();
+        }
+    }
+
+    /// <summary>D-1：跨窗口状态提示（App 层在倒计时被取消时调用）。</summary>
+    public void ShowStatus(string text) => _vm.StatusText = text;
+
+    /// <summary>
     /// Window 捕获：弹出 <see cref="WindowPickerDialog"/> 让用户挑一个顶层窗口，
     /// 主窗口隐藏 → 等 250ms 让候选窗口浮到前台 → <see cref="ICaptureService.CaptureWindow"/> →
     /// 进入编辑器。用户取消 picker 则复原。

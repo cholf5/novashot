@@ -172,6 +172,13 @@ public class UiSnapshotTests
         Save(settings, "30-settings.png");
         settings.Close();
 
+        // Capture Launcher (G-26)：默认区域模式 + 主屏预填
+        var launcher = new CaptureLauncherWindow();
+        launcher.Show();
+        Pump(launcher);
+        Save(launcher, "40-launcher.png");
+        launcher.Close();
+
         var canvas = new Window
         {
             Width = 264, Height = 726,
