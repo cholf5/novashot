@@ -71,6 +71,13 @@
             <CheckBox IsChecked="{Binding CloseToTray}" Content="{DynamicResource L.Settings.General.CloseToTray}" />
             <CheckBox IsChecked="{Binding ShowNotification}" Content="{DynamicResource L.Settings.General.ShowNotification}" />
             <CheckBox IsChecked="{Binding CheckOnStartup}" Content="{DynamicResource L.Settings.General.CheckUpdates}" />
+            <!-- C-1/R-1：Velopack feed 地址（留空 = 不检查；policy 见 Core UpdateCheckPolicy） -->
+            <StackPanel Spacing="4">
+              <TextBox Text="{Binding FeedUrl}"
+                       Watermark="{DynamicResource L.Settings.General.FeedUrl}" />
+              <TextBlock Classes="hint" TextWrapping="Wrap"
+                         Text="{DynamicResource L.Settings.General.FeedUrlHint}" />
+            </StackPanel>
 
             <Border Height="1" Background="{DynamicResource Line}" Margin="0,4" />
             <StackPanel Spacing="8">

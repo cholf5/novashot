@@ -2,6 +2,7 @@ using Avalonia;
 using Prtsc.App.Logging;
 using Prtsc.Core.Config;
 using Serilog;
+using Velopack;
 
 namespace Prtsc.App;
 
@@ -13,6 +14,11 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // R-1：Velopack 入口钩子必须在 Main 最早处（vpk 安装器/更新器的 --velopack-* 参数在这里被消化）。
+        // 未打包环境（开发跑 / zip 便携）该调用安全空转：参数不匹配任何钩子，同时把默认 locator 装配好
+        // 供后续 UpdateManager.IsInstalled 判断使用。
+        VelopackApp.Build().Run();
+
         var configDir = JsonConfigStore.DefaultConfigDirectory();
         Directory.CreateDirectory(configDir);
 

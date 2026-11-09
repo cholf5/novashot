@@ -92,6 +92,10 @@ public partial class App : Application
             SetupTrayIcon();
             SetupHotkeys(store.Current.Hotkeys);
 
+            // C-1/R-1：启动更新检查（fire-and-forget）——policy 拒绝/未打包/无 feed/无网络全都静默，
+            // 有更新才弹非阻塞提示框；内部所有 Velopack 调用自带 try-catch，绝不阻塞启动路径
+            _ = Update.StartupUpdateChecker.RunOnStartupAsync(store, _mainWindow, _logger);
+
             desktop.Exit += (_, _) =>
             {
                 // E-2 跟进：退出前把防抖中的 config 改动（画布参数/窗口尺寸）同步落盘，

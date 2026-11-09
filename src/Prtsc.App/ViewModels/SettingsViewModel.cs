@@ -34,6 +34,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _closeToTray;
     [ObservableProperty] private bool _showNotification;
     [ObservableProperty] private bool _checkOnStartup;
+    [ObservableProperty] private string _feedUrl = "";
     [ObservableProperty] private int _languageIndex;
 
     // —— QuickSave ——
@@ -97,6 +98,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CloseToTray = c.Startup.CloseToTray;
         ShowNotification = c.Startup.ShowNotification;
         CheckOnStartup = c.Update.CheckOnStartup;
+        FeedUrl = c.Update.FeedUrl;
         LanguageIndex = MapTo(Languages, c.Language);
         QuickSaveFolder = c.QuickSave.Folder;
         QuickSavePatternIndex = MapTo(Patterns, c.QuickSave.Pattern);
@@ -154,6 +156,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             c.Startup.CloseToTray = CloseToTray;
             c.Startup.ShowNotification = ShowNotification;
             c.Update.CheckOnStartup = CheckOnStartup;
+            c.Update.FeedUrl = FeedUrl.Trim();
             c.Language = Languages[Math.Clamp(LanguageIndex, 0, Languages.Length - 1)];
             c.QuickSave.Folder = QuickSaveFolder.Trim();
             c.QuickSave.Pattern = Patterns[Math.Clamp(QuickSavePatternIndex, 0, Patterns.Length - 1)];

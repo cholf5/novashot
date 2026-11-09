@@ -111,6 +111,12 @@ public sealed class UpdateConfig
 {
     public bool CheckOnStartup { get; set; } = true;
     public string SkippedVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 更新 feed 地址（R-1 Velopack：自建 GitHub Releases 的 vpk feed URL）。
+    /// 空 = 不做启动检查（未打包/没配 feed 都不会检查，见 UpdateCheckPolicy.ShouldCheckOnStartup）。
+    /// </summary>
+    public string FeedUrl { get; set; } = string.Empty;
 }
 
 public sealed class CloudConfig

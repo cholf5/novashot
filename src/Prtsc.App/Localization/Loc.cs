@@ -367,6 +367,8 @@ internal static class Strings
         ["Settings.General.CloseToTray"] = "Close button hides to tray",
         ["Settings.General.ShowNotification"] = "Show capture notifications",
         ["Settings.General.CheckUpdates"] = "Check for updates on startup",
+        ["Settings.General.FeedUrl"] = "Update feed URL",
+        ["Settings.General.FeedUrlHint"] = "Velopack feed address — a GitHub Releases repo or a static host serving releases.win.json. Empty = never check.",
         ["Settings.General.Language"] = "Language",
         ["Settings.General.LangSystem"] = "System",
         ["Settings.General.LangEn"] = "English",
@@ -423,6 +425,18 @@ internal static class Strings
         ["Settings.Hint.HotkeyInvalid"] = "Invalid hotkey — pick a main key, optionally with Ctrl/Alt/Shift/Win",
         ["Settings.Hint.HotkeyDuplicate"] = "Two capture actions share the same hotkey",
         ["Settings.Hint.AutostartFailed"] = "Could not update launch-on-startup: {0}",
+
+        // ---- update prompt (C-1/R-1 velopack) ----
+        ["Update.Prompt.Title"] = "Update available",
+        ["Update.Prompt.Lede"] = "Prtsc {0} is available (current: {1}).",
+        ["Update.Prompt.Install"] = "Download and install",
+        ["Update.Prompt.Skip"] = "Skip this version",
+        ["Update.Prompt.Later"] = "Later",
+        ["Update.Prompt.Downloading"] = "Downloading… {0}%",
+        ["Update.Prompt.Restarting"] = "Update downloaded — restarting…",
+        ["Update.Prompt.DownloadFailed"] = "Update failed: {0}",
+        ["Update.Prompt.NoUpdateOnRetry"] = "No update found anymore — the feed changed?",
+        ["Status.UpdateCheckFailed"] = "Update check failed: {0}",
 
         // ---- window picker ----
         ["Picker.Title"] = "Capture a window",
@@ -692,6 +706,8 @@ internal static class Strings
         ["Settings.General.CloseToTray"] = "点 ✕ 隐藏到托盘",
         ["Settings.General.ShowNotification"] = "截图完成通知",
         ["Settings.General.CheckUpdates"] = "启动时检查更新",
+        ["Settings.General.FeedUrl"] = "更新 feed 地址",
+        ["Settings.General.FeedUrlHint"] = "Velopack feed 地址——GitHub Releases 仓库或提供 releases.win.json 的静态主机。留空 = 不检查更新。",
         ["Settings.General.Language"] = "语言",
         ["Settings.General.LangSystem"] = "跟随系统",
         ["Settings.General.LangEn"] = "English",
@@ -748,6 +764,18 @@ internal static class Strings
         ["Settings.Hint.HotkeyInvalid"] = "热键无效——需要一个主键，可搭配 Ctrl/Alt/Shift/Win",
         ["Settings.Hint.HotkeyDuplicate"] = "有两个截图动作共用了同一组热键",
         ["Settings.Hint.AutostartFailed"] = "开机自启设置失败：{0}",
+
+        // ---- update prompt (C-1/R-1 velopack) ----
+        ["Update.Prompt.Title"] = "有可用更新",
+        ["Update.Prompt.Lede"] = "Prtsc {0} 已发布（当前版本 {1}）。",
+        ["Update.Prompt.Install"] = "下载并安装",
+        ["Update.Prompt.Skip"] = "跳过此版本",
+        ["Update.Prompt.Later"] = "以后再说",
+        ["Update.Prompt.Downloading"] = "下载中… {0}%",
+        ["Update.Prompt.Restarting"] = "更新已下载，正在重启…",
+        ["Update.Prompt.DownloadFailed"] = "更新失败：{0}",
+        ["Update.Prompt.NoUpdateOnRetry"] = "feed 上没有找到更新——地址是不是变了？",
+        ["Status.UpdateCheckFailed"] = "更新检查失败：{0}",
 
         // ---- window picker ----
         ["Picker.Title"] = "选择要截取的窗口",

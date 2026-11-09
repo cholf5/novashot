@@ -32,6 +32,7 @@ public class SettingsViewModelTests
         vm.CloseToTray = false;
         vm.ShowNotification = false;
         vm.CheckOnStartup = false;
+        vm.FeedUrl = "  https://github.com/cholf5/prtsc/releases  ";
         vm.LanguageIndex = 2;
         vm.QuickSaveFolder = "/tmp/shots";
         vm.QuickSavePatternIndex = 1;
@@ -68,6 +69,7 @@ public class SettingsViewModelTests
         Assert.False(c.Startup.CloseToTray);
         Assert.False(c.Startup.ShowNotification);
         Assert.False(c.Update.CheckOnStartup);
+        Assert.Equal("https://github.com/cholf5/prtsc/releases", c.Update.FeedUrl); // C-1：草稿 Trim 后落盘
         Assert.Equal("zh-CN", c.Language);
         Assert.Equal("/tmp/shots", c.QuickSave.Folder);
         Assert.Equal("date", c.QuickSave.Pattern);

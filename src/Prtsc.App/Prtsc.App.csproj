@@ -37,6 +37,8 @@
     </PackageReference>
 
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <!-- R-1：Velopack 更新器运行时（双 TFM 都引用，交叉平台包）。打包侧 vpk 见 scripts/pack-windows.sh -->
+    <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
