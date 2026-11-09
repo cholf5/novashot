@@ -43,7 +43,7 @@ kanban/issues/G-26-capture-launcher.md             新建（Done）
 25. **NativeMenuItem 子菜单**：`new NativeMenuItem(title) { Menu = new NativeMenu() }`；Text 是普通字符串，切语言靠 `RebuildTrayMenu` 整表重建（既有机制，新增项自动跟随）。
 26. **角标定位用 WorkArea 不是 Bounds**：macOS 顶部有菜单栏、Windows 任务栏可能在顶部，`DisplayInfo.WorkArea` 两边都已排除；物理像素坐标直接给 `Window.Position`（PixelPoint 就是物理像素）。
 27. **Launcher 关窗时机**：`Close()` 后 `Task.Delay(200)` 才触发捕获（本窗残影入快照的风险与 Hide+Delay(200) 同源）；delay>0 时反正还有倒计时+250ms，双保险。
-28. **`Dispatcher.UIThread.Post(async () => …)`** 是 async void——异常会炸进程，FinishCountdownAndCapture 内部自兜 try 语义（DispatchCaptureAsync 各分支已有 catch）。
+28. **`Dispatcher.UIThread.Post(async () => …)`** 是 async void——异常会炸进程，DispatchCaptureAsync 各分支内部已有 catch 兜底（review pass 后 `FinishCountdownAndCapture` 已删除，倒计时完成路径同样收敛到 DispatchCaptureAsync）。
 
 ## 3. 诚实清单（未经真机验证）
 

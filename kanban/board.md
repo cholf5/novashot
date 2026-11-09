@@ -10,11 +10,9 @@
 - B-3 跨屏选框（多显示器 overlay 覆盖虚拟桌面）（P2）
 - B-4 crop 后 reshape 手柄（复用 BoxHandles）（P3）
 - B-6 工具栏按钮自定义（flameshot 式可见工具配置）（P3）
-- G-26 Capture Launcher 独立窗口（X/Y/W/H + 延时 + 模式单选；与 D-1 合并做）（P3）
 
 ## To Do
-- C-1 M7 云上传/Library/Updater/Pin（R2=S3 兼容 PUT + GDrive multipart + Library(library.json+缩略图) + Updater + Pin 贴图；凭据键 Prtsc_R2_*/Prtsc_GDrive_*，不迁移 WinShot 凭据）（P1）
-- S-1 M8 设置中心 GUI（常规/启动/热键录制/QuickSave/导出质量滑杆/编辑器默认值/WGC 光标开关/**语言切换（先只在托盘菜单，需搬进来）**；保存后热键重注册；吸收 backlog 导出滑杆与光标开关两项）（P1）
+- C-1 M7 云上传/Library/Updater/Pin（R2=S3 兼容 PUT + GDrive multipart + Library(library.json+缩略图) + Updater + Pin 贴图；凭据键 Prtsc_R2_*/Prtsc_GDrive_*，不迁移 WinShot 凭据）（P1）——仅剩 Updater 子任务，与 R-1 合并执行
 - D-1 M9 延时截图（托盘菜单 3s/5s + Capture.DelaySeconds；overlay 不得先于快照出现；winshot/flameshot 均有而 prtsc 缺）（P1）
 - E-1 M9 屏幕取色器（放大镜 + HEX/RGB 浮签 + 点击复制，可设为描边色；flameshot 招牌交互）（P2）
 - N-1 M9 桌面通知（托盘气球通知，导出/QuickSave/上传/复制触发，ShowNotification 字段已备）（P2）
@@ -37,6 +35,8 @@
 - 
 
 ## Done
+- D-1+G-26 延时截图 + Capture Launcher：Core `DelayedCaptureCountdown`（单 Monitor 锁全覆盖状态迁移）+ `CountdownOrchestrator`（pending 绑定轮次号，settle 裁决下沉 Core）+ `CaptureDelayOptions.Resolve`（延时解析纯函数）；托盘「延时截图」3s/5s 子项 + 设置页默认延时（0/3/5 钳制）+ 倒计时角标窗（WorkArea 定位，关窗后 250ms 才抓帧）；取消语义=热键取消本轮/再触发取消旧轮按新意图；G-26 启动器窗口（全屏/区域单选 + X/Y/W/H 越界钳制 + 延时 + 开始截图，走同一咽喉点）；独立 review 报 1 Critical（250ms 间隙竞态→角标入快照）+1 Important（线程池回调违约）全修复（`42100d7`，C-1/I-1 均有「去实现即挂」回归用例）；测试 727/727（Core 502 + App 100×2TFM + Mac 80 + Linux 45）；快照 `artifacts/ui/40-launcher.png`；真机待验项入 handoff 261110 §3 与 QA-1（2026-11-10）
+- S-1 M8 设置中心 GUI：六分区设置窗口（常规/热键/QuickSave/导出/编辑器默认值/捕获），整窗草稿 + 保存/取消语义；语言入口从托盘搬进设置（托盘语言子菜单删除）；热键录制控件（KeyCombo→HotkeyParser spec 串，Esc/纯修饰键/NumPad 拒绝）+ 保存一刻原子发生（自启切换→config Update→热键重注册→语言全局刷新）；新 Core 字段 Capture.IncludeCursor（WGC 光标开关）；独立 reviewer 报 1 Critical + 4 Important 全修复（`19bfde1`：Windows 泵线程权威 `_registeredIds` 防重注册竞态、Linux 补 XUngrabKey、重复热键提示、Loc.ApplyStoredPreference、IncludeCursor 复制）；测试 635+91 全绿；未真机项入 `docs/qa/261102-smoke-checklist.md`（⚑ 段 I/J）；handoff `261102-s1-settings-handoff.md`（2026-11-02）
 - U-1 透明背景预览可见性：`TransparencyChecker`（Core，瓦片 shader 棋盘格）+ `SkiaCanvas` 在 `Background=None` 时于内容区铺暗色占位格（编辑器 chrome，不进导出）+ 面板 None 项 ToolTip；先 RED 后 GREEN，Core 新增 6 例单测，快照 `artifacts/ui/05-editor-transparent-bg.png` 人工核对；全量 Core 438 + App 97×2TFM + Mac 80 + Linux 45；存量 flake 与本卡无关：SettingsWindowXamlTests（并行）/ MacClipboardServiceTests.ManualRoundtrip（并行）（2026-11-03）
 - E-2 画布参数持久化：Core `EditorConfigMapper` 双向映射（FromConfig 出初始态 / ApplyTo 回写，外观字段 round-trip 有测试钉死）+ 画布面板 `Apply` 咽喉点 `CanvasStateChanged` 回调 + 主 VM UI 线程同步回写内存、500ms 防抖写盘、ReturnToCapture flush；「编辑器默认值」语义升级为「上次使用的画布参数」。顺带修三件：showBackground 死字段激活（None↔false 双向）、GradientParser.ParseColor 8 位 CSS #rrggbbaa 通道纠正（SKColor.Parse 原生按 #aarrggbb 读）与 ArgumentException 捕获（"#gg0000" 不再炸）、ToCssColor 小写对齐 config 风格；测试 651/651（Core 432 + App 94×2TFM + Mac 80 + Linux 45）；已知存量：SettingsWindowXamlTests 全解决方案并行下偶发 flake（stash 基线复现，与本卡无关）（2026-11-03）
 - UI-1 视觉重设计 + i18n：Theme 层（Tokens/Icons/ControlTheme）替掉默认 Fluent，IBM Plex 随包；编辑器 dock（修工具栏溢出）+ Style/Canvas 分页；主窗口命令列表 + 最近 4 张；Library/云设置/窗口选择器/确认环重绘；Loc.cs 双语文案表 + 托盘切语言（config.language）；headless 视觉快照（PRTSC_SNAPSHOT=1，artifacts/ui/）；测试 666/666（Core 414 + Mac 80 + Linux 44 + App 64×2TFM）；明细见 handoff 261102 §3/§4（2026-11-02）
