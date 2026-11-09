@@ -47,7 +47,4 @@
 7. **Review pass（2026-11-10 独立审查）**：I-1 默认配置双/三 toast 判违背验收精神 → `Copy(notifyCopied)`
    拆分 + 管线内 `CopySilently()`（手动复制仍通知，不动 NotificationPolicy）；M-1/M-2/M-4 随手清；
    M-3/M-5 PM 记录。终态 1020 全绿。详见 `docs/handoff/261110-n1-notifications-handoff.md` Review pass 段。
-7. **Review pass（2026-11-10 独立审查）**：I-1 默认配置双/三 toast 判违背验收精神 → `Copy(notifyCopied)`
-   拆分 + 管线内 `CopySilently()`（手动复制仍通知，不动 NotificationPolicy）；M-1/M-2/M-4 随手清；
-   M-3/M-5 PM 记录。终态 1020 全绿。详见 `docs/handoff/261110-n1-notifications-handoff.md` Review pass 段。
 8. 真机项（toast 实弹、点击开目录、未打包降级、专注助手拦截）→ QA-1 §K + handoff 诚实清单。
