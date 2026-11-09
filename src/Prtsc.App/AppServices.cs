@@ -63,7 +63,8 @@ public static class AppServices
             sp.GetService<IUploadService>(),
             sp.GetService<Prtsc.Core.Library.LibraryStore>(),
             sp.GetService<ILogger<MainWindowViewModel>>(),
-            sp.GetService<Prtsc.Core.Editor.ColorHistory>()));
+            sp.GetService<Prtsc.Core.Editor.ColorHistory>(),
+            sp.GetService<Prtsc.Core.Notifications.INotificationService>()));
 
         _provider = services.BuildServiceProvider();
     }

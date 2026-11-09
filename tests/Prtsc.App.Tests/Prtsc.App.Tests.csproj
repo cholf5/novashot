@@ -7,6 +7,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!-- N-1：与 Prtsc.App 同款 TFM 常量——测试可 #if WIN_PLATFORM 分腿断言平台装配（仅编译差异） -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) == 'windows'">
+    <DefineConstants>$(DefineConstants);WIN_PLATFORM</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia.Headless" Version="12.1.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />

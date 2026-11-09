@@ -5,6 +5,7 @@ using Prtsc.Core.Autostart;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Clipboard;
 using Prtsc.Core.Hotkeys;
+using Prtsc.Core.Notifications;
 using Prtsc.Core.Windows;
 using Prtsc.Platform.Mac.Autostart;
 using Prtsc.Platform.Mac.Capture;
@@ -33,6 +34,10 @@ public static class MacServiceCollectionExtensions
         services.TryAddSingleton<IProcessRunner, SystemProcessRunner>();
         services.TryAddSingleton<IAutostartService, LaunchdAutostartService>();
         services.TryAddSingleton<IClipboardService, MacClipboardService>();
+
+        // N-1：mac 本卡不做原生通知（UNUserNotificationCenter 未排期，见 issue handoff）；
+        // Core 已默认注册 Null，这里显式钉住装配意图（TryAdd 幂等）
+        services.TryAddSingleton<INotificationService, NullNotificationService>();
         return services;
     }
 }

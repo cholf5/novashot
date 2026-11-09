@@ -303,6 +303,7 @@ public partial class MainWindow : Window
             _logger.LogInformation("Exported {Path} ({Format}, {Width}x{Height})",
                 path, format, editor.ContentWidth, editor.ContentHeight);
             _vm.StatusText = Loc.T("Status.Exported", path);
+            _vm.NotifyExported(path); // N-1：手动导出成功即通知（QuickSave 路径的通知在 VM 内）
 
             await RecordLibraryAfterExportAsync(path, editor);
 

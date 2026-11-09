@@ -321,6 +321,16 @@ internal static class Strings
         ["Status.CaptureFailed"] = "Capture failed: {0}",
         ["Status.WindowFailed"] = "Window capture failed: {0}",
 
+        // ---- N-1 desktop notifications（toast 双行：title + message；开关见 Settings.General.ShowNotification） ----
+        ["Notify.Exported.Title"] = "Screenshot saved",
+        ["Notify.Exported.Message"] = "Saved to {0}",
+        ["Notify.QuickSaved.Title"] = "Quick save complete",
+        ["Notify.QuickSaved.Message"] = "Saved to {0}",
+        ["Notify.Copied.Title"] = "Copied to clipboard",
+        ["Notify.Copied.Message"] = "{0} × {1} pixels",
+        ["Notify.Uploaded.Title"] = "Upload complete",
+        ["Notify.Uploaded.Message"] = "{0}",
+
         // ---- delayed capture (D-1) ----
         ["Delay.BadgeCancelHint"] = "Press a capture hotkey to cancel",
 
@@ -662,6 +672,16 @@ internal static class Strings
         ["Status.RegionFailed"] = "区域截图失败：{0}",
         ["Status.CaptureFailed"] = "截图失败：{0}",
         ["Status.WindowFailed"] = "窗口截图失败：{0}",
+
+        // ---- N-1 desktop notifications（toast 双行：title + message；开关见 Settings.General.ShowNotification） ----
+        ["Notify.Exported.Title"] = "截图已保存",
+        ["Notify.Exported.Message"] = "已保存到 {0}",
+        ["Notify.QuickSaved.Title"] = "快速保存完成",
+        ["Notify.QuickSaved.Message"] = "已保存到 {0}",
+        ["Notify.Copied.Title"] = "已复制到剪贴板",
+        ["Notify.Copied.Message"] = "{0} × {1} 像素",
+        ["Notify.Uploaded.Title"] = "上传完成",
+        ["Notify.Uploaded.Message"] = "{0}",
 
         // ---- delayed capture (D-1) ----
         ["Delay.BadgeCancelHint"] = "按任意截图热键取消",

@@ -4,11 +4,13 @@ using Prtsc.Core.Autostart;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Clipboard;
 using Prtsc.Core.Hotkeys;
+using Prtsc.Core.Notifications;
 using Prtsc.Core.Windows;
 using Prtsc.Platform.Windows.Autostart;
 using Prtsc.Platform.Windows.Capture;
 using Prtsc.Platform.Windows.Clipboard;
 using Prtsc.Platform.Windows.Hotkeys;
+using Prtsc.Platform.Windows.Notifications;
 using Prtsc.Platform.Windows.Windowing;
 
 namespace Prtsc.Platform.Windows;
@@ -26,6 +28,10 @@ public static class WindowsServiceCollectionExtensions
         services.TryAddSingleton<IAutostartService, RegistryAutostartService>();
         services.TryAddSingleton<IWindowService, WindowEnumerator>();
         services.TryAddSingleton<IClipboardService, WindowsClipboardService>();
+
+        // N-1：Core 已默认注册 Null → 移除后换 WinRT Toast（未打包 AUMID 未注册时服务内自吞降级为日志）
+        services.RemoveAll<INotificationService>();
+        services.TryAddSingleton<INotificationService, ToastNotificationService>();
         return services;
     }
 }

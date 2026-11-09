@@ -94,3 +94,17 @@
 ## J. Linux 真机段
 
 - [ ] 设置里改热键保存 → 旧组合不再触发、新组合生效（XUngrabKey 修复，I3）
+
+## K. N-1 桌面通知真机段（Windows toast 只能实弹验；2026-11-10 追加）
+
+> 接线与开关判定已有单测（Core 578 / App 154×2TFM）；本段全部是 Windows toast 实弹项，
+> mac/Linux 本卡为 Null 静默（无通知 UI，验「完全无感不炸」即可）。
+
+- [ ] **安装版 toast 实弹**（vpk Setup.exe 装好 → 开始菜单快捷方式在册）：编辑器导出成功 → Windows 右下角弹「Screenshot saved / 截图已保存」toast，正文带保存路径；QuickSave（`Ctrl+Q`）→「快速保存完成」；`Ctrl+C` →「已复制到剪贴板」；配渠道上传成功 →「上传完成」正文含 URL（handoff 诚实清单：本机 macOS 只能交叉编译，未实弹）
+- [ ] **点击 toast 开目录**：QuickSave/导出的 toast 点击 → explorer 打开并选中该文件（`explorer /select,<path>`）；上传/复制类 toast 点击无动作（无 path，尽力而为语义）
+- [ ] **未打包降级**：`dotnet run`（或便携 zip，无开始菜单快捷方式 → AUMID `Prtsc` 未注册）→ toast 可能不弹，但**绝不崩溃**，日志只有一条 Warning（`Toast notification failed`）；导出/复制/上传主流程不受影响
+- [ ] **开关全关**：设置 → 常规 → 取消「截图完成通知」→ 保存 → 导出/QuickSave/复制/上传全部静默（无任何 toast）；重新勾选 → 恢复
+- [ ] **失败不扰**：通知被系统「专注助手/勿扰」拦截或通知权限关掉时，截图流程零感知
+- [ ] mac/Linux 冒烟：通知开关开/关两种状态下正常截图导出（Null 服务静默，无窗口、无报错、无日志异常）
+- [ ] 默认配置（`Export.AutoCopyToClipboard=true`）导出一次 → 观察 toast 数量：预期为 2 条（导出 + 自动复制），若观感过于吵闹记 ❌ 开卡（见 handoff 已知观感项）
+

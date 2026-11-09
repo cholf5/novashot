@@ -8,9 +8,11 @@ using Prtsc.Core.Annotation;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Clipboard;
 using Prtsc.Core.Cloud;
+using Prtsc.App.Notifications;
 using Prtsc.Core.Config;
 using Prtsc.Core.Editor.Export;
 using Prtsc.Core.Library;
+using Prtsc.Core.Notifications;
 using SkiaSharp;
 
 namespace Prtsc.App.ViewModels;
@@ -29,6 +31,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly LibraryStore? _library;
     private readonly ILogger? _logger;
 
+    /// <summary>N-1：桌面通知服务（Windows=WinRT Toast / 其余 Null 静默）。可为 null（DI 外旧构造）。</summary>
+    private readonly INotificationService? _notifications;
+
     /// <summary>E-2：画布参数写盘防抖（内存回写在 UI 线程同步做，防抖的只是磁盘 IO）。</summary>
     private static readonly TimeSpan ConfigSaveDebounce = TimeSpan.FromMilliseconds(500);
     private CancellationTokenSource? _configSaveDebounceCts;
@@ -36,7 +41,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel(IClipboardService clipboard, IConfigStore? configStore = null,
         IUploadService? upload = null, LibraryStore? library = null, ILogger? logger = null,
-        Prtsc.Core.Editor.ColorHistory? colorHistory = null)
+        Prtsc.Core.Editor.ColorHistory? colorHistory = null,
+        INotificationService? notifications = null)
     {
         _clipboard = clipboard;
         _configStore = configStore;
@@ -44,6 +50,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _library = library;
         _logger = logger;
         _colorHistory = colorHistory;
+        _notifications = notifications;
     }
 
     /// <summary>DI 外（测试）直接 new 时的兼容构造。</summary>
@@ -301,7 +308,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             using var image = Prtsc.Core.Editor.Export.ImageExporter.Render(editor.Document, editor.CompositionState);
             using var bitmap = SKBitmap.FromImage(image);
             if (_clipboard.TrySetImage(bitmap))
+            {
                 StatusText = Loc.T("Status.Copied", bitmap.Width, bitmap.Height);
+                NotifyCopied(bitmap.Width, bitmap.Height); // N-1：手动 Copy 与导出后自动复制同走这里
+            }
             else
                 StatusText = Loc.T("Status.CopyBusy");
         }
@@ -330,6 +340,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // G-9（winshot）：QuickSave 成功后自动复制文件路径（导出/粘贴后可直接粘进聊天）
             var copiedPath = _clipboard.TrySetText(path);
             StatusText = copiedPath ? Loc.T("Status.QuickSavedPath", path) : Loc.T("Status.QuickSaved", path);
+            NotifyQuickSaved(path); // N-1：落盘成功即通知（托盘常驻场景无焦点窗口也能看到）
         }
         catch (Exception ex)
         {
@@ -339,6 +350,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     private bool CanQuickSave() => Editor is not null && _configStore is not null;
+
+    // ---- N-1: desktop notifications（四处触发点的统一出口：SuccessNotifier 内判 policy + 自吞异常） ----
+
+    /// <summary>导出成功通知（MainWindow 导出落盘后调用；QuickSave/复制/上传在 VM 内自调）。</summary>
+    public void NotifyExported(string path) =>
+        SuccessNotifier.Notify(_notifications, _configStore, NotificationEvent.Exported,
+            Loc.T("Notify.Exported.Title"), Loc.T("Notify.Exported.Message", path), path, _logger);
+
+    private void NotifyQuickSaved(string path) =>
+        SuccessNotifier.Notify(_notifications, _configStore, NotificationEvent.QuickSaved,
+            Loc.T("Notify.QuickSaved.Title"), Loc.T("Notify.QuickSaved.Message", path), path, _logger);
+
+    private void NotifyCopied(int width, int height) =>
+        SuccessNotifier.Notify(_notifications, _configStore, NotificationEvent.Copied,
+            Loc.T("Notify.Copied.Title"), Loc.T("Notify.Copied.Message", width, height), filePath: null, _logger);
+
+    /// <summary><paramref name="detail"/>：有 URL 带 URL，无 URL 退文件名。</summary>
+    private void NotifyUploaded(string detail) =>
+        SuccessNotifier.Notify(_notifications, _configStore, NotificationEvent.Uploaded,
+            Loc.T("Notify.Uploaded.Title"), Loc.T("Notify.Uploaded.Message", detail), filePath: null, _logger);
 
     // ---- M7b: cloud upload + library + pin ----
 
@@ -370,9 +401,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             if (outcome.Url is { } url && _clipboard.TrySetText(url))
+            {
                 StatusText = Loc.T("Status.UploadedUrl", outcome.Entry?.FileName, url);
+                NotifyUploaded(url); // N-1：正文带 URL
+            }
             else
+            {
                 StatusText = Loc.T("Status.Uploaded", outcome.Entry?.FileName);
+                NotifyUploaded(outcome.Entry?.FileName ?? string.Empty);
+            }
         }
         catch (OperationCanceledException)
         {

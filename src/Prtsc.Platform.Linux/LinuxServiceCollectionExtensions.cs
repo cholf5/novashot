@@ -5,6 +5,7 @@ using Prtsc.Core.Autostart;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Clipboard;
 using Prtsc.Core.Hotkeys;
+using Prtsc.Core.Notifications;
 using Prtsc.Core.Windows;
 using Prtsc.Platform.Linux.Autostart;
 using Prtsc.Platform.Linux.Capture;
@@ -32,6 +33,10 @@ public static class LinuxServiceCollectionExtensions
         services.TryAddSingleton<IHotkeyService, LinuxHotkeyService>();
         services.TryAddSingleton<IAutostartService, XdgAutostartService>();
         services.TryAddSingleton<IClipboardService, LinuxClipboardService>();
+
+        // N-1：linux 本卡不做原生通知（AppIndicator/libnotify 未排期，见 issue handoff）；
+        // Core 已默认注册 Null，这里显式钉住装配意图（TryAdd 幂等）
+        services.TryAddSingleton<INotificationService, NullNotificationService>();
         return services;
     }
 }
