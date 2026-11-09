@@ -21,7 +21,7 @@
 - 
 
 ## Testing / QA
-- QA-1 真机人工冒烟（**UI-1 改版后清单要重写**：dock 15 工具点选/hover/热键 + 面板 tab + 色块选中环 + 滑杆 + ⋯ 菜单 + ToolTip + 最近 4 张点击回编辑器 + zh/en 切换全窗口 + 托盘语言菜单；再叠加原 M4–M6d 项：选择/撤销、裁剪(X/比例/A 取色)、Copy/Ctrl+V/Ctrl+Q、Word/微信/Chrome 剪贴板互通、三种捕获、托盘、WindowPicker）（P0）
+- QA-1 真机人工冒烟（**UI-1 改版后清单要重写**：dock 15 工具点选/hover/热键 + 面板 tab + 色块选中环 + 滑杆 + ⋯ 菜单 + ToolTip + 最近 4 张点击回编辑器 + zh/en 切换全窗口 + 托盘语言菜单；再叠加原 M4–M6d 项：选择/撤销、裁剪(X/比例/A 取色)、Copy/Ctrl+V/Ctrl+Q、Word/微信/Chrome 剪贴板互通、三种捕获、托盘、WindowPicker）（P0）——**2026-11-10 已追加 §K 通知 / §L 导入 / §M 延时+Launcher / §N 取色器 / §O CLI 五段**（M9/M10 真机项入清单，待真机执行）
 - QA-L1 Linux 真机冒烟（X11 三捕获/热键/xclip 两环境/自启/多屏负坐标/KDE+GNOME；清单见 handoff 261101-linux1 §6）（P1）
 
 ## Blocked
