@@ -1,0 +1,113 @@
+# Prtsc CI（R-1）。
+#
+# 测试矩阵 = 三个 runner 各跑自己平台能跑的腿（划分对齐本地基线口径
+# Core 502 / App 105×2TFM / Mac 80 / Linux 45）：
+#   windows-latest → Core + App 的 windows TFM 腿（App 的 net10.0 腿带 mac 平台 P/Invoke，Windows 上不跑）
+#   ubuntu-latest  → Core + Linux.Tests + App 的 net10.0 腿
+#   macos-latest   → Mac.Tests + App 的 net10.0 腿
+#
+# tag push（v*）追加 release job：版本号断言（tag == Directory.Build.props <Version>）
+# → scripts/pack-windows.sh（windows-latest 上跑，self-contained win-x64）
+# → Setup.exe / Portable.zip / nupkg + sha256 清单传 GitHub Release。
+# 更新 feed（releases.win.json / RELEASES / full.nupkg）就在这批产物里，Release 页面即 vpk feed 托管点。
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Core + App (windows TFM)
+        run: |
+          dotnet test tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj
+          dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0-windows10.0.19041.0
+
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Core + Linux + App (net10.0 leg)
+        run: |
+          dotnet test tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj
+          dotnet test tests/Prtsc.Linux.Tests/Prtsc.Linux.Tests.csproj
+          dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Mac + App (net10.0 leg)
+        run: |
+          dotnet test tests/Prtsc.Mac.Tests/Prtsc.Mac.Tests.csproj
+          dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0
+
+  release:
+    # 仅 tag push（v*）打包发布。需要 tag 与仓库版本一致，防呆。
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-windows, test-linux, test-macos]
+    runs-on: windows-latest
+    permissions:
+      contents: write # gh release 上传产物
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # 版本单调性检查（简单断言）：tag v0.2.0 必须等于 Directory.Build.props 的 <Version>0.2.0</Version>
+      - name: Assert tag == build version
+        shell: pwsh
+        run: |
+          $props = Get-Content Directory.Build.props -Raw
+          if ($props -notmatch '<Version>([^<]+)</Version>') { throw "no <Version> in Directory.Build.props" }
+          $version = $Matches[1].Trim()
+          $tagVersion = $env:TAG -replace '^v', ''
+          Write-Host "tag=$env:TAG version=$version"
+          if ($tagVersion -ne $version) {
+            throw "tag version ($tagVersion) != Directory.Build.props Version ($version) — bump <Version> before tagging"
+          }
+          "PACK_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # 打包（脚本同样可跑在 mac/linux——vpk 交叉打包；CI 用 windows 宿主更直白）
+      - name: Pack (vpk)
+        shell: bash
+        run: |
+          dotnet tool install --global vpk
+          ./scripts/pack-windows.sh --version "$PACK_VERSION"
+
+      # sha256 清单随产物一起上传（用户侧校验）
+      - name: Checksums
+        shell: bash
+        run: |
+          cd artifacts/pack
+          shasum -a 256 Prtsc-win-Setup.exe Prtsc-win-Portable.zip Prtsc-*.full.nupkg > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 重复 push 同一 tag 时幂等：release 已存在就 --clobber 覆盖上传
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "Prtsc $TAG" --generate-notes
+          (cd artifacts/pack && gh release upload "$TAG" \
+            Prtsc-win-Setup.exe Prtsc-win-Portable.zip Prtsc-*.full.nupkg \
+            releases.win.json RELEASES SHA256SUMS.txt --clobber)
