@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Rendering;
 using Avalonia.Threading;
 
@@ -31,11 +32,14 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     private const double MinSize      = 4;   // 选框最小边
 
     // ---- 画笔 ----
-    private static readonly IBrush DimBrush        = new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0));
+    // E-1 M9：静态渲染资源一律用 Immutable 变体——mutable Brush/Pen 是 AvaloniaObject（线程仿亲），
+    // 多 headless session / 多窗口 compositor 并发 AddRef 时会踩「calling thread cannot access」
+    //（ColorPickerOverlayTests headless 实测炸过，immutable 无线程仿亲）。
+    private static readonly IBrush DimBrush        = new ImmutableSolidColorBrush(Color.FromArgb(0x99, 0, 0, 0));
     private static readonly IBrush HandleFillBrush = Brushes.White;
-    private static readonly IPen   HandleStrokePen = new Pen(Brushes.Black, 1);
-    private static readonly IPen   SelectionPen    = new Pen(Brushes.White, 1);
-    private static readonly IBrush LabelBgBrush    = new SolidColorBrush(Color.FromArgb(0xC0, 0, 0, 0));
+    private static readonly IPen   HandleStrokePen = new ImmutablePen(Brushes.Black, 1);
+    private static readonly IPen   SelectionPen    = new ImmutablePen(Brushes.White, 1);
+    private static readonly IBrush LabelBgBrush    = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0, 0, 0));
     private static readonly IBrush LabelFgBrush    = Brushes.White;
 
     // ---- 事件 ----

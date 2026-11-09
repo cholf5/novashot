@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Prtsc.App.Localization;
 using Prtsc.Core.Annotation;
 using Prtsc.Core.Annotation.Model;
+using Prtsc.Core.Editor;
 using SkiaSharp;
 
 namespace Prtsc.App.ViewModels;
@@ -13,6 +14,9 @@ namespace Prtsc.App.ViewModels;
 ///
 /// 样式改动**不进 Undo/Redo**（参考 Flameshot）。原地修改后通过
 /// <see cref="AnnotationDocument.NotifyMutated"/> 触发画布重绘。
+///
+/// E-1 M9：持有会话级 <see cref="ColorHistory"/>（overlay 取色写入），
+/// 面板在预设 8 色旁显示历史行；点历史色 = <see cref="Stroke"/> 既有设置路径。
 /// </summary>
 public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
 {
@@ -33,10 +37,27 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
 
     public EditorViewModel Editor { get; }
 
-    public StylePanelViewModel(EditorViewModel editor)
+    private readonly ColorHistory? _colorHistory;
+
+    public StylePanelViewModel(EditorViewModel editor, ColorHistory? colorHistory = null)
     {
         Editor = editor ?? throw new ArgumentNullException(nameof(editor));
+        _colorHistory = colorHistory;
+        if (_colorHistory is not null)
+            _colorHistory.Changed += OnColorHistoryChanged;
         Editor.PropertyChanged += OnEditorPropertyChanged;
+    }
+
+    /// <summary>E-1 M9：会话级取色历史（最新在前；无历史实例时空表）。</summary>
+    public IReadOnlyList<SKColor> HistoryColors => _colorHistory?.Colors ?? Array.Empty<SKColor>();
+
+    /// <summary>历史行显隐（空则整行隐藏）。</summary>
+    public bool HasColorHistory => HistoryColors.Count > 0;
+
+    private void OnColorHistoryChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(HistoryColors));
+        OnPropertyChanged(nameof(HasColorHistory));
     }
 
     private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -140,5 +161,7 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         Editor.PropertyChanged -= OnEditorPropertyChanged;
+        if (_colorHistory is not null)
+            _colorHistory.Changed -= OnColorHistoryChanged;
     }
 }

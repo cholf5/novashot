@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
 using Prtsc.App.Localization;
@@ -14,6 +15,7 @@ using Prtsc.Core.Annotation.Model;
 using Prtsc.Core.Annotation.Tools;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Common;
+using Prtsc.Core.Clipboard;
 using Prtsc.Core.Config;
 using Prtsc.Core.Editor.Export;
 using Prtsc.Core.Windows;
@@ -575,17 +577,25 @@ public partial class MainWindow : Window
                 {
                     CloseAll();
                     foreach (var s in displayShots) s.Dispose();
+                    _vm.PendingStrokeColor = null; // E-1 M9：取色后取消捕获，挂起色不泄漏进下一次会话
                     if (wasVisible) { Show(); Activate(); }
                 });
             }
+
+            // E-1 M9：取色模式服务（剪贴板 + 会话历史）；取色点击挂起为编辑器描边色
+            IClipboardService clipboard;
+            try { clipboard = AppServices.GetRequiredService<IClipboardService>(); }
+            catch { clipboard = new FakeClipboardService(); }
+            var colorHistory = AppServices.Services.GetService<Prtsc.Core.Editor.ColorHistory>();
 
             for (int i = 0; i < displays.Count; i++)
             {
                 var display = displays[i];
                 var shot = displayShots[i];
-                var overlay = new OverlayWindow(shot.Bitmap, display);
+                var overlay = new OverlayWindow(shot.Bitmap, display, clipboard, colorHistory);
                 overlay.Confirmed += (_, region) => OnAnyConfirmed(region);
                 overlay.Cancelled += (_, _) => OnAnyCancelled();
+                overlay.StrokePicked += (_, color) => _vm.PendingStrokeColor = color;
                 overlays.Add(overlay);
             }
 

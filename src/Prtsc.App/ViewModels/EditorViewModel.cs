@@ -103,7 +103,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         Document.NotifyMutated();
     }
 
-    public EditorViewModel(CapturedImage image)
+    public EditorViewModel(CapturedImage image, Prtsc.Core.Editor.ColorHistory? colorHistory = null)
     {
         _capturedImage = image ?? throw new ArgumentNullException(nameof(image));
         Document = new AnnotationDocument(image.Bitmap);
@@ -130,7 +130,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         History.StateChanged += OnHistoryStateChanged;
         Document.Changed += OnDocumentChanged;
 
-        StylePanel = new StylePanelViewModel(this);
+        StylePanel = new StylePanelViewModel(this, colorHistory);
         CompositionPanelViewModel = new CompositionPanelViewModel(this);
     }
 

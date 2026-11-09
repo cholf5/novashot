@@ -35,20 +35,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _configDirty;
 
     public MainWindowViewModel(IClipboardService clipboard, IConfigStore? configStore = null,
-        IUploadService? upload = null, LibraryStore? library = null, ILogger? logger = null)
+        IUploadService? upload = null, LibraryStore? library = null, ILogger? logger = null,
+        Prtsc.Core.Editor.ColorHistory? colorHistory = null)
     {
         _clipboard = clipboard;
         _configStore = configStore;
         _upload = upload;
         _library = library;
         _logger = logger;
+        _colorHistory = colorHistory;
     }
 
     /// <summary>DI 外（测试）直接 new 时的兼容构造。</summary>
     public MainWindowViewModel(IClipboardService clipboard, IConfigStore? configStore, ILogger? logger)
-        : this(clipboard, configStore, upload: null, library: null, logger: logger)
+        : this(clipboard, configStore, upload: null, library: null, logger: logger, colorHistory: null)
     {
     }
+
+    /// <summary>E-1 M9：会话级取色历史（overlay 写入；面板历史行消费）。可为 null（无历史服务）。</summary>
+    private readonly Prtsc.Core.Editor.ColorHistory? _colorHistory;
+
+    /// <summary>
+    /// E-1 M9：overlay 取色模式下点选的颜色。进入编辑器时经 StylePanel 既有路径写入描边色
+    /// （<see cref="EnterEditor"/>），取消防捕获时清空（外层 OnAnyCancelled），不污染下一次会话。
+    /// </summary>
+    [ObservableProperty]
+    private SKColor? _pendingStrokeColor;
 
     [ObservableProperty]
     private MainViewMode _mode = MainViewMode.CaptureIdle;
@@ -115,12 +127,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void EnterEditor(CapturedImage image)
     {
         Editor?.Dispose();
-        var editor = new EditorViewModel(image);
+        var editor = new EditorViewModel(image, _colorHistory);
         ApplyEditorDefaults(editor);
         editor.CompositionPanelViewModel.CanvasStateChanged = OnCanvasStateChanged;
+        ApplyPendingStroke(editor);
         Editor = editor;
         Mode = MainViewMode.Editor;
         StatusText = Loc.T("Status.Captured", image.Width, image.Height, image.ScaleFactor.ToString("0.##"));
+    }
+
+    /// <summary>
+    /// E-1 M9：把 overlay 取的挂起色经 StylePanel 既有 Stroke 路径写入（进编辑器时必无选中标注
+    /// → 落在 CurrentStyle 上，后续新标注沿用该色，语义与预设色点击一致）。消费即清空。
+    /// </summary>
+    private void ApplyPendingStroke(EditorViewModel editor)
+    {
+        if (PendingStrokeColor is not { } picked) return;
+        editor.StylePanel.Stroke = picked;
+        PendingStrokeColor = null;
     }
 
     /// <summary>

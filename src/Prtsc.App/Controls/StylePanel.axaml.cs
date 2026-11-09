@@ -33,22 +33,25 @@ public partial class StylePanel : UserControl
         RefreshSwatchStates();
     }
 
-    /// <summary>把当前选中颜色反映到 ToggleButton.IsChecked 上（视觉高亮）。</summary>
+    /// <summary>把当前选中颜色反映到 ToggleButton.IsChecked 上（视觉高亮）。预设行与历史行都刷。</summary>
     private void RefreshSwatchStates()
     {
         if (DataContext is not StylePanelViewModel vm) return;
-        var items = this.FindControl<ItemsControl>("ColorSwatches");
-        if (items is null) return;
         // Avalonia ItemsControl 的容器：遍历 LogicalChildren 拿到每个 ContentPresenter → 子 ToggleButton
-        foreach (var container in items.GetLogicalChildren())
+        foreach (var name in new[] { "ColorSwatches", "HistorySwatches" })
         {
-            if (container is not Control ctrl) continue;
-            var toggle = ctrl.GetVisualDescendants()
-                             .OfType<ToggleButton>()
-                             .FirstOrDefault();
-            if (toggle is null) continue;
-            if (toggle.Tag is SKColor color)
-                toggle.IsChecked = color == vm.Stroke;
+            var items = this.FindControl<ItemsControl>(name);
+            if (items is null) continue;
+            foreach (var container in items.GetLogicalChildren())
+            {
+                if (container is not Control ctrl) continue;
+                var toggle = ctrl.GetVisualDescendants()
+                                 .OfType<ToggleButton>()
+                                 .FirstOrDefault();
+                if (toggle is null) continue;
+                if (toggle.Tag is SKColor color)
+                    toggle.IsChecked = color == vm.Stroke;
+            }
         }
     }
 }

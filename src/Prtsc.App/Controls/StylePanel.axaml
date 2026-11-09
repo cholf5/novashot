@@ -34,6 +34,28 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+
+      <!-- E-1 M9：取色历史行（会话级最近 10 色，最新在前；点历史色 = 设为描边色）。空则整行隐藏 -->
+      <StackPanel IsVisible="{Binding HasColorHistory}" Margin="0,6,0,0">
+        <TextBlock Classes="label" Text="{DynamicResource L.Panel.History}" Margin="0,0,0,4" />
+        <ItemsControl x:Name="HistorySwatches" ItemsSource="{Binding HistoryColors}" Margin="-2,0">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="5" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <ToggleButton Classes="swatch small" Click="OnSwatchClick" Tag="{Binding}"
+                             ToolTip.Tip="{Binding}">
+                <ToggleButton.Background>
+                  <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}" />
+                </ToggleButton.Background>
+              </ToggleButton>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
     </StackPanel>
 
     <!-- Stroke -->

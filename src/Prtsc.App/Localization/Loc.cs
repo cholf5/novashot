@@ -113,6 +113,8 @@ internal static class Strings
         // ---- common ----
         ["App.Title"] = "Prtsc",
         ["Overlay.Hint"] = "Drag to select · drag handles to adjust · Enter to confirm · Esc to cancel",
+        ["Overlay.PickerHint"] = "Pick mode: click to sample a colour · C to exit",
+        ["Overlay.PickerCopied"] = "Copied {0}",
         ["Pin.Hint"] = "Drag to move · scroll to zoom · double-click or Esc to close",
         ["Ring.Cancel"] = "Cancel (Esc)",
         ["Ring.Confirm"] = "Confirm (Enter)",
@@ -212,6 +214,7 @@ internal static class Strings
         ["Panel.Style"] = "Style",
         ["Panel.Canvas"] = "Canvas",
         ["Panel.Colour"] = "Colour",
+        ["Panel.History"] = "History",
         ["Panel.Stroke"] = "Stroke",
         ["Panel.TextSize"] = "Text size",
         ["Panel.Selection"] = "Selection",
@@ -452,6 +455,8 @@ internal static class Strings
         // ---- common ----
         ["App.Title"] = "Prtsc",
         ["Overlay.Hint"] = "拖动创建选框 · 拖角/边调整 · Enter 确认 · Esc 取消",
+        ["Overlay.PickerHint"] = "取色模式：点击拾取颜色 · C 退出",
+        ["Overlay.PickerCopied"] = "已复制 {0}",
         ["Pin.Hint"] = "拖动移动 · 滚轮缩放 · 双击或 Esc 关闭",
         ["Ring.Cancel"] = "取消 (Esc)",
         ["Ring.Confirm"] = "确认 (Enter)",
@@ -551,6 +556,7 @@ internal static class Strings
         ["Panel.Style"] = "样式",
         ["Panel.Canvas"] = "画布",
         ["Panel.Colour"] = "颜色",
+        ["Panel.History"] = "取色历史",
         ["Panel.Stroke"] = "粗细",
         ["Panel.TextSize"] = "字号",
         ["Panel.Selection"] = "选中",

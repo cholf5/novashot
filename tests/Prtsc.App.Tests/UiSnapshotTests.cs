@@ -172,6 +172,29 @@ public class UiSnapshotTests
         Save(launcher, "40-launcher.png");
         launcher.Close();
 
+        // E-1 M9 取色器：放大镜 + HEX/RGB 浮签（C 键取色模式下的视觉态；直接驱动放大镜属性，
+        // 模式接线由 ColorPickerOverlayTests 锁定，这里只出视觉图人工核对）
+        var pickerBmp = MakeFakeShot();
+        var pickerDisplay = new Prtsc.Core.Common.DisplayInfo(0, "Snapshot",
+            new Prtsc.Core.Common.PixelRect(0, 0, 1400, 900),
+            new Prtsc.Core.Common.PixelRect(0, 0, 1400, 900), 1.0, IsPrimary: true);
+        var pickerOverlay = new OverlayWindow(pickerBmp, pickerDisplay)
+        {
+            Width = 700,
+            Height = 450,
+        };
+        var pm = pickerOverlay.FindControl<Controls.ColorMagnifier>("ColorMagnifier");
+        if (pm is not null)
+        {
+            pm.IsVisible = true;
+            pm.CursorPoint = new Avalonia.Point(430, 260);
+        }
+        pickerOverlay.Show();
+        Pump(pickerOverlay);
+        Save(pickerOverlay, "50-overlay-picker.png");
+        pickerOverlay.Close();
+        pickerBmp.Dispose();
+
         var canvas = new Window
         {
             Width = 264, Height = 726,

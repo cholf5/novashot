@@ -52,6 +52,9 @@ public static class AppServices
             sp.GetRequiredService<ILogger<JsonConfigStore>>(),
             overrideDirectory: configDirectory));
 
+        // E-1 M9：会话级取色历史（overlay 写入 + StylePanel 历史行消费；非 config 持久化）
+        services.AddSingleton<Prtsc.Core.Editor.ColorHistory>();
+
         // ViewModels（IClipboardService 由 Platform 层注册；无 Platform 时退回进程内 Fake）
         services.TryAddSingleton<IClipboardService, FakeClipboardService>();
         services.AddSingleton<MainWindowViewModel>(sp => new MainWindowViewModel(
@@ -59,7 +62,8 @@ public static class AppServices
             sp.GetRequiredService<IConfigStore>(),
             sp.GetService<IUploadService>(),
             sp.GetService<Prtsc.Core.Library.LibraryStore>(),
-            sp.GetService<ILogger<MainWindowViewModel>>()));
+            sp.GetService<ILogger<MainWindowViewModel>>(),
+            sp.GetService<Prtsc.Core.Editor.ColorHistory>()));
 
         _provider = services.BuildServiceProvider();
     }
