@@ -276,13 +276,13 @@ public partial class MainWindow : Window
 
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export image",
+            Title = Loc.T("Editor.ExportDialogTitle"),
             SuggestedFileName = suggested,
             FileTypeChoices = new List<Avalonia.Platform.Storage.FilePickerFileType>
             {
-                new("PNG image")  { Patterns = new[] { "*.png" } },
-                new("JPEG image") { Patterns = new[] { "*.jpg", "*.jpeg" } },
-                new("WebP image") { Patterns = new[] { "*.webp" } },
+                new(Loc.T("Editor.ExportTypePng"))  { Patterns = new[] { "*.png" } },
+                new(Loc.T("Editor.ExportTypeJpeg")) { Patterns = new[] { "*.jpg", "*.jpeg" } },
+                new(Loc.T("Editor.ExportTypeWebp")) { Patterns = new[] { "*.webp" } },
             },
         });
         if (file is null) return;
@@ -290,7 +290,7 @@ public partial class MainWindow : Window
         var path = file.TryGetLocalPath();
         if (string.IsNullOrEmpty(path))
         {
-            _vm.StatusText = "Export failed: no local file path.";
+            _vm.StatusText = Loc.T("Status.ExportFailedNoPath");
             return;
         }
 
@@ -300,7 +300,7 @@ public partial class MainWindow : Window
             ImageExporter.Save(editor.Document, path, format, state: editor.CompositionState);
             _logger.LogInformation("Exported {Path} ({Format}, {Width}x{Height})",
                 path, format, editor.ContentWidth, editor.ContentHeight);
-            _vm.StatusText = $"Saved {path}";
+            _vm.StatusText = Loc.T("Status.Exported", path);
 
             await RecordLibraryAfterExportAsync(path, editor);
 
@@ -308,7 +308,7 @@ public partial class MainWindow : Window
             if (IsAutoCopyEnabled())
             {
                 _vm.CopyCommand.Execute(null);
-                _vm.StatusText = $"Saved {path} (also copied to clipboard)";
+                _vm.StatusText = Loc.T("Status.ExportedCopied", path);
             }
 
             // M7b: Auto-upload —— 导出成功后按 config 自动上传
@@ -318,7 +318,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _logger.LogError(ex, "Export to {Path} failed", path);
-            _vm.StatusText = "Export failed: " + ex.Message;
+            _vm.StatusText = Loc.T("Status.ExportFailed", ex.Message);
         }
     }
 
@@ -497,7 +497,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fullscreen capture failed");
-            _vm.StatusText = "Capture failed: " + ex.Message;
+            _vm.StatusText = Loc.T("Status.CaptureFailed", ex.Message);
             if (wasVisible) Show();
         }
     }
@@ -555,7 +555,7 @@ public partial class MainWindow : Window
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Region crop failed");
-                        _vm.StatusText = "Region capture failed: " + ex.Message;
+                        _vm.StatusText = Loc.T("Status.RegionFailed", ex.Message);
                     }
                     finally
                     {
@@ -688,7 +688,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _logger.LogError(ex, "Window capture failed");
-            _vm.StatusText = "Window capture failed: " + ex.Message;
+            _vm.StatusText = Loc.T("Status.WindowFailed", ex.Message);
         }
         finally
         {

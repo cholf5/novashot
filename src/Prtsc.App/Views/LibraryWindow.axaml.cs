@@ -75,12 +75,14 @@ public partial class LibraryWindow : Window
     {
         if (_vm.SelectedEntry is not { } item) return;
 
-        // G-17（winshot）：删除带确认，防误触（记录本身可直接重建，但本地文件会真删）
+        // G-17（winshot）：删除带确认，防误触（记录本身可直接重建；本地文件不会动，仍留在磁盘上）
         var file = item.Entry.LocalPath;
-        var detail = string.IsNullOrEmpty(file) ? "仅删除历史记录" : $"本地文件 {file} 也将删除";
+        var detail = string.IsNullOrEmpty(file)
+            ? Prtsc.App.Localization.Loc.T("Library.DeleteRecordOnly")
+            : Prtsc.App.Localization.Loc.T("Library.DeleteFileStays");
         var dialog = new Window
         {
-            Title = "确认删除",
+            Title = Prtsc.App.Localization.Loc.T("Library.DeleteConfirmTitle"),
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
@@ -93,7 +95,8 @@ public partial class LibraryWindow : Window
                 {
                     new Avalonia.Controls.TextBlock
                     {
-                        Text = $"确定删除「{item.Entry.FileName}」？\n{detail}",
+                        Text = Prtsc.App.Localization.Loc.T("Library.DeleteConfirmRecord", item.Entry.FileName)
+                               + "\n" + detail,
                         MaxWidth = 420,
                         TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                     },
@@ -104,7 +107,7 @@ public partial class LibraryWindow : Window
                         Spacing = 8,
                         Children =
                         {
-                            CancelButton("取消"),
+                            CancelButton(Prtsc.App.Localization.Loc.T("Common.Cancel")),
                             OkButtonForDelete(item),
                         },
                     },
@@ -125,7 +128,7 @@ public partial class LibraryWindow : Window
     {
         var b = new Button
         {
-            Content = "删除",
+            Content = Prtsc.App.Localization.Loc.T("Library.Delete"),
             Padding = new Avalonia.Thickness(14, 5),
         };
         b.Click += async (_, _) =>

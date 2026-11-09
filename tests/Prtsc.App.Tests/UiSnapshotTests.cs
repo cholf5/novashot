@@ -31,17 +31,10 @@ public class UiSnapshotTests
     {
         get
         {
-            var dir = Path.Combine(RepoRoot(), "artifacts", "ui");
+            var dir = Path.Combine(TestRepoRoot.Path, "artifacts", "ui");
             Directory.CreateDirectory(dir);
             return dir;
         }
-    }
-
-    private static string RepoRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Prtsc.slnx"))) dir = dir.Parent;
-        return dir?.FullName ?? AppContext.BaseDirectory;
     }
 
     /// <summary>

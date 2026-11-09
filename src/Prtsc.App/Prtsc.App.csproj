@@ -58,4 +58,9 @@
     <ProjectReference Include="..\Prtsc.Platform.Linux\Prtsc.Platform.Linux.csproj"
                      Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'" />
   </ItemGroup>
+
+  <!-- L-2 key 一致性单测：测试工程直接操作 internal Strings 双语表（同 Mac/Linux 平台工程约定） -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Prtsc.App.Tests" />
+  </ItemGroup>
 </Project>

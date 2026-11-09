@@ -70,11 +70,11 @@ public partial class WindowPickerDialog : Window
     public sealed class Row
     {
         public WindowInfo Info { get; }
-        public string Title => string.IsNullOrEmpty(Info.Title) ? "(untitled)" : Info.Title;
+        public string Title => string.IsNullOrEmpty(Info.Title) ? Prtsc.App.Localization.Loc.T("Picker.Untitled") : Info.Title;
         public string SubText =>
             (string.IsNullOrEmpty(Info.ProcessName) ? "?" : Info.ProcessName)
             + $"   {Info.Bounds.Width}×{Info.Bounds.Height}"
-            + (Info.IsMinimized ? "   [最小化]" : string.Empty);
+            + (Info.IsMinimized ? "   " + Prtsc.App.Localization.Loc.T("Picker.Minimized") : string.Empty);
 
         public Row(WindowInfo info) { Info = info; }
     }

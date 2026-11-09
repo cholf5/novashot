@@ -41,7 +41,7 @@ public partial class CloudSettingsWindow : Window
             {
                 1 => await Prtsc.Core.Cloud.CloudConnectionTester.TestR2Async(_vm.ToR2Config()),
                 2 => await Prtsc.Core.Cloud.CloudConnectionTester.TestGDriveAsync(_vm.ToGDriveConfig()),
-                _ => (false, "先选择 R2 或 Google Drive 渠道再测试。"),
+                _ => (false, Prtsc.App.Localization.Loc.T("Cloud.PickProviderFirst")),
             };
             _vm.SaveHint = (ok ? "✓ " : "✗ ") + message;
         }

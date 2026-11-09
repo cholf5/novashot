@@ -159,6 +159,10 @@ internal static class Strings
         ["Editor.Redo"] = "Redo",
         ["Editor.Save"] = "Save",
         ["Editor.SaveTip"] = "Export as PNG / JPEG / WebP (format follows the file extension)",
+        ["Editor.ExportDialogTitle"] = "Export image",
+        ["Editor.ExportTypePng"] = "PNG image",
+        ["Editor.ExportTypeJpeg"] = "JPEG image",
+        ["Editor.ExportTypeWebp"] = "WebP image",
         ["Editor.Copy"] = "Copy",
         ["Editor.CopyTip"] = "Copy the composed image to the clipboard",
         ["Editor.More"] = "More actions",
@@ -247,13 +251,17 @@ internal static class Strings
         ["Library.Uploaded"] = "{0} · uploaded",
         ["Library.CountOne"] = "1 shot",
         ["Library.CountMany"] = "{0} shots",
-        ["Library.DeleteConfirm"] = "Delete this record? The image file stays on disk.",
+        ["Library.DeleteConfirmTitle"] = "Confirm delete",
+        ["Library.DeleteConfirmRecord"] = "Delete \"{0}\"?",
+        ["Library.DeleteFileStays"] = "The image file stays on disk.",
+        ["Library.DeleteRecordOnly"] = "Only the library record is removed.",
 
         // ---- cloud settings ----
         ["Cloud.NoneTitle"] = "Nothing is uploaded",
         ["Cloud.NoneHint"] = "Shots stay on this machine. Pick a provider above to upload and copy a link.",
         ["Cloud.Testing"] = "Testing the connection…",
         ["Cloud.TestError"] = "Connection test failed: {0}",
+        ["Cloud.PickProviderFirst"] = "Pick a provider (R2 or Google Drive) first.",
         ["Cloud.MissingR2"] = "R2 needs Account ID, Bucket, Access Key ID and Secret Access Key.",
         ["Cloud.MissingDrive"] = "Google Drive needs Client ID, Client Secret and Refresh Token.",
         ["Cloud.Saved"] = "Saved.",
@@ -291,6 +299,10 @@ internal static class Strings
         ["Status.QuickSaved"] = "Saved {0}",
         ["Status.QuickSavedPath"] = "Saved {0} — path copied",
         ["Status.QuickSaveFailed"] = "Quick save failed: {0}",
+        ["Status.Exported"] = "Saved {0}",
+        ["Status.ExportedCopied"] = "Saved {0} (also copied to clipboard)",
+        ["Status.ExportFailedNoPath"] = "Export failed: no local file path.",
+        ["Status.ExportFailed"] = "Export failed: {0}",
         ["Status.UploadFailed"] = "Upload failed: {0}",
         ["Status.UploadedUrl"] = "Uploaded {0} — URL copied",
         ["Status.Uploaded"] = "Uploaded {0}",
@@ -303,6 +315,8 @@ internal static class Strings
         ["Status.PinFailed"] = "Pin failed: {0}",
         ["Status.DelayCanceled"] = "Delayed capture canceled",
         ["Status.RegionFailed"] = "Region capture failed: {0}",
+        ["Status.CaptureFailed"] = "Capture failed: {0}",
+        ["Status.WindowFailed"] = "Window capture failed: {0}",
 
         // ---- delayed capture (D-1) ----
         ["Delay.BadgeCancelHint"] = "Press a capture hotkey to cancel",
@@ -415,6 +429,8 @@ internal static class Strings
         ["Picker.Lede"] = "Pick the window to capture. Double-click to grab it.",
         ["Picker.Capture"] = "Capture",
         ["Picker.Empty"] = "No capturable windows found.",
+        ["Picker.Untitled"] = "(untitled)",
+        ["Picker.Minimized"] = "[minimized]",
     };
 
     public static readonly Dictionary<string, string> Zh = new(StringComparer.Ordinal)
@@ -468,6 +484,10 @@ internal static class Strings
         ["Editor.Redo"] = "重做",
         ["Editor.Save"] = "保存",
         ["Editor.SaveTip"] = "导出为 PNG / JPEG / WebP（格式跟随扩展名）",
+        ["Editor.ExportDialogTitle"] = "导出图片",
+        ["Editor.ExportTypePng"] = "PNG 图片",
+        ["Editor.ExportTypeJpeg"] = "JPEG 图片",
+        ["Editor.ExportTypeWebp"] = "WebP 图片",
         ["Editor.Copy"] = "复制",
         ["Editor.CopyTip"] = "把合成后的图片复制到剪贴板",
         ["Editor.More"] = "更多操作",
@@ -556,13 +576,17 @@ internal static class Strings
         ["Library.Uploaded"] = "{0} · 已上传",
         ["Library.CountOne"] = "1 条记录",
         ["Library.CountMany"] = "{0} 条记录",
-        ["Library.DeleteConfirm"] = "删除这条记录？图片文件仍保留在磁盘上。",
+        ["Library.DeleteConfirmTitle"] = "确认删除",
+        ["Library.DeleteConfirmRecord"] = "确定删除「{0}」？",
+        ["Library.DeleteFileStays"] = "图片文件仍保留在磁盘上。",
+        ["Library.DeleteRecordOnly"] = "仅删除历史记录。",
 
         // ---- cloud settings ----
         ["Cloud.NoneTitle"] = "当前不上传",
         ["Cloud.NoneHint"] = "截图只保存到本机。选择上面的渠道即可上传并复制链接。",
         ["Cloud.Testing"] = "正在测试连接…",
         ["Cloud.TestError"] = "连接测试异常：{0}",
+        ["Cloud.PickProviderFirst"] = "先选择 R2 或 Google Drive 渠道再测试。",
         ["Cloud.MissingR2"] = "R2 需要填写 Account ID / Bucket / Access Key ID / Secret Access Key。",
         ["Cloud.MissingDrive"] = "Google Drive 需要填写 Client ID / Client Secret / Refresh Token。",
         ["Cloud.Saved"] = "已保存。",
@@ -600,6 +624,10 @@ internal static class Strings
         ["Status.QuickSaved"] = "已保存 {0}",
         ["Status.QuickSavedPath"] = "已保存 {0} — 路径已复制",
         ["Status.QuickSaveFailed"] = "快速保存失败：{0}",
+        ["Status.Exported"] = "已保存 {0}",
+        ["Status.ExportedCopied"] = "已保存 {0}（并已复制到剪贴板）",
+        ["Status.ExportFailedNoPath"] = "导出失败：没有本地文件路径。",
+        ["Status.ExportFailed"] = "导出失败：{0}",
         ["Status.UploadFailed"] = "上传失败：{0}",
         ["Status.UploadedUrl"] = "已上传 {0} — 链接已复制",
         ["Status.Uploaded"] = "已上传 {0}",
@@ -612,6 +640,8 @@ internal static class Strings
         ["Status.PinFailed"] = "贴图失败：{0}",
         ["Status.DelayCanceled"] = "延时截图已取消",
         ["Status.RegionFailed"] = "区域截图失败：{0}",
+        ["Status.CaptureFailed"] = "截图失败：{0}",
+        ["Status.WindowFailed"] = "窗口截图失败：{0}",
 
         // ---- delayed capture (D-1) ----
         ["Delay.BadgeCancelHint"] = "按任意截图热键取消",
@@ -724,5 +754,7 @@ internal static class Strings
         ["Picker.Lede"] = "选一个窗口，双击直接截取。",
         ["Picker.Capture"] = "截取",
         ["Picker.Empty"] = "没找到可截取的窗口。",
+        ["Picker.Untitled"] = "（未命名）",
+        ["Picker.Minimized"] = "[已最小化]",
     };
 }
