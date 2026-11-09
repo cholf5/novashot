@@ -5,12 +5,15 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Prtsc.App.Assets;
+using Prtsc.App.Cli;
 using Prtsc.App.Logging;
 using Prtsc.App.Localization;
 using Prtsc.App.ViewModels;
 using Prtsc.App.Views;
 using Prtsc.Core.Autostart;
 using Prtsc.Core.Capture;
+using Prtsc.Core.Cli;
+using Prtsc.Core.Clipboard;
 using Prtsc.Core.Common;
 using Prtsc.Core.Config;
 using Prtsc.Core.Hotkeys;
@@ -31,6 +34,9 @@ public partial class App : Application
     // D-1：延时截图倒计时（Core Orchestrator 持有 pending 意图与轮次裁决；App 只做 marshal 与角标 UI）
     private CountdownOrchestrator<CaptureIntent>? _countdown;
     private CountdownBadgeWindow? _countdownBadge;
+
+    // L-1：CLI 单实例管道服务端（App 运行全程持有，退出时停；accept/handler 全程吞异常不影响 GUI）
+    private CliPipeServerHost? _cliPipeHost;
 
     /// <summary>角标关闭到抓帧的间隙（对齐既有 Hide+Delay(200) 防残影做法，取 250ms）。</summary>
     private const int CountdownToCaptureGapMs = 250;
@@ -92,6 +98,9 @@ public partial class App : Application
             SetupTrayIcon();
             SetupHotkeys(store.Current.Hotkeys);
 
+            // L-1：CLI 单实例管道服务端（启动即开、退出即停；接收分发见 BuildCliPipeRouter）
+            StartCliPipeHost();
+
             // C-1/R-1：启动更新检查（fire-and-forget）——policy 拒绝/未打包/无 feed/无网络全都静默，
             // 有更新才弹非阻塞提示框；内部所有 Velopack 调用自带 try-catch，绝不阻塞启动路径
             _ = Update.StartupUpdateChecker.RunOnStartupAsync(store, _mainWindow, _logger);
@@ -101,6 +110,7 @@ public partial class App : Application
                 // E-2 跟进：退出前把防抖中的 config 改动（画布参数/窗口尺寸）同步落盘，
                 // 优雅退出（托盘 Quit / 会话结束）不丢最后 500ms；进程强杀仍可接受丢失
                 (_mainWindow?.DataContext as MainWindowViewModel)?.FlushConfigSaveSync();
+                _cliPipeHost?.Dispose();
                 _hotkeys?.Dispose();
                 _tray?.Dispose();
                 LoggingSetup.Close();
@@ -397,6 +407,52 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             desktop.Shutdown();
     }
+
+    // ---- L-1：CLI 单实例管道服务端（接收转发命令） ----
+
+    private void StartCliPipeHost()
+    {
+        try
+        {
+            _cliPipeHost = new CliPipeServerHost(
+                CliPipeNames.ForCurrentUser(),
+                (command, ct) => BuildCliPipeRouter().HandleAsync(command, ct),
+                _logger);
+            _cliPipeHost.Start();
+        }
+        catch (Exception ex)
+        {
+            // 管道起不来只影响「CLI 转发到 GUI」能力，headless CLI 仍可用——绝不影响 GUI 主流程
+            _logger?.LogError(ex, "Failed to start CLI pipe server host");
+        }
+    }
+
+    /// <summary>
+    /// CLI 接收分发（线程契约：本方法跑在管道连接的后台线程——
+    /// 交互/激活回调内部自行 marshal 到 UI 线程；headless 分支留在后台线程跑导出执行器，无 GUI 闪现）。
+    /// </summary>
+    private CliRequestRouter BuildCliPipeRouter() => new(
+        activate: ShowMainWindow,
+        triggerInteractive: (action, delaySeconds) =>
+            _ = TriggerCaptureAsync(action, CaptureTriggerSource.Tray, delaySeconds),
+        executeHeadless: async (command, ct) =>
+        {
+            try
+            {
+                var executor = new CliCaptureExecutor(
+                    AppServices.GetRequiredService<ICaptureService>(),
+                    AppServices.GetRequiredService<IConfigStore>(),
+                    AppServices.GetRequiredService<IClipboardService>());
+                var result = await executor.ExecuteAsync(command, ct).ConfigureAwait(false);
+                _logger?.LogInformation("CLI forwarded command executed: {Message}", result.Message);
+                return result.ToResponse();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "CLI forwarded command failed ({Mode})", command.Mode);
+                return CliPipeResponse.Fail(CliExitCodes.Failure, $"Command handling failed: {ex.Message}");
+            }
+        });
 
     /// <summary>程序集 InformationalVersion（无则回退文件版本、再回退 "0.1"）。</summary>
     private static string GetAppVersion()

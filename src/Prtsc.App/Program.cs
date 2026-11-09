@@ -1,5 +1,7 @@
 using Avalonia;
+using Prtsc.App.Cli;
 using Prtsc.App.Logging;
+using Prtsc.Core.Cli;
 using Prtsc.Core.Config;
 using Serilog;
 using Velopack;
@@ -22,12 +24,24 @@ internal static class Program
         var configDir = JsonConfigStore.DefaultConfigDirectory();
         Directory.CreateDirectory(configDir);
 
-        LoggingSetup.Configure(configDir);
-
         try
         {
-            AppServices.Initialize(configDir);
-            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // L-1 CLI 分流（关键约束：捕获命令绝不进入 Avalonia 运行时）：
+            // 纯函数解析 → CLI 命令走 CliApplication（转发/headless）后直接返回退出码；
+            // gui / 无参数走现行 GUI 路径。
+            // 日志形态：CLI 进程（含 gui 转发客户端）一律只落文件（stdout/stderr 是脚本契约）；
+            // 只有真要启动 GUI 时才切回 console+file 形态。
+            var parse = CliArgs.Parse(args);
+            LoggingSetup.Configure(configDir, consoleSink: false);
+
+            var run = CliApplication.Run(parse, args, configDir);
+            if (run.Outcome == CliRunOutcome.LaunchGui)
+            {
+                LoggingSetup.Configure(configDir, consoleSink: true);
+                AppServices.Initialize(configDir);
+                return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            }
+            return run.ExitCode;
         }
         catch (Exception ex)
         {
