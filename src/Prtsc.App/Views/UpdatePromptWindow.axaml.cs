@@ -11,23 +11,23 @@ namespace Prtsc.App.Views;
 /// <summary>
 /// C-1 更新提示对话框（非阻塞 Show）：新版本号 + 下载并安装 / 跳过此版本 / 以后再说。
 /// 「跳过此版本」把目标版本写 config.Update.SkippedVersion 并存盘（同版本不再提示，更高版本会再提示）；
-/// 「下载并安装」→ DownloadUpdatesAsync（进度回 UI）→ ApplyUpdatesAndRestart（该方法会立即退出进程）。
+/// 「下载并安装」→ 重查 feed（用户点击距启动检查可能隔了很久）→ DownloadUpdatesAsync（进度回 UI）
+/// → ApplyUpdatesAndRestart（该方法会立即退出进程）。
 /// 所有 Velopack 调用的异常都落在本窗口内部：失败只改 Hint 文案，绝不崩溃。
+/// 无参构造是 Avalonia 运行时 XAML 加载器的要求（AVLN3001），走 OverlayWindow 同款 null 委托 +
+/// 处理器早退模式——不会留可触发的 NRE（review M7）。
 /// </summary>
 public partial class UpdatePromptWindow : Window
 {
-    private readonly UpdatePromptViewModel _vm = null!;
-    private readonly UpdateManager _manager = null!;
-    private readonly IConfigStore _store = null!;
-    private readonly ILogger _logger = null!;
+    private readonly UpdatePromptViewModel? _vm;
+    private readonly UpdateManager? _manager;
+    private readonly IConfigStore? _store;
+    private readonly ILogger? _logger;
     private readonly string _targetVersion = "";
 
-    public UpdatePromptWindow()
-    {
-        InitializeComponent();
-    }
+    public UpdatePromptWindow() : this(null!, null!, "", "", null!) { }
 
-    public UpdatePromptWindow(IConfigStore store, UpdateManager manager, UpdateInfo info,
+    public UpdatePromptWindow(IConfigStore store, UpdateManager manager,
         string targetVersion, string currentVersion, ILogger logger)
     {
         _store = store;
@@ -43,6 +43,7 @@ public partial class UpdatePromptWindow : Window
 
     private async Task InstallAsync()
     {
+        if (_manager is null || _vm is null) return; // 无参构造形态：未注入即无行为
         try
         {
             _vm.Choose(UpdatePromptChoice.Install);
@@ -63,13 +64,14 @@ public partial class UpdatePromptWindow : Window
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Update download/apply failed");
+            _logger?.LogWarning(ex, "Update download/apply failed");
             if (_vm.IsBusy) _vm.EndDownloadFailed(ex.Message);
         }
     }
 
     private void OnSkipClick(object? sender, RoutedEventArgs e)
     {
+        if (_store is null || _vm is null) return; // 无参构造形态：未注入即无行为
         _vm.Choose(UpdatePromptChoice.Skip);
         _store.Update(c => c.Update.SkippedVersion = _targetVersion);
         _ = _store.SaveAsync();
@@ -78,7 +80,7 @@ public partial class UpdatePromptWindow : Window
 
     private void OnLaterClick(object? sender, RoutedEventArgs e)
     {
-        _vm.Choose(UpdatePromptChoice.Later);
+        _vm?.Choose(UpdatePromptChoice.Later);
         Close();
     }
 }

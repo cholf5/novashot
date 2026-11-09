@@ -21,7 +21,10 @@ public sealed partial class UpdatePromptViewModel : ObservableObject
     /// <summary>完整提示文案（Loc.T("Update.Prompt.Lede", new, current)，构造时定死）。</summary>
     public string Lede { get; }
 
-    /// <summary>用户的选择；窗口关闭后由 StartupUpdateChecker 读取。</summary>
+    /// <summary>
+    /// 用户的选择（对话态记录）。注意：Skip 的 SkippedVersion 落盘与窗口关闭的副作用
+    /// 由 UpdatePromptWindow 事件直接处理，启动链路不读本属性——当前读者只有测试（review M8）。
+    /// </summary>
     public UpdatePromptChoice Choice { get; private set; } = UpdatePromptChoice.Undecided;
 
     /// <summary>下载期间隐藏动作按钮（避免重复触发 ApplyUpdatesAndRestart）。</summary>

@@ -16,7 +16,7 @@
 3. Updater：~~参考 `UpdateConfig.CheckOnStartup / SkippedVersion`；若与 R-1 Velopack 打包协调，改用 vpk UpdateManager（见 R-1 卡，先沟通再动手）。~~
    ✅ **完成（2026-11-10，与 R-1 合并执行）**：方案按裁决接入 **Velopack 1.2.161 vpk UpdateManager**。
    - config：`UpdateConfig` 加 `FeedUrl`（string 默认空；JSON roundtrip + 未知字段容忍有测试）。
-   - 决策下沉 Core 纯函数 `Update/UpdateCheckPolicy`：`ShouldCheckOnStartup(isPackaged, checkOnStartup, feedUrl)` 三条件与；`ShouldPrompt(update, current, skipped)`——System.Version 解析语义钉死（更高才提示；相等/更低不提示；同版本跳过生效；prerelease 串解析失败不提示），测试 20 例 + config 5 例。
+   - 决策下沉 Core 纯函数 `Update/UpdateCheckPolicy`：`ShouldCheckOnStartup(isPackaged, checkOnStartup, feedUrl)` 三条件与；`ShouldPrompt(update, current, skipped)`——System.Version 解析语义钉死（更高才提示；相等/更低不提示；同版本跳过生效；prerelease 串解析失败不提示），测试 21 例 + config 4 例。
    - 运行时接入：`Program.Main` 第一行 `VelopackApp.Build().Run()`（vpk 打包时自动验证此行存在）；`Startup/StartupUpdateChecker` fire-and-forget——未打包（`UpdateManager.IsInstalled` false，mac/linux 腿恒 false）/policy 拒绝/无网络/Feed 404 全部静默或状态栏提示，绝不阻塞启动。
    - UI：`UpdatePromptWindow` 非阻塞提示框（新版本号 + 下载并安装/跳过此版本/以后再说）；跳过写 `SkippedVersion` 存盘；下载带进度，`ApplyUpdatesAndRestart` 由 Velopack 接管重启。VM 决策抽出为 `UpdatePromptViewModel`（App.Tests 6 例）。
    - 设置页：常规分区 CheckOnStartup 勾选框下新增 FeedUrl 输入框 + hint（草稿+Save 模式）。
@@ -37,7 +37,7 @@
 - GDrive multipart body 构造测试。✅
 - Library 索引增删、损坏 json 容错。✅
 - Pin 窗口逻辑以 App.Tests 覆盖可测部分（截图→窗口参数映射）。✅
-- （新增 2026-11-10）UpdateCheckPolicy 决策用例 20 例 + UpdateConfig FeedUrl roundtrip/未知字段 5 例 + UpdatePromptViewModel 对话态 6 例。
+- （新增 2026-11-10）UpdateCheckPolicy 决策用例 21 例 + UpdateConfig FeedUrl roundtrip/未知字段 4 例 + UpdatePromptViewModel 对话态 6 例 + StartupUpdateChecker 静默守卫 3 例（review pass）。
 
 ## 备注 / 风险
 

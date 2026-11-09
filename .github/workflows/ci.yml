@@ -18,6 +18,10 @@ on:
     tags: ['v*']
   pull_request:
 
+# 顶层最小权限（review M9）：test job 只读；release job 用 job 级 permissions: contents: write 覆盖
+permissions:
+  contents: read
+
 jobs:
   test-windows:
     runs-on: windows-latest

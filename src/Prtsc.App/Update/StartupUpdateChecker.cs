@@ -24,23 +24,30 @@ public static class StartupUpdateChecker
     public static async Task RunOnStartupAsync(IConfigStore store, MainWindow owner, ILogger logger)
     {
         var update = store.Current.Update;
-        UpdateManager? manager = null;
+
+        // 空 FeedUrl = 默认配置常态，静默退出：CreateSimpleSource 对空白 URL 抛 ArgumentException，
+        // 不挡的话每次启动都走异常路径记 Warning 噪音（review M2）
+        if (string.IsNullOrWhiteSpace(update.FeedUrl)) return;
+
+        UpdateManager manager;
         try
         {
             manager = new UpdateManager(update.FeedUrl);
         }
         catch (Exception ex)
         {
-            // FeedUrl 空/非法在这层就挡下（Uri 构造失败）；locator 缺失（VelopackApp.Run 未跑）同理
+            // FeedUrl 非法（拼不出 Uri/源）；locator 缺失（VelopackApp.Run 未跑）同理。
+            // 这类是配置/环境问题而非故障，记日志后静默退出，不打状态栏。
             logger.LogWarning(ex, "UpdateManager init failed; startup update check skipped");
             return;
         }
 
-        if (!UpdateCheckPolicy.ShouldCheckOnStartup(manager.IsInstalled, update.CheckOnStartup, update.FeedUrl))
-            return;
-
         try
         {
+            // IsInstalled 读取也在 try 内（locator 侧异常同口径兜住，对齐 App.axaml.cs 的注释口径，review M3）
+            if (!UpdateCheckPolicy.ShouldCheckOnStartup(manager.IsInstalled, update.CheckOnStartup, update.FeedUrl))
+                return;
+
             var info = await manager.CheckForUpdatesAsync();
             var target = info?.TargetFullRelease;
             if (target?.Version is not { } version) return; // 无更新：静默
@@ -51,7 +58,7 @@ public static class StartupUpdateChecker
             var currentText = manager.CurrentVersion?.ToFullString() ?? "";
             if (!UpdateCheckPolicy.ShouldPrompt(targetText, currentText, update.SkippedVersion)) return;
 
-            await Dispatcher.UIThread.InvokeAsync(() => ShowPrompt(store, manager, owner, info!, targetText, currentText, logger));
+            await Dispatcher.UIThread.InvokeAsync(() => ShowPrompt(store, manager, owner, targetText, currentText, logger));
         }
         catch (Exception ex)
         {
@@ -60,13 +67,13 @@ public static class StartupUpdateChecker
         }
     }
 
-    /// <summary>非阻塞弹窗（Show 不是 ShowDialog）：不打断截图主流程。</summary>
+    /// <summary>非阻塞弹窗（Show 不是 ShowDialog）：不打断截图主流程。窗口内安装前会重查 feed（info 不落窗）。</summary>
     private static void ShowPrompt(IConfigStore store, UpdateManager manager, MainWindow owner,
-        UpdateInfo info, string targetText, string currentText, ILogger logger)
+        string targetText, string currentText, ILogger logger)
     {
         try
         {
-            var window = new UpdatePromptWindow(store, manager, info, targetText, currentText, logger);
+            var window = new UpdatePromptWindow(store, manager, targetText, currentText, logger);
             window.Show(owner);
         }
         catch (Exception ex)

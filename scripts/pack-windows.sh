@@ -39,10 +39,12 @@ if [[ -z "$VERSION" ]]; then
 fi
 echo "==> pack $PACK_ID $VERSION ($RID, self-contained)"
 
-# —— vpk 定位：PATH 优先，退回 dotnet global tools 默认位置 ——
-VPK="$(command -v vpk || true)"
+# —— vpk 定位：PATH 优先，退回 dotnet global tools 默认位置（Windows 宿主上是 vpk.exe，review M5）——
+VPK="$(command -v vpk || command -v vpk.exe || true)"
 if [[ -z "$VPK" && -x "$HOME/.dotnet/tools/vpk" ]]; then
   VPK="$HOME/.dotnet/tools/vpk"
+elif [[ -z "$VPK" && -x "$HOME/.dotnet/tools/vpk.exe" ]]; then
+  VPK="$HOME/.dotnet/tools/vpk.exe"
 fi
 if [[ -z "$VPK" ]]; then
   echo "ERROR: vpk not found. Install with: dotnet tool install --global vpk" >&2
@@ -51,6 +53,8 @@ fi
 
 # —— publish（self-contained；EnableWindowsTargeting 已在 Directory.Build.props 打开，
 #     mac/linux 上交叉 publish windows TFM 无需 Windows 机器）——
+# 先清空 publish 目录：上次残留/已从项目移除的文件不清理会被 vpk 整目录打进包（review M6）
+rm -rf "$PACK_DIR"
 mkdir -p "$PACK_DIR"
 dotnet publish "$ROOT/src/Prtsc.App" \
   -c Release -f "$TFM" -r "$RID" --self-contained true \
@@ -82,7 +86,7 @@ fi
   -c "$CHANNEL" \
   -r "$RID" \
   -o "$OUT_DIR" \
-  "${ICON_ARGS[@]}"
+  ${ICON_ARGS[@]+"${ICON_ARGS[@]}"}  # 空数组 + set -u 在 macOS 自带 bash 3.2 会 unbound variable（review M4）
 
 echo "==> artifacts:"
 find "$OUT_DIR" -maxdepth 2 -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "*.zip" -o -name "releases*.json" -o -name "RELEASES" \) -print

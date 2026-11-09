@@ -11,7 +11,7 @@
 - CI：`.github/workflows/ci.yml` 三平台测试矩阵 + tag `v*` release job（版本断言 → pack → Release 传产物 + SHA256SUMS）。
 - 图标：`assets/app.ico`（`scripts/make-app-icon.py` 可复现，品牌渐变对齐编辑器默认背景）。
 
-测试基线 837 → **874 全绿**（Core 527 / App 111×2TFM / Mac 80 / Linux 45），零删除。
+测试基线 837 → **880 全绿**（Core 527 / App 114×2TFM / Mac 80 / Linux 45），零删除。（review pass 后口径：874 + StartupUpdateCheckerTests 3 例×2TFM）
 
 ## 文件地图
 
@@ -25,15 +25,16 @@
 | `src/Prtsc.App/Views/UpdatePromptWindow.axaml(.cs)` | 非阻塞提示框：Install（DownloadUpdatesAsync 进度→ApplyUpdatesAndRestart）/ Skip（写 SkippedVersion + SaveAsync）/ Later |
 | `src/Prtsc.App/ViewModels/SettingsViewModel.cs` | FeedUrl 草稿 + Save（Trim 落盘） |
 | `src/Prtsc.App/Views/SettingsWindow.axaml` | 常规分区 FeedUrl 输入框 + hint |
-| `src/Prtsc.App/Localization/Loc.cs` | 新增 11 个 key（En/Zh：`Settings.General.FeedUrl*`、`Update.Prompt.*`、`Status.UpdateCheckFailed`） |
+| `src/Prtsc.App/Localization/Loc.cs` | 新增 12 个 key（En/Zh：`Settings.General.FeedUrl/FeedUrlHint`、`Update.Prompt.*`×9、`Status.UpdateCheckFailed`） |
 | `src/Prtsc.App/Prtsc.App.csproj` | `Velopack 1.2.161`（双 TFM 都引用，mac restore/build 已验） |
 | `scripts/make-app-icon.py` | 生成 `assets/app.ico`（PIL，16–256 六档；依赖 Pillow） |
 | `scripts/pack-windows.sh` | publish + vpk pack；`--version` 参数或读 Directory.Build.props；channel 钉 `win` |
 | `assets/app.ico` | 品牌 .ico（渐变 #667eea→#764ba2 + 白相机剪影） |
 | `.github/workflows/ci.yml` | 测试矩阵（windows/ubuntu/macos）+ tag release job |
-| `tests/Prtsc.Core.Tests/Update/UpdateCheckPolicyTests.cs` | 20 例（相等/更低/更高/四段修订/跳过版/跳过版非法/prerelease 解析失败/v 前缀解析失败等） |
+| `tests/Prtsc.Core.Tests/Update/UpdateCheckPolicyTests.cs` | 21 例（相等/更低/更高/四段修订/跳过版/跳过版非法/prerelease 解析失败/v 前缀解析失败等） |
 | `tests/Prtsc.Core.Tests/Config/UpdateConfigTests.cs` | 4 例（默认值 / roundtrip / 旧 config 缺节点 / update 节点未知字段容忍） |
 | `tests/Prtsc.App.Tests/UpdatePromptViewModelTests.cs` | 6 例（Lede 含双版本 / 默认 Undecided / 三选一 / busy 态隐藏动作 / busy 中选择忽略 / 进度钳制） |
+| `tests/Prtsc.App.Tests/StartupUpdateCheckerTests.cs` | 3 例（review pass 新增：空/空白 FeedUrl 静默返回不碰 Velopack 与 owner；测试进程 locator 未设 → 构造 catch 兜住不崩） |
 
 产物输出（gitignore 内，不入库）：`artifacts/pack/`（publish 目录 + vpk 产物）。
 
@@ -47,7 +48,7 @@
    - 「是否已打包」= `UpdateManager.IsInstalled`（`IsPackaged` 是 0.0.x 旧名，1.x 已无）；
    - feedUrl 传 **UpdateManager 构造器**，`CheckForUpdatesAsync()` 无参；
    - `VelopackLocator.Current` 在 `VelopackApp.Build().Run()` 未跑时会 throw——所以 Main 第一行必须先 Run()（也是官方要求）；
-   - 未打包环境 `new UpdateManager(url)` 不抛，`IsInstalled` 恒 false——运行时判定靠它，Core 侧 policy 只接收 bool，不依赖 Velopack。
+   - `new UpdateManager(url)` 抛不抛**只取决于 URL 形态**（空/空白抛 ArgumentException，反编译确认；与环境是否打包无关）。未打包 + 合法 URL → `IsInstalled` 恒 false——运行时判定靠它，Core 侧 policy 只接收 bool，不依赖 Velopack。
 4. **vpk 会自动验证 `VelopackApp.Run()` 在 Main 里**（本机实跑日志：`Verified VelopackApp.Run() in Prtsc.App.Program::Main`）——位置不对打包会 fail 或告警。
 5. `dotnet publish` win TFM 在 mac/linux 交叉编译无障碍（仓库 `EnableWindowsTargeting=true` 已开）。
 6. Velopack 安装器默认装快捷方式（Desktop + StartMenuRoot）与卸载项，无需额外参数；**自启不写安装器**——`RegistryAutostartService` 由用户在设置里开（决定：安装器不碰 Run 注册表，卸载不残留自启键）。
@@ -61,6 +62,21 @@
 - **应用内 FeedUrl 输入框 / 更新提示框的真人 UX**：仅 headless 结构测试覆盖，未真人点过。
 - **Portable.zip 行为**：便携包内 `UpdateManager.IsInstalled` 应为 false（无 Update.exe）→ 不检查更新——语义推定正确，未实测。
 - 验收标准降级条款：R-1「VM 安装冒烟」「更新在打包版内可用（端到端）」允许降级并已在 issue 卡标注。
+
+## Review pass（2026-11-10 独立审查后跟进）
+
+独立审查通过（无 Critical），1 Important + 9 Minor 已随本批清掉（commit `fix(app): R-1+C-1 review pass`）：
+
+- **I-1**：FeedUrl hint 文案误导——反编译确认 Velopack 1.2.161 **无任何 GitHub 仓库 URL 识别**（只认 SimpleWebSource：`{base}/releases.win.json`），填裸 releases 页会 404 且更新静默失效。en/zh hint 改为给出正确形态示例 `https://github.com/cholf5/prtsc/releases/latest/download/`（CI 每版上传同名 `releases.win.json`，该 URL 恒指向最新版，与实现匹配）。
+- **M2**：空 FeedUrl 每次启动走异常记 Warning → `RunOnStartupAsync` 开头 `IsNullOrWhiteSpace` 静默 return（默认配置不再产生 `UpdateManager init failed` 噪音日志），新增 3 例守卫测试钉住。
+- **M3**：`manager.IsInstalled` 读取挪进 try-catch，与 `App.axaml.cs` 启动注释口径对齐。
+- **M4**：pack 脚本空数组 + `set -u` 在 macOS bash 3.2 炸 → `${ICON_ARGS[@]+...}`（本机 bash 3.2 实测空/非空两态）。
+- **M5**：vpk fallback 识别 `vpk.exe`（Windows 宿主）。
+- **M6**：publish 前 `rm -rf "$PACK_DIR"`，陈旧文件不混包。
+- **M7**：删 `UpdatePromptWindow` 公共无参构造（连带消灭一组 `null!` 字段的可达 NRE 面）。
+- **M8**：`UpdatePromptViewModel.Choice` 注释改实（副作用由窗口事件处理，属性当前仅测试读取）。
+- **M9**：ci.yml 顶层 `permissions: contents: read`（release job 仍 job 级 `contents: write`）。
+- **M10**：文档计数更正（policy 21 例 / config 4 例 / Loc key 12 个）+ 坑 3 措辞（`new UpdateManager` 抛不抛取决于 URL 形态而非是否打包）。
 
 ## 下一步
 
