@@ -15,7 +15,6 @@ public sealed class MacCaptureService : ICaptureService
 {
     private readonly IMacDisplayApi _api;
     private readonly ILogger<MacCaptureService> _logger;
-    private readonly List<uint> _rawIds = [];
 
     public MacCaptureService(IMacDisplayApi api, ILogger<MacCaptureService> logger)
     {
@@ -23,42 +22,62 @@ public sealed class MacCaptureService : ICaptureService
         _logger = logger;
     }
 
-    public IReadOnlyList<DisplayInfo> EnumerateDisplays()
+    /// <summary>
+    /// 一次枚举的快照：DisplayInfo 与 CG displayId 配对，全部是局部数据、无共享可变状态
+    /// （review I-2：旧实现把 rawId 存实例字段 List，UI 线程热键抓帧与 CLI 转发后台线程抓帧
+    /// 并发时互相覆写 → 张冠李戴/IndexOutOfRange。L-1 起捕获可跑在任意线程，快照语义是结构性修复）。
+    /// </summary>
+    private sealed record DisplaySnapshot(DisplayInfo Info, uint RawId);
+
+    private DisplaySnapshot[] EnumerateSnapshot()
     {
         var raws = _api.EnumerateDisplays();
         var sorted = MacDisplayGeometry.SortForIndexing(raws);
-        // 每次返回新数组：调用方会在枚举返回值的过程中再次触发本方法（如 Region 流程逐屏 CaptureDisplay），
-        // 若返回内部活缓存，外层 foreach 会抛 Collection was modified
-        var displays = new DisplayInfo[sorted.Length];
-        _rawIds.Clear();
+        var snapshot = new DisplaySnapshot[sorted.Length];
         for (var i = 0; i < sorted.Length; i++)
         {
-            displays[i] = MacDisplayGeometry.ToDisplayInfo(sorted[i], MacDisplayGeometry.DeriveScaleFactor(sorted[i]), i);
-            _rawIds.Add(sorted[i].Id);
+            snapshot[i] = new DisplaySnapshot(
+                MacDisplayGeometry.ToDisplayInfo(sorted[i], MacDisplayGeometry.DeriveScaleFactor(sorted[i]), i),
+                sorted[i].Id);
         }
+        return snapshot;
+    }
+
+    private static DisplayInfo[] Infos(DisplaySnapshot[] snapshot)
+    {
+        var displays = new DisplayInfo[snapshot.Length];
+        for (var i = 0; i < snapshot.Length; i++) displays[i] = snapshot[i].Info;
         return displays;
+    }
+
+    public IReadOnlyList<DisplayInfo> EnumerateDisplays()
+    {
+        // 每次返回新数组：调用方会在枚举返回值的过程中再次触发本方法（如 Region 流程逐屏 CaptureDisplay）；
+        // 快照语义天然满足（无内部活缓存可被第二次枚举改动）
+        return Infos(EnumerateSnapshot());
     }
 
     public CapturedImage CaptureFullscreen()
     {
-        var displays = EnumerateDisplays();
-        if (displays.Count == 0)
+        var snapshot = EnumerateSnapshot();
+        if (snapshot.Length == 0)
             throw new InvalidOperationException(ScreenPermissionHint("No active displays"));
+        var displays = Infos(snapshot);
 
         var union = MacDisplayGeometry.VirtualDesktopBounds(displays);
         var bitmap = new SKBitmap(union.Width, union.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
         var drawn = false;
 
-        foreach (var d in displays)
+        foreach (var d in snapshot)
         {
-            var image = RequireDisplayImage(_rawIds[d.Index], d.Index);
+            var image = RequireDisplayImage(d.RawId, d.Info.Index);
             try
             {
                 // CG 全局坐标与物理 Bounds 同为左上原点：位图偏移 = display.Bounds - union 原点
-                var offsetX = d.Bounds.X - union.X;
-                var offsetY = d.Bounds.Y - union.Y;
-                DrawImageInto(canvas, image, d.Bounds, offsetX, offsetY);
+                var offsetX = d.Info.Bounds.X - union.X;
+                var offsetY = d.Info.Bounds.Y - union.Y;
+                DrawImageInto(canvas, image, d.Info.Bounds, offsetX, offsetY);
                 drawn = true;
             }
             finally
@@ -74,16 +93,16 @@ public sealed class MacCaptureService : ICaptureService
 
     public CapturedImage CaptureDisplay(int displayIndex)
     {
-        var displays = EnumerateDisplays();
-        if (displayIndex < 0 || displayIndex >= displays.Count)
+        var snapshot = EnumerateSnapshot();
+        if (displayIndex < 0 || displayIndex >= snapshot.Length)
             throw new ArgumentOutOfRangeException(nameof(displayIndex));
-        var d = displays[displayIndex];
+        var d = snapshot[displayIndex];
 
-        var image = RequireDisplayImage(_rawIds[displayIndex], displayIndex);
+        var image = RequireDisplayImage(d.RawId, displayIndex);
         try
         {
-            var bitmap = ImageToBitmap(image, d.Bounds.Width, d.Bounds.Height);
-            return new CapturedImage(bitmap, d.Bounds, d.ScaleFactor, CaptureSource.Display);
+            var bitmap = ImageToBitmap(image, d.Info.Bounds.Width, d.Info.Bounds.Height);
+            return new CapturedImage(bitmap, d.Info.Bounds, d.Info.ScaleFactor, CaptureSource.Display);
         }
         finally
         {
@@ -96,7 +115,8 @@ public sealed class MacCaptureService : ICaptureService
         if (region.IsEmpty)
             throw new ArgumentException("Region is empty", nameof(region));
 
-        var displays = EnumerateDisplays();
+        var snapshot = EnumerateSnapshot();
+        var displays = Infos(snapshot);
         var hits = MacDisplayGeometry.IntersectingDisplays(displays, region);
         if (hits.Count == 0)
             throw new ArgumentException($"Region {region} intersects no display", nameof(region));
@@ -106,7 +126,7 @@ public sealed class MacCaptureService : ICaptureService
 
         foreach (var d in hits)
         {
-            var image = RequireDisplayImage(_rawIds[d.Index], d.Index);
+            var image = RequireDisplayImage(snapshot[d.Index].RawId, d.Index);
             try
             {
                 // 该屏位图相对 region 的偏移（可能是负数：屏在 region 左/上方）

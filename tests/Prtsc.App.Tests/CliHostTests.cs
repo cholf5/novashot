@@ -140,6 +140,17 @@ public class CliPipeHostAssemblyTests
 {
     private static string UniquePipeName() => $"prtsc-cli-t{Guid.NewGuid():N}".AsSpan(0, 17).ToString();
 
+    /// <summary>review I-1 闸门生效后：服务端入口由后台 Task 创建，转发前先等廉价探测命中（生产为秒级间隔无此竞态）。</summary>
+    private static async Task WaitUntilProbeAsync(string pipeName, int timeoutMs = 2000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (!CliPipeClient.CheapProbe(pipeName))
+        {
+            Assert.True(sw.ElapsedMilliseconds < timeoutMs, $"Server pipe entry never appeared within {timeoutMs} ms.");
+            await Task.Delay(10);
+        }
+    }
+
     [Fact]
     public async Task HostWithRouter_ForwardedWindowCommand_TriggersInteractiveAndRespondsOk()
     {
@@ -152,6 +163,7 @@ public class CliPipeHostAssemblyTests
 
         using var host = new CliPipeServerHost(pipeName, (cmd, ct) => router.HandleAsync(cmd, ct));
         host.Start();
+        await WaitUntilProbeAsync(pipeName);
 
         var result = await CliPipeClient.TryForwardAsync(
             pipeName, ["window", "--delay", "3"], connectTimeoutMs: 2000);
@@ -174,6 +186,7 @@ public class CliPipeHostAssemblyTests
 
         using var host = new CliPipeServerHost(pipeName, (cmd, ct) => router.HandleAsync(cmd, ct));
         host.Start();
+        await WaitUntilProbeAsync(pipeName);
 
         var result = await CliPipeClient.TryForwardAsync(pipeName, [], connectTimeoutMs: 2000);
 

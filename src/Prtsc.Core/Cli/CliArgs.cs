@@ -177,13 +177,23 @@ public static class CliArgs
         });
     }
 
-    /// <summary>读取带值选项的下一个 token；缺失或以 "--" 开头（更像下一个选项）→ false。</summary>
+    /// <summary>
+    /// 已知选项 token 全集（review M-1）：带值选项的下一个 token 若是其中之一，
+    /// 判定为「缺值」而非吞成值——<c>prtsc full -p -c</c> 不得把 <c>-c</c> 吞成路径值。
+    /// 注意不能用「以 - 开头且非纯整数」一刀切拒绝：<c>--geometry -10,-20,300,400</c> 是合法负值。
+    /// </summary>
+    private static readonly HashSet<string> KnownOptionTokens = new(StringComparer.Ordinal)
+    {
+        "-c", "--clipboard", "-d", "--delay", "-p", "--path", "-f", "--format", "--geometry", "-h", "--help",
+    };
+
+    /// <summary>读取带值选项的下一个 token；缺失、以 "--" 开头、或命中已知选项 token → false。</summary>
     private static bool TryReadValue(string[] args, ref int index, out string value)
     {
         value = string.Empty;
         if (index + 1 >= args.Length) return false;
         var candidate = args[index + 1];
-        if (candidate.StartsWith("--")) return false;
+        if (candidate.StartsWith("--") || KnownOptionTokens.Contains(candidate)) return false;
         value = candidate;
         index++;
         return true;

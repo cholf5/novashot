@@ -78,7 +78,18 @@ public static class CliPipeProtocol
                 MaxDepth = 4,
             });
             var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("args", out var argsEl))
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                error = "expected a JSON object with an 'args' array.";
+                return false;
+            }
+            // review M-2：版本字段必须存在且 == 1（闸门，不是摆设）；不符拒帧，未来演进时旧端可明确报因
+            if (!root.TryGetProperty("v", out var vEl) || vEl.ValueKind != JsonValueKind.Number || vEl.GetInt32() != ProtocolVersion)
+            {
+                error = $"unsupported protocol version (expected {ProtocolVersion}).";
+                return false;
+            }
+            if (!root.TryGetProperty("args", out var argsEl))
             {
                 error = "expected a JSON object with an 'args' array.";
                 return false;
@@ -165,6 +176,12 @@ public static class CliPipeProtocol
             if (root.ValueKind != JsonValueKind.Object)
             {
                 error = "expected a JSON object.";
+                return false;
+            }
+            // review M-2：版本闸门同请求侧
+            if (!root.TryGetProperty("v", out var vEl) || vEl.ValueKind != JsonValueKind.Number || vEl.GetInt32() != ProtocolVersion)
+            {
+                error = $"unsupported protocol version (expected {ProtocolVersion}).";
                 return false;
             }
             if (!root.TryGetProperty("ok", out var okEl) || okEl.ValueKind != JsonValueKind.True && okEl.ValueKind != JsonValueKind.False

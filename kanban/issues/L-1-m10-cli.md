@@ -30,6 +30,7 @@ flameshot 式命令行：脚本化/第三方启动器调用截图。
 ## Verification（2026-11-10）
 
 - 模式语义（PM 裁决）：`gui`/无参数 = 现行 GUI（有实例转发 activate）；`full` headless 抓全虚拟桌面导出；`region` headless 需 `--geometry`（缺失 → stderr + 退出码 2；有实例转发触发 overlay 选区）；`window` 需交互选窗（有实例转发触发选窗流程，无实例报错退出不启动 GUI）。转发来的 headless 命令在 GUI 进程内执行同一执行器（无 GUI 闪现）；`activate` → 主窗口弹前台。退出码：0 成功 / 1 失败 / 2 用法错误。
-- 测试 **1160/1160 全绿**（Core 696 + App 168×2TFM + Mac 82 + Linux 46，基线 1038 → +122）；`dotnet build Prtsc.slnx` 0 Error（windows TFM mac 交叉编译通过）。
-- 实弹（本机 macOS 26.5.2 M2）：headless `full --clipboard` **1.25s** exit 0、剪贴板有图（TIFF+PNGf）；`--path`+`--format webp/jpeg` 文件名/扩展名/尺寸全对；`region --geometry 100,50,800,600` 出图恰 800x600；GUI 实例存活时 `full --clipboard`/`full --path`/`gui`/`window` 转发全通（GUI 日志「CLI forwarded command executed」佐证执行发生在 GUI 进程）；`--help` exit 0；错误路径 2/1/2/1。**坑：显示器休眠时 CGGetActiveDisplayList 返回 0**（首跑误判为权限问题，caffeinate -u 唤醒后全通）。
+- 测试 **1170/1170 全绿**（Core 705 + App 168×2TFM + Mac 83 + Linux 46，基线 1038 → +132）；`dotnet build Prtsc.slnx` 0 Error（windows TFM mac 交叉编译通过）。
+- **Review pass（同日独立审查，`fix(app): L-1 review pass`）**：I-1 无实例探测拖慢 GUI 冷启动 ≈0.5s → `CheapProbe` 廉价闸门（无实例 0 等待）+ gui 模式 100ms 短超时，实弹 gui 冷启动到首条日志 0.13s；I-2 `MacCaptureService._rawIds` 共享可变状态 → 快照语义（共享字段删除，hammer 测试 + 结构性审查兜底）；顺手 M-1（`-p -c` 吞旗标）/M-2（协议 v:1 校验）/M-6（二次 Ctrl+C 放行终止）/M-7（GUI 启动日志 Configure 去重）。M-3/M-4/M-5/M-8 由 PM 记录。详见 handoff §7。
+- 实弹（本机 macOS 26.5.2 M2）：headless `full --clipboard` **1.25s**（review pass 后复验 1.23s）exit 0、剪贴板有图（TIFF+PNGf）；`--path`+`--format webp/jpeg` 文件名/扩展名/尺寸全对；`region --geometry 100,50,800,600` 出图恰 800x600；GUI 实例存活时 `full --clipboard`/`full --path`/`gui`/`window` 转发全通（GUI 日志「CLI forwarded command executed」佐证执行发生在 GUI 进程）；`--help` exit 0；错误路径 2/1/2/1。**坑：显示器休眠时 CGGetActiveDisplayList 返回 0**（首跑误判为权限问题，caffeinate -u 唤醒后全通）。
 - 已知边界：CLI 输出全 en（不经 Loc 表）；无 --path 无 --clipboard 默认 --clipboard（flameshot 对齐）；--geometry 只配 region；双实例并发（开发调试场景）管道归属有竞态，记 handoff 已知影响。

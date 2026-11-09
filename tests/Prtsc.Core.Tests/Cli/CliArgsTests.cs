@@ -170,6 +170,26 @@ public class CliArgsTests
         Assert.Contains("Missing value", r.Error);
     }
 
+    [Fact]
+    public void Parse_Path_SingleDashKnownFlagValue_Rejected()
+    {
+        // review M-1 实测坑：-c 被吞成 --path 的值（cwd 建出 "-c" 目录落图、无剪贴板）。
+        // 已知选项 token 一律视为缺值，不做值。
+        var r = CliArgs.Parse(["full", "-p", "-c"]);
+        Assert.False(r.Success);
+        Assert.Contains("Missing value", r.Error);
+    }
+
+    [Fact]
+    public void Parse_Path_UnknownDashValue_AcceptedAsLiteral()
+    {
+        // 非「已知选项 token」的单横线值仍按字面量接受（文档化边界；含横线路径不常见）。
+        // 不能用「以 - 开头且非纯整数」一刀切拒绝——--geometry -10,-20,300,400 是合法负值。
+        var r = CliArgs.Parse(["full", "--path", "-custom"]);
+        Assert.True(r.Success);
+        Assert.Equal("-custom", r.Command!.Path);
+    }
+
     // ---------- 默认导出目标（对齐 flameshot：无 --path 无 --clipboard → clipboard） ----------
 
     [Fact]

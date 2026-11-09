@@ -25,6 +25,7 @@ public class CliPipeTests
         using var host = new CliPipeServerHost(pipeName,
             (_, _) => Task.FromResult(CliPipeResponse.Success("Saved to /tmp/x.png (10 bytes)")));
         host.Start();
+        await WaitUntilProbeAsync(pipeName);
 
         var result = await CliPipeClient.TryForwardAsync(pipeName, ["full", "--clipboard"], connectTimeoutMs: 2000);
 
@@ -41,6 +42,7 @@ public class CliPipeTests
         using var host = new CliPipeServerHost(pipeName,
             (_, _) => Task.FromResult(CliPipeResponse.Fail(1, "Capture failed: no permission")));
         host.Start();
+        await WaitUntilProbeAsync(pipeName);
 
         var result = await CliPipeClient.TryForwardAsync(pipeName, ["full"], connectTimeoutMs: 2000);
 
@@ -56,6 +58,7 @@ public class CliPipeTests
         using var host = new CliPipeServerHost(pipeName,
             (_, _) => Task.FromResult(CliPipeResponse.Success("never called")));
         host.Start();
+        await WaitUntilProbeAsync(pipeName);
 
         // 服务端对无法解析的命令自己回 usage error，handler 不被调用
         var result = await CliPipeClient.TryForwardAsync(pipeName, ["full", "--nope"], connectTimeoutMs: 2000);
@@ -72,6 +75,7 @@ public class CliPipeTests
         using var host = new CliPipeServerHost(pipeName,
             (_, _) => throw new InvalidOperationException("di crashed"));
         host.Start();
+        await WaitUntilProbeAsync(pipeName);
 
         var result = await CliPipeClient.TryForwardAsync(pipeName, ["full"], connectTimeoutMs: 2000);
 
@@ -92,6 +96,7 @@ public class CliPipeTests
                 return Task.FromResult(CliPipeResponse.Success($"ok-{handled.Count}"));
             });
         host.Start();
+        await WaitUntilProbeAsync(pipeName);
 
         var first = await CliPipeClient.TryForwardAsync(pipeName, ["full"], connectTimeoutMs: 2000);
         var second = await CliPipeClient.TryForwardAsync(pipeName, ["region"], connectTimeoutMs: 2000);
@@ -131,6 +136,74 @@ public class CliPipeTests
         Assert.Null(result.TransportError);
     }
 
+    // ---------- 廉价探测闸门（review I-1 回归） ----------
+
+    [Fact]
+    public void CheapProbe_NonexistentPipe_ReturnsFalse()
+    {
+        Assert.False(CliPipeClient.CheapProbe(UniquePipeName()));
+    }
+
+    [Fact]
+    public async Task CheapProbe_LiveServer_ReturnsTrue()
+    {
+        var pipeName = UniquePipeName();
+        using var host = new CliPipeServerHost(pipeName, (_, _) => Task.FromResult(CliPipeResponse.Success("unused")));
+        host.Start();
+        try
+        {
+            await WaitUntilProbeAsync(pipeName);
+            Assert.True(CliPipeClient.CheapProbe(pipeName));
+        }
+        finally
+        {
+            host.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task TryForward_NoInstance_DoesNotPayFullConnectTimeout()
+    {
+        // 回归（review I-1）：无实例时不得为单实例探测支付全额连接等待——
+        // connect 超时故意给 10s：闸门失效（直接进 ConnectAsync 全额轮询）时本用例耗 ≥10s 必挂；
+        // 闸门生效立即返回。计时断言程度：证明走的是廉价闸门而非连接等待（不承诺精确毫秒）。
+        var pipeName = UniquePipeName(); // 从未创建服务端
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var result = await CliPipeClient.TryForwardAsync(pipeName, ["full"], connectTimeoutMs: 10_000);
+        sw.Stop();
+
+        Assert.False(result.Connected);
+        Assert.True(sw.ElapsedMilliseconds < 2_000,
+            $"No-instance forward took {sw.ElapsedMilliseconds} ms despite 10s connect timeout — probe gate not effective.");
+    }
+
+    [Fact]
+    public async Task TryForward_StaleSocketFile_FailsFastNotTimeout()
+    {
+        // review 实测场景：宿主被杀后 Unix 残留 CoreFxPipe_* socket 文件。此处放一个同名普通文件
+        // 模拟「闸门命中但不是活 socket」：connect 必须立即失败（ENOTSOCK/ENOENT 或超时兜底），
+        // 不得挂满超时（gui 冷启动传 GuiConnectTimeoutMs=100ms，这里给 3s 余量验证远小于超时）。
+        // Windows 无 socket 文件概念，该文件对闸门无影响 → 走 skip 分支，同样快速返回。
+        var pipeName = UniquePipeName();
+        var stalePath = Path.Combine(Path.GetTempPath(), "CoreFxPipe_" + pipeName);
+        await File.WriteAllTextAsync(stalePath, "not a socket");
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = await CliPipeClient.TryForwardAsync(pipeName, ["full"],
+                connectTimeoutMs: CliPipeClient.GuiConnectTimeoutMs, responseTimeoutMs: 3000);
+            sw.Stop();
+
+            Assert.False(result.Connected);
+            Assert.True(sw.ElapsedMilliseconds < 3_000,
+                $"Stale-entry forward took {sw.ElapsedMilliseconds} ms — stale file must fail fast, not wait the timeout.");
+        }
+        finally
+        {
+            File.Delete(stalePath);
+        }
+    }
+
     // ---------- 宿主装配 ----------
 
     [Fact]
@@ -151,7 +224,7 @@ public class CliPipeTests
         var pipeName = UniquePipeName();
         var host = new CliPipeServerHost(pipeName, (_, _) => Task.FromResult(CliPipeResponse.Success("unused")));
         host.Start();
-        await Task.Delay(50);
+        await WaitUntilProbeAsync(pipeName);
         host.Dispose();
 
         // 服务端已停：此时连接可能失败（无实例回退）也可能连上但无响应（传输失败），都不得挂死
@@ -189,6 +262,22 @@ public class CliPipeTests
     }
 
     // ---------- helpers ----------
+
+    /// <summary>
+    /// 等宿主的管道入口出现（review I-1 闸门生效后的测试义务）：CliPipeServerHost.Start() 是
+    /// fire-and-forget，服务端流在后台 Task 里创建——廉价闸门探不到入口时 TryForwardAsync 会
+    /// 立即判 NoInstance（这正是它的职责）。生产语境 CLI 在 GUI 启动数秒后才调用，无此竞态；
+    /// 测试里轮询闸门到位再转发，等价于模拟「实例已起来」。
+    /// </summary>
+    private static async Task WaitUntilProbeAsync(string pipeName, int timeoutMs = 2000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (!CliPipeClient.CheapProbe(pipeName))
+        {
+            Assert.True(sw.ElapsedMilliseconds < timeoutMs, $"Server pipe entry never appeared within {timeoutMs} ms.");
+            await Task.Delay(10);
+        }
+    }
 
     /// <summary>裸管道客户端：写任意行，读回一帧响应（绕过 CliPipeClient，测试坏帧路径）。</summary>
     private static async Task<CliPipeResponse> SendRawAndReadResponseAsync(string pipeName, string line)

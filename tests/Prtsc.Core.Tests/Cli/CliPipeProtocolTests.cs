@@ -163,6 +163,32 @@ public class CliPipeProtocolTests
         Assert.NotNull(decoded);
     }
 
+    // ---------- 协议版本闸门（review M-2） ----------
+
+    [Fact]
+    public void Request_WrongProtocolVersion_Fails()
+    {
+        var payload = Encoding.UTF8.GetBytes("{\"v\":2,\"args\":[\"full\"]}\n");
+        Assert.False(CliPipeProtocol.TryDecodeRequest(payload, out _, out var error));
+        Assert.Contains("unsupported protocol version", error);
+    }
+
+    [Fact]
+    public void Request_MissingProtocolVersion_Fails()
+    {
+        var payload = Encoding.UTF8.GetBytes("{\"args\":[\"full\"]}\n");
+        Assert.False(CliPipeProtocol.TryDecodeRequest(payload, out _, out var error));
+        Assert.Contains("unsupported protocol version", error);
+    }
+
+    [Fact]
+    public void Response_WrongProtocolVersion_Fails()
+    {
+        var payload = Encoding.UTF8.GetBytes("{\"v\":99,\"ok\":true,\"exitCode\":0,\"message\":\"m\"}\n");
+        Assert.False(CliPipeProtocol.TryDecodeResponse(payload, out _, out var error));
+        Assert.Contains("unsupported protocol version", error);
+    }
+
     // ---------- 响应容错 ----------
 
     [Theory]

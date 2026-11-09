@@ -7,7 +7,7 @@
 - **L-1 完成**：flameshot 式 CLI——`prtsc gui|full|region|window --delay <s> --path <dir> --clipboard --format png|jpeg|webp --geometry X,Y,W,H`。
 - **分流**（Program.Main，Velopack 钩子之后、`BuildAvaloniaApp` 之前）：CLI 捕获命令 → 单实例管道探测（有实例转发整条 argv 后按响应退出）→ 无实例按模式分流（full / region+geometry → headless 执行；region 缺 geometry → usage error；window → 报错退出不启动 GUI）；gui/无参数 → 现行 GUI 路径。**CLI 路径零 Avalonia 运行时**。
 - **退出码约定**：0 成功 / 1 一般失败 / 2 用法错误（stderr 报错，stdout 只出结果行）。
-- **单实例**：命名管道 `System.IO.Pipes`，服务端 GUI 全程 host（App 启动起、退出停，吞异常）；客户端 500ms 探测，连接成功即转发原始 argv（JSON 数组行式帧）并等执行结果；**plain `gui` 也转发**（接收方映射为 activate：主窗口 Show+Activate，对齐 winshot）。
+- **单实例**：命名管道 `System.IO.Pipes`，服务端 GUI 全程 host（App 启动起、退出停，吞异常）；客户端先廉价存在性闸门（无实例 0 等待，review I-1）再连接（捕获模式 500ms / gui 模式 100ms 超时），连接成功即转发原始 argv（JSON 数组行式帧）并等执行结果；**plain `gui` 也转发**（接收方映射为 activate：主窗口 Show+Activate，对齐 winshot）。
 - **headless 执行器**：Core `CliCaptureExecutor`（注入 ICaptureService/IConfigStore/IClipboardService，零 Avalonia）——抓帧 → `ImageExporter.Encode`（无标注 AnnotationDocument = 原图直出，不加编辑器 padding/背景，对齐 flameshot CLI）→ `--path` 落盘（文件名走 `FilenamePatterns` 既有模式 + config.QuickSave.Pattern，目录自动创建）/ `--clipboard`（`IClipboardService.TrySetImage` 快照）；两者可并存。CLI 进程与 GUI 接收方共用同一执行器。
 - **--delay 与 D-1 的复用边界**（PM 裁决）：CLI 语境 = 简单延时（`Task.Delay` + CancellationToken，Ctrl+C 取消），**不复用** `DelayedCaptureCountdown`/`CountdownOrchestrator`——那是 UI 倒计时状态机（角标/取消热键/settle 间隙语义），headless 硬套没有意义；秒数钳制 0-60（与 D-1 的 {0,3,5} 合法值表无关）。转发到 GUI 的 region/window 交互模式则走 `TriggerCaptureAsync` 既有倒计时（CLI 显式 delay 透传，显式值覆盖 config 默认）。
 - **CLI 输出 en，不经 Loc 表**（PM 裁决）：help/错误/结果文案都是英文字面量（`CliArgs.HelpText` + stderr），脚本契约不受语言设置影响。
@@ -67,6 +67,7 @@ kanban/issues/L-1-m10-cli.md                           Done + Verification
 - **Windows/Linux 腿**：编译过（slnx 0 Error）、单测全绿，真机未验证（管道名长上限在自定义 TMPDIR 的退化、Win32 命名管道 ACL、Linux 剪贴板服务在 CLI 进程内是否可用——留 QA-1）。
 - CLI headless 导出**不加编辑器合成**（padding/背景/圆角）——flameshot 语义；要带样式的导出走 GUI。
 - 转发等待上限 120s（delay 最大 60 + 抓帧导出余量）；GUI 内执行超时客户端 exit 1（执行可能仍在后台完成，结果不回传）。
+- 无实例探测成本（review I-1 后）：Unix 闸门 stat 不存在的入口 → 0 等待；**stale socket 文件残留**（宿主被杀不清文件）时捕获模式 connect 轮询 500ms、gui 模式 100ms——前者审查定性为 headless 必要成本，后者是 GUI 冷启动上限。
 - CLI 进程与 GUI 共写同一日志文件（rolling daily）——多进程写有交错，dev 日志仅观测用。
 
 ## 5. 实弹记录（本机 macOS 26.5.2 / Apple M2，2026-11-10）
@@ -90,7 +91,36 @@ kanban/issues/L-1-m10-cli.md                           Done + Verification
 
 观测：`--delay 60` 上限钳制、`--delay 0-60` 之外值钳制由单测覆盖（真实 60s 等待未实弹耗等）。
 
-## 6. 下一步
+## 7. Review pass（2026-11-10 独立审查后修复，`fix(app): L-1 review pass` commit）
+
+独立审查（`/tmp/prtsc-sdd/batch7-review-findings.md`）结论「通过 + 2 Important + 一行级 Minor」。修复 I-1/I-2 + M-1/M-2/M-6/M-7；M-3/M-4/M-5/M-8 由 PM 记录未修。
+
+### I-1：无实例探测为 GUI 冷启动固定 +≈0.5s → 廉价闸门 + gui 短超时
+
+- **修复**（审查建议 b+c 组合，超出行也覆盖）：
+  1. `CliPipeClient.CheapProbe(pipeName)`（公开静态，Core）：先于 `ConnectAsync` 的存在性检查——Windows `File.Exists(@"\\.\pipe\{name}")`；Unix `File.Exists(GetTempPath()+"CoreFxPipe_"+name)`（dotnet 命名管道在 Unix 落成该路径的域 socket，文件不存在必无监听者）。探测异常保守放行（交给 ConnectAsync 真实判定）。`TryForwardAsync` 开头闸门不命中 → **0 等待**回退 NoInstance——所有模式受益，Unix/Windows 无实例（含 stale 残留之外的场景）不再付全额连接等待。
+  2. gui/无参 模式另用 `CliPipeClient.GuiConnectTimeoutMs = 100`（捕获模式保持 500ms）：闸门命中但实例已死（**Unix stale socket 文件残留**——宿主被杀不清文件，connect 会轮询满超时）时以 100ms 短超时兜底。**GUI 冷启动成本结论：0（入口未建，闸门秒判）~0.1s（stale 残留 connect 兜底）**，实弹测得 gui 冷启动到首条日志 0.13s（BASE 即时启动基本还原）。
+- **如实边界**：Unix 闸门依赖 `CoreFxPipe_` 路径这一 .NET 运行时实现细节（Core 系长期稳定）——若未来变更只会退化成「闸门恒 false → CLI 永远 headless（慢但不炸）」；另一边界：宿主 `Start()` 后入口由后台 Task 创建，CLI 在 GUI 起动同毫秒内调用可能漏转发（生产 CLI 与 GUI 启动间隔秒级，可接受）。
+- **测试**：`TryForward_NoInstance_DoesNotPayFullConnectTimeout`——connect 超时故意给 10s、无实例断言 <2s 返回（闸门失效必挂；能测到「走闸门而非连接等待」的程度，不承诺精确毫秒）；`CheapProbe` 存在性两例 + `TryForward_StaleSocketFile_FailsFastNotTimeout`（stale 条目快速失败）。既有宿主测试补 `WaitUntilProbeAsync`（闸门生效后，服务端入口由后台 Task 创建，测试须等探测命中再转发——生产语境 CLI 与 GUI 启动间隔秒级无此竞态）。
+
+### I-2：MacCaptureService._rawIds 共享可变状态 → 快照语义（结构性修复）
+
+- **修复**：`List<uint> _rawIds` 实例字段删除；新增私有 `DisplaySnapshot(Info, RawId)` record + `EnumerateSnapshot()`——每次枚举产出局部配对数组，`CaptureFullscreen/Display/Region` 全部改用快照（`Region` 经 `snapshot[d.Index].RawId` 取 id），无任何跨方法共享状态 → UI 线程热键抓帧与 CLI 转发后台线程抓帧并发安全（结构上不可能再互相覆写）。
+- **测试（如实）**：`MacCaptureServiceConcurrencyTests` 8 线程 × 12 轮 hammer 轮转三组不同尺寸显示器（另插并发 EnumerateDisplays），断言 `CapturedImage.Bounds 与位图实际尺寸逐例一致`——id 错配即错配尺寸必被观测。**旧实现的竞态窗口在服务内部「枚举返回 ↔ id 读取」两行之间、无外部 seam，无法决定性复现单次错配**——决定性回归由「共享字段已删除」的结构性审查兜底（同 D-1 review pass「竞态逻辑整体下沉、无可测残留」判例）；hammer 覆盖粗回归（Collection-modified / IndexOutOfRange / 错配），新实现确定性通过无 flake。
+
+### 顺手项（M-1/M-2/M-6/M-7）
+
+- **M-1**：`TryReadValue` 只拒 `--` 前缀 → `prtsc full -p -c` 把 `-c` 吞成路径值。修复 = 下一个 token 命中**已知选项 token 全集**（`-c/--clipboard/-d/--delay/-p/--path/-f/--format/--geometry/-h/--help`）即判缺值。**没用审查建议的「横线开头且非纯整数拒绝」**：那会误杀 `--geometry -10,-20,300,400`（既有测试钉住）；非已知 token 的横线值（如 `-custom`）按字面量接受，测试钉住此边界。
+- **M-2**：`TryDecodeRequest/TryDecodeResponse` 校验 `"v":1`（缺失或不符 → "unsupported protocol version (expected 1)" 拒帧）——版本字段从摆设变闸门，未来演进旧端可明确报因。
+- **M-6**：`Console.CancelKeyPress` 处理器——第一次 Ctrl+C 仍 `e.Cancel=true` 优雅取消（拿退出码）；**已取消后再按放行默认终止**（`cts.IsCancellationRequested` → `e.Cancel=false`），原生抓帧悬挂时第二次 Ctrl+C 必杀得掉。
+- **M-7**：`LoggingSetup.Configure` 双调用去重——gui/无参 不再预配置（转发客户端本身不产生日志），只有 `LaunchGui` 后唯一一次 Configure(console+file)；CLI 捕获命令（含 --help/解析失败）file-only 一次。实弹：一次 GUI 启动日志恰好 1 对 "Prtsc starting / Log dir"（修复前 2 对）。
+
+### Review pass 后测试与实弹
+
+- **1170/1170 全绿**（Core 705 + App 168×2TFM + Mac 83 + Linux 46；1160 → +10：Core +9 = 协议版本 3 + 闸门/计时 4 + M-1 两例，Mac +1 = 并发 hammer）；`dotnet build Prtsc.slnx` 0 Error。
+- 实弹复验（本机 macOS，无回归）：headless `full --clipboard` **1.23s** exit 0（< 2s，stale socket 残留场景下含 500ms 捕获模式探测——审查已定性为 headless 必要成本；无残留文件时闸门 0 等待）；GUI 存活转发 full/gui 全通；杀 GUI 后 headless 回退 + 退出码电池（window=1 / format=2 / `-p -c`=2 即 M-1 实弹生效）全对；GUI 冷启动到首条日志 **0.13s**（修复前 ≥0.5s）。
+
+## 8. 下一步
 
 - QA-1 真机冒烟补 L-1 段：Linux（管道名长上限/剪贴板）、Windows（Win32 管道 ACL、CLI 进程内 Win32 剪贴板、WGC headless 抓帧）、macOS 权限拒绝文案。
 - 可选后续（未排期）：`--screen <n>` 单屏导出、`--clipboard-only` 输出静音模式、CLI 输出 JSON `--out json`。

@@ -44,8 +44,13 @@ public static class CliApplication
             return CliRunResult.With(CliExitCodes.Usage);
         }
 
-        // 1) 单实例探测：已有实例 → 转发整条原始命令行，按响应退出（gui 在接收方映射为 activate）
-        var forward = CliPipeClient.TryForwardAsync(CliPipeNames.ForCurrentUser(), args)
+        // 1) 单实例探测：已有实例 → 转发整条原始命令行，按响应退出（gui 在接收方映射为 activate）。
+        //    review I-1：TryForwardAsync 内置廉价闸门（无实例 0 等待）；gui/无参 冷启动另用短连接超时，
+        //    防 Unix stale socket 残留把探测拖满 500ms——GUI 冷启动上限 ~0.1s（BASE 即时启动）。
+        var connectTimeoutMs = parse.Command.Mode == CliCaptureMode.Gui
+            ? CliPipeClient.GuiConnectTimeoutMs
+            : CliPipeClient.DefaultConnectTimeoutMs;
+        var forward = CliPipeClient.TryForwardAsync(CliPipeNames.ForCurrentUser(), args, connectTimeoutMs)
             .GetAwaiter().GetResult();
         if (forward.Connected)
         {
@@ -96,9 +101,15 @@ public static class CliApplication
         try
         {
             using var cts = new CancellationTokenSource();
-            // Ctrl+C 取消（--delay 期间或抓帧/导出中）；e.Cancel=true 让进程走正常退出路径拿退出码
+            // Ctrl+C：第一次 = 请求取消，进程走正常退出路径拿退出码（e.Cancel=true 吞掉本次 SIGINT）；
+            // 已取消后再按（原生抓帧/导出悬挂时）= 放行默认终止，保证进程杀得掉（review M-6）。
             cancelHandler = (_, e) =>
             {
+                if (cts.IsCancellationRequested)
+                {
+                    e.Cancel = false;
+                    return;
+                }
                 e.Cancel = true;
                 cts.Cancel();
             };
