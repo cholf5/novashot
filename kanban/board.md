@@ -13,7 +13,6 @@
 - B-7 Library 删除记录时可选连磁盘文件一起删（现仅删 library.json 记录、文件保留——L-2 审计确认的行为裁决， safer 默认；需求来源：删除确认对话框文案语义修正）（P3）
 
 ## To Do
-- L-1 M10 CLI（prtsc full|region|window --delay --path --clipboard --format；单实例命名管道转发）（P2）
 
 ## In Progress
 
@@ -29,6 +28,7 @@
 - 
 
 ## Done
+- L-1 M10 CLI：`prtsc gui|full|region|window --delay --path --clipboard --format`（region 需 `--geometry X,Y,W,H`）；Program.Main 分流——捕获命令不进 Avalonia、退出码 0/1/2、Velopack 钩子共存（对照 v1.2.161 源码证实）；命名管道单实例（原始命令行整条转发，GUI 进程内同一 `CliCaptureExecutor` 执行 headless 导出，无第二套实现；plain gui 也单实例转发 activate）；Core `CliArgs`/协议编解码/执行器全纯函数单测；**实弹 macOS：`full --clipboard` headless 1.23s（<2s 验收线）exit 0 剪贴板实有图，GUI 转发全通无闪现，退出码电池全对**；review 报 2 Important（gui 冷启动 +0.5s 探测、MacCaptureService 跨线程竞态）+8 Minor，修复后 gui 冷启动 0.06s 还原 BASE 级、`_rawIds` 快照语义结构性消除竞态（`3781fda`）；测试 1170/1170（Core 705 + App 168×2TFM + Mac 83 + Linux 46）；Windows/Linux 真机 CLI 留 QA-1（2026-11-10）
 - I-1 M9 Ctrl+O 导入图片：Ctrl+O 热键（置于 editor guard **前**——空闲态可用是本卡主路径，审查判定成立）+ ⋯ 菜单入口（原卡「工具环按钮」取舍已记录）；`OpenFilePickerAsync` 单选（图片档默认 + All files 档——macOS NSOpenPanel 硬拦任意扩展所需，审查判定合理）；扩展名判定下沉 Core `ImageFileTypes`（HDROP 粘贴共用，零残留）；复用 `ImportImageFile`（G-11 共建，语义零改动，CaptureSource.File）；取消静默；审查零 Critical/Important（7 Minor 记录，含 headless 测试绕开 WgcCaptureService WinRT 探测的坑记入 handoff）；测试 1038/1038（Core 592 + App 159×2TFM + Mac 82 + Linux 46）（2026-11-10）
 - N-1 M9 桌面通知：Core `INotificationService` + `NullNotificationService`（mac/linux）+ `NotificationPolicy` 决策表（4 事件×开关，纯单测）+ `ToastXml.Build` 纯函数（转义/round-trip 可测）；Windows WinRT toast（AUMID Prtsc，未打包降级为日志不崩；Activated → explorer /select 开目录）；四处触发接线（导出/QuickSave/复制/上传成功分支，失败全静默）；review 抓出并修复双 toast 缺陷（默认 AutoCopy 下导出=2 条 → 管线内 `CopySilently()` 静默、手动复制仍通知，wiring 测试钉死恰 1 条）（`4d9df62`）；测试 1020/1020（Core 578 + App 157×2TFM + Mac 82 + Linux 46）；toast 实弹/点击/降级真机项入 QA-1 §K（2026-11-10）
 - E-1 M9 屏幕取色器：overlay 选框阶段 C 键取色模式（**KeyUp 触发**——Avalonia 12.1 KeyEventArgs 无 Timestamp/IsRepeat，审查者反编译实证后改 KeyUp 堵长按连发翻转）；Core `ColorSampler`/`ColorFormatter`/`ColorHistory`（会话 10 色去重）+ StylePanel 历史行再取 + 点击复制 HEX（IClipboardService.TrySetText）并经既有 Stroke 路径写入描边色；放大镜 11×11 最近邻 + 网格 + 中心高亮 + HEX/RGB 浮签（隐身守卫零常态开销）；顺带修两个 headless 暴露的并发坑（位图 posted Dispose 延一跳 Background 堵在途帧 SIGSEGV 窗口；静态画刷迁 Immutable 含既有 SelectionAdorner 等价迁移）；独立 review 2 Important（连发翻转/释放窗口）+ 9 Minor，修复轮全处置（`ad93255`）；测试 963/963（Core 558 + App 142×2TFM + Mac 80 + Linux 45）；快照 `artifacts/ui/50-overlay-picker.png`；真机 DPI/粘贴待验入 handoff 261110（2026-11-10）
