@@ -218,6 +218,48 @@ public partial class MainWindow : Window
         if (!string.IsNullOrEmpty(failure)) _vm.StatusText = failure;
     }
 
+    // ---- I-1: Ctrl+O 导入图片文件（⋯ 菜单入口；解码/所有权/失败提示全在 VM.ImportImageFile） ----
+
+    private void OnImportClick(object? sender, RoutedEventArgs e) => _ = ImportImageFromPickerAsync();
+
+    /// <summary>
+    /// I-1 Ctrl+O / ⋯ 菜单导入：<see cref="TopLevel.StorageProvider"/> 单选文件
+    /// （常用图片扩展名过滤 + All files——任意扩展不在此拦截，解不动走 UnsupportedFormat 既有提示）。
+    /// 用户取消（空结果）静默返回，无副作用。
+    /// </summary>
+    internal async Task ImportImageFromPickerAsync()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = Loc.T("Editor.ImportDialogTitle"),
+            AllowMultiple = false,
+            FileTypeFilter = new List<FilePickerFileType>
+            {
+                new(Loc.T("Editor.ImportTypeImages"))
+                {
+                    Patterns = Prtsc.Core.Utils.ImageFileTypes.Patterns,
+                },
+                new(Loc.T("Editor.ImportTypeAll")) { Patterns = new[] { "*.*" } },
+            },
+        });
+        ImportPickedFiles(files);
+    }
+
+    /// <summary>选择器结果落地：取消/空列表静默返回；非空取第一个本地路径交给 VM（失败走既有 StatusText）。</summary>
+    private void ImportPickedFiles(IReadOnlyList<IStorageFile> files)
+    {
+        if (files.Count == 0) return; // 用户取消：静默返回，无副作用
+        var path = files[0].TryGetLocalPath();
+        if (string.IsNullOrEmpty(path))
+        {
+            _logger.LogWarning("Import picked file has no local path; skipped");
+            _vm.StatusText = Loc.T("Status.ImportFailed", "");
+            return;
+        }
+        if (_vm.ImportImageFile(path, out var failure)) return;
+        if (!string.IsNullOrEmpty(failure)) _vm.StatusText = failure;
+    }
+
     private void OnExportClick(object? sender, RoutedEventArgs e) => _ = ExportCurrentAsync();
 
     // ---- M7b: cloud upload / library / pin / cloud settings ----
@@ -398,11 +440,21 @@ public partial class MainWindow : Window
     /// 编辑 Text 时或 TextBox 拿焦时禁用，避免抢用户输入。
     /// 走 <see cref="OnKeyDown"/> 覆盖而非 <c>Window.KeyBindings</c> —— 后者不看焦点，字母键会被吞掉。
     /// M6a：Ctrl+S 触发导出（编辑文本中不导出——导出会跳过编辑中的 Text，先提交再存）。
+    /// I-1：Ctrl+O 导入图片文件——空闲/编辑器两态都可用（空闲态是「无图进编辑器」的主路径，
+    /// 对齐 winshot），故分发在 editor guard 之前；编辑文本中不接管（同款防抢输入）。
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
         if (e.Handled) return;
+        // I-1：Ctrl+O 导入图片文件（两态；编辑文本中不接管）
+        var textInputActive = _vm.Editor?.EditingText is not null || _textEditBox is { IsFocused: true };
+        if (e.Key == Key.O && e.KeyModifiers == KeyModifiers.Control && !textInputActive)
+        {
+            e.Handled = true;
+            _ = ImportImageFromPickerAsync();
+            return;
+        }
         if (_vm.Editor is not { } editor) return;
         if (editor.EditingText is not null) return;
         if (_textEditBox is { IsFocused: true }) return;

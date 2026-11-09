@@ -176,7 +176,7 @@ public sealed class WindowsClipboardService : IClipboardService
         }
     }
 
-    /// <summary>图片扩展名判定（winshot 对齐：png/jpg/jpeg/gif/bmp/webp）。</summary>
+    /// <summary>图片扩展名判定（winshot 对齐；I-1 起与 Ctrl+O 文件选择器共用 Core 真值）。</summary>
     internal static bool IsImageExtension(string? extension) =>
-        extension?.ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp";
+        Prtsc.Core.Utils.ImageFileTypes.IsSupported(extension);
 }

@@ -96,6 +96,7 @@
                 <MenuItem Header="{DynamicResource L.Editor.Upload}" Command="{Binding UploadCommand}" />
                 <MenuItem Header="{DynamicResource L.Editor.Pin}" Command="{Binding PinCommand}" />
                 <Separator />
+                <MenuItem Header="{DynamicResource L.Editor.Import}" Click="OnImportClick" />
                 <MenuItem Header="{DynamicResource L.Editor.Library}" Click="OnLibraryClick" />
                 <MenuItem Header="{DynamicResource L.Editor.CloudSettings}" Click="OnCloudSettingsClick" />
                 <MenuItem Header="{DynamicResource L.Editor.Settings}" Click="OnSettingsClick" />
