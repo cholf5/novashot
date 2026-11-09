@@ -13,7 +13,6 @@
 - B-7 Library 删除记录时可选连磁盘文件一起删（现仅删 library.json 记录、文件保留——L-2 审计确认的行为裁决， safer 默认；需求来源：删除确认对话框文案语义修正）（P3）
 
 ## To Do
-- I-1 M9 Ctrl+O 导入图片文件（复用粘贴路径；注意 CapturedImage 所有权坑）（P2）
 - L-1 M10 CLI（prtsc full|region|window --delay --path --clipboard --format；单实例命名管道转发）（P2）
 
 ## In Progress
@@ -30,6 +29,7 @@
 - 
 
 ## Done
+- I-1 M9 Ctrl+O 导入图片：Ctrl+O 热键（置于 editor guard **前**——空闲态可用是本卡主路径，审查判定成立）+ ⋯ 菜单入口（原卡「工具环按钮」取舍已记录）；`OpenFilePickerAsync` 单选（图片档默认 + All files 档——macOS NSOpenPanel 硬拦任意扩展所需，审查判定合理）；扩展名判定下沉 Core `ImageFileTypes`（HDROP 粘贴共用，零残留）；复用 `ImportImageFile`（G-11 共建，语义零改动，CaptureSource.File）；取消静默；审查零 Critical/Important（7 Minor 记录，含 headless 测试绕开 WgcCaptureService WinRT 探测的坑记入 handoff）；测试 1038/1038（Core 592 + App 159×2TFM + Mac 82 + Linux 46）（2026-11-10）
 - N-1 M9 桌面通知：Core `INotificationService` + `NullNotificationService`（mac/linux）+ `NotificationPolicy` 决策表（4 事件×开关，纯单测）+ `ToastXml.Build` 纯函数（转义/round-trip 可测）；Windows WinRT toast（AUMID Prtsc，未打包降级为日志不崩；Activated → explorer /select 开目录）；四处触发接线（导出/QuickSave/复制/上传成功分支，失败全静默）；review 抓出并修复双 toast 缺陷（默认 AutoCopy 下导出=2 条 → 管线内 `CopySilently()` 静默、手动复制仍通知，wiring 测试钉死恰 1 条）（`4d9df62`）；测试 1020/1020（Core 578 + App 157×2TFM + Mac 82 + Linux 46）；toast 实弹/点击/降级真机项入 QA-1 §K（2026-11-10）
 - E-1 M9 屏幕取色器：overlay 选框阶段 C 键取色模式（**KeyUp 触发**——Avalonia 12.1 KeyEventArgs 无 Timestamp/IsRepeat，审查者反编译实证后改 KeyUp 堵长按连发翻转）；Core `ColorSampler`/`ColorFormatter`/`ColorHistory`（会话 10 色去重）+ StylePanel 历史行再取 + 点击复制 HEX（IClipboardService.TrySetText）并经既有 Stroke 路径写入描边色；放大镜 11×11 最近邻 + 网格 + 中心高亮 + HEX/RGB 浮签（隐身守卫零常态开销）；顺带修两个 headless 暴露的并发坑（位图 posted Dispose 延一跳 Background 堵在途帧 SIGSEGV 窗口；静态画刷迁 Immutable 含既有 SelectionAdorner 等价迁移）；独立 review 2 Important（连发翻转/释放窗口）+ 9 Minor，修复轮全处置（`ad93255`）；测试 963/963（Core 558 + App 142×2TFM + Mac 80 + Linux 45）；快照 `artifacts/ui/50-overlay-picker.png`；真机 DPI/粘贴待验入 handoff 261110（2026-11-10）
 - R-1 M10 Velopack 打包 + C-1 Updater（合并执行，C-1 整卡完成）：`VelopackApp.Build().Run()` 进 Main 首行；`scripts/pack-windows.sh`（publish self-contained win-x64 → `vpk [win] pack`，**[win] directive 钉死**防误走宿主打包器；bash 3.2 空数组两态实测）；macOS 交叉打包实跑成功（Setup.exe + Portable.zip + full.nupkg + releases.win.json 落 artifacts/pack/，不入 git）；`assets/app.ico` 脚本化生成；CI `.github/workflows/ci.yml`（三 OS 测试矩阵 + tag release 附 sha256）；Updater：`UpdateConfig.FeedUrl` + 设置页输入框（hint 给 `releases/latest/download/` 正确形态——Velopack 无 GitHub URL 识别，审查者反编译证实）+ `UpdateCheckPolicy` 纯函数（21 例）+ 启动 fire-and-forget 检查（未打包静默、全程吞异常不崩启动）+ 非阻塞更新提示框（安装/跳过此版本/以后再说）；独立 review 1 Important（hint 陷阱）+ 9 Minor 全处置（`bdc7a3b`）；测试 880/880（Core 527 + App 114×2TFM + Mac 80 + Linux 45）；未真机项（VM 安装/更新端到端/CI 首跑）入 handoff 261110（2026-11-10）
