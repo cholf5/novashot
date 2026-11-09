@@ -77,7 +77,17 @@ L-2 是收尾批（复杂度 S）。PM 裁决（已写进 issue 完成备注）�
 
 ```bash
 dotnet build Prtsc.slnx
-dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj --filter "FullyQualifiedName~LocKeyConsistency"   # 8 (4×2TFM)
-dotnet test   # 全量：Core 502 + App 104×2TFM + Mac 80 + Linux 45
+dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj --filter "FullyQualifiedName~LocKeyConsistency"   # 10 (5×2TFM)
+dotnet test   # 全量：Core 502 + App 105×2TFM + Mac 80 + Linux 45
 ```
-新增 key 时只需在 `Loc.cs` 双表同时加（一致性测试兜底）；新增引用若用非 `Loc.T(...)`/`L(...)`/`DynamicResource L.*` 的新入口，记得扩 `LocKeyConsistencyTests` 的扫描正则。
+新增 key 时只需在 `Loc.cs` 双表同时加（一致性测试兜底，含占位符一致性）；新增引用若用非 `Loc.T(...)`/`L(...)`/`DynamicResource L.*` 的新入口，记得扩 `LocKeyConsistencyTests` 的扫描正则。
+
+## 6. Review pass（2026-11-10，独立审查通过后的跟进）
+
+审查结论：通过（逐项核实记录 + 3 组 mutation 见 `/tmp/prtsc-sdd/batch2-review-findings.md`）。本节是修复记录：
+
+- **I-1（Important，必修）占位符一致性断言**：审查者 mutation 证实盲区——Zh 表 `Status.Exported` 丢 `{0}` 后 4/4 仍全绿（丢占位符 → `string.Format` 静默吞参；多/错位占位符 → 调用点运行时 FormatException；key 集合相等与 value 非空都拦不住 value 层损坏）。修复：`En_and_Zh_have_identical_key_sets_and_no_blank_values` 增加 per-key `\{\d+\}` 序列（排序后多重集相等）断言，差异 key 连同两侧占位符序列进断言消息。**mutation 自验**：临时把 Zh `Status.Exported` 改为 `已保存 MUTATED` → `En_and_Zh…` 在两个 TFM 各 failed 1，消息含 `Status.Exported:  En=[{0}]  Zh=[]` ✓；`git restore` 还原后 5/5 ×2TFM 复绿，临时改动未进任何 commit。
+- **M-2（Minor）`CodeLResourceLookup` 正则收紧**：`[\s*` → `Resources\s*\[\s*`，消除任意 `x["L.y"]` 索引的假阳性面（当前 src 无该形态使用点，纯收紧）。
+- **M-1（Minor，可选采纳）动态 key 显式断言**：`SettingsViewModel.ValidateHotkeys` 返回的 `Settings.Hint.HotkeyInvalid/HotkeyDuplicate` 经变量传 `Loc.T`，静态扫描不可达——新增 `Dynamically_referenced_keys_are_defined_in_both_tables`（清单在 `DynamicallyReferencedKeys`，注明引用方），把「动态引用」从注释声明升格为断言。采纳。
+- **M-3 不采纳**（审查者自己评级仅记录）：XAML 注释内的 `DynamicResource L.x` 会被扫为引用——假阳性方向、影响小，收窄需跳过 XML 注释增加扫描复杂度，收益不成比例。
+- 新增用例 1 个：LocKeyConsistency 5 用例 ×2 TFM = 10；App.Tests 105×2。修复后全量复跑：App 105/105 ×2TFM、build 0 Error。

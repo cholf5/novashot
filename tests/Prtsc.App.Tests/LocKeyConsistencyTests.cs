@@ -8,15 +8,17 @@ namespace Prtsc.App.Tests;
 /// <summary>
 /// L-2 收尾：Loc 双语表的 CI 兜底单测。
 ///
-/// 覆盖三件事：
-/// 1. <see cref="Strings"/> 的 En/Zh 两张表 key 集合双向相等，且所有 value 非空非纯空白；
+/// 覆盖四件事：
+/// 1. <see cref="Strings"/> 的 En/Zh 两张表 key 集合双向相等 + value 非空非纯空白
+///    + per-key {N} 占位符序列一致（review I-1：丢占位符=静默吞参，多占位符=运行时 FormatException）；
 /// 2. 引用完整性（单方向：引用 ⊆ 定义）：扫描 src/Prtsc.App 的 .axaml（DynamicResource/StaticResource）
 ///    与 .cs（Loc.T("...")、托盘私有 L("...")、FindResource/Resources["L.x"]）提取 key 引用，
 ///    断言每个引用在 En 与 Zh 都有定义；
-/// 3. 回退链：zh 缺 key → en 兜底；两侧都缺 → 返回 key 本身；带参 T(key, args) 走 string.Format。
+/// 3. 动态 key 补钉（review M-1）：SettingsViewModel.ValidateHotkeys 返回的 key 名显式断言在册；
+/// 4. 回退链：zh 缺 key → en 兜底；两侧都缺 → 返回 key 本身；带参 T(key, args) 走 string.Format。
 ///
 /// 刻意不做的断言（避免 false positive，见 batch 简报裁决）：
-/// - 「定义 ⊆ 引用」反方向不断言 —— 存在动态拼 key（如 ValidateHotkeys 返回 key 名传给 Loc.T）
+/// - 「定义 ⊆ 引用」反方向不断言 —— 存在动态拼 key（ValidateHotkeys，已由 M-1 显式断言兜底）
 ///   与刻意预留的 key（如 Picker.Empty），未引用 ≠ 错误。
 /// - 多行调用的 string 提取：括号配平按当前源码风格（调用都在单行）处理，跨行调用不保证覆盖；
 ///   本测试只保证「引用到的 key 必须存在」，漏扫只影响覆盖面不影响正确性。
@@ -31,10 +33,13 @@ public class LocKeyConsistencyTests
     // 用来从调用点提取的字符串里滤掉非 key 参数（如 string.Format 的 "0.##"、空串 ""）。
     private static readonly Regex KeyShape = new(@"^[A-Z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+$", RegexOptions.Compiled);
 
+    // string.Format 占位符：{0} {1} ...（review I-1：En/Zh 同 key 的占位符序列必须一致）
+    private static readonly Regex FormatPlaceholder = new(@"\{\d+\}", RegexOptions.Compiled);
+
     private static readonly Regex XamlResourceRef = new(@"(?:Dynamic|Static)Resource\s+(L\.[A-Za-z0-9_.]+)", RegexOptions.Compiled);
 
-    // this.FindResource("L.x") / TryFindResource / Resources["L.x"] —— 现无使用点，防将来回归
-    private static readonly Regex CodeLResourceLookup = new(@"(?:(?:FindResource|TryFindResource)\(\s*|\[\s*)""(L\.[A-Za-z0-9_.]+)""", RegexOptions.Compiled);
+    // Resources["L.x"] / this.FindResource("L.x") / TryFindResource("L.x") —— 现无使用点，防将来回归
+    private static readonly Regex CodeLResourceLookup = new(@"(?:(?:FindResource|TryFindResource)\(\s*|Resources\s*\[\s*)""(L\.[A-Za-z0-9_.]+)""", RegexOptions.Compiled);
 
     // 取串入口：Loc.T(...) 与 App.axaml.cs 托盘用的私有 helper L(...)
     private static readonly Regex CallStart = new(@"(?:Loc\.T|(?<![A-Za-z0-9_.])L)\(", RegexOptions.Compiled);
@@ -64,6 +69,22 @@ public class LocKeyConsistencyTests
             "所有 value 必须非空非纯空白。\n" +
             $"En 空值 key: {string.Join(", ", blankEn)}\n" +
             $"Zh 空值 key: {string.Join(", ", blankZh)}");
+
+        // review I-1：per-key 占位符序列一致性（排序后比较多重集）。
+        // zh 丢 {0} → string.Format 静默吞参（如导出路径从状态栏文案消失）；
+        // zh 多/错位占位符 → 调用点 Loc.T(key, args) 运行时 FormatException。
+        // key 集合相等 + value 非空都拦不住这种 value 层损坏（mutation 实证过的盲区）。
+        string Ph(string s) => string.Join(", ", FormatPlaceholder.Matches(s).Select(m => m.Value)
+            .OrderBy(v => v, StringComparer.Ordinal));
+        var placeholderMismatch = en.Keys
+            .Where(k => !FormatPlaceholder.Matches(en[k]).Select(m => m.Value)
+                        .OrderBy(v => v, StringComparer.Ordinal)
+                        .SequenceEqual(FormatPlaceholder.Matches(zh[k]).Select(m => m.Value)
+                        .OrderBy(v => v, StringComparer.Ordinal)))
+            .OrderBy(k => k, StringComparer.Ordinal).ToList();
+        Assert.True(placeholderMismatch.Count == 0,
+            "En/Zh 同 key 的 {N} 占位符序列必须一致。\n" +
+            string.Join("\n", placeholderMismatch.Select(k => $"{k}:  En=[{Ph(en[k])}]  Zh=[{Ph(zh[k])}]")));
     }
 
     // ---------- 2. 引用完整性（引用 ⊆ 定义） ----------
@@ -114,6 +135,27 @@ public class LocKeyConsistencyTests
             "以下被引用的 key 没有同时在 En/Zh 两表定义：\n  " +
             string.Join("\n  ", missing.Select(k =>
                 $"{k}  (En: {(Strings.En.ContainsKey(k) ? "✓" : "缺")}, Zh: {(Strings.Zh.ContainsKey(k) ? "✓" : "缺")})")));
+    }
+
+    /// <summary>
+    /// review M-1：动态 key 盲区补钉。<see cref="Prtsc.App.ViewModels.SettingsViewModel.ValidateHotkeys"/>
+    /// 返回 key 名字面量，经变量传给 Loc.T（SettingsViewModel.Save），上面的扫描提取不到；
+    /// 这里显式断言在册，把「动态引用」从注释声明变成断言。
+    /// </summary>
+    public static readonly string[] DynamicallyReferencedKeys =
+    [
+        "Settings.Hint.HotkeyInvalid",
+        "Settings.Hint.HotkeyDuplicate",
+    ];
+
+    [Fact]
+    public void Dynamically_referenced_keys_are_defined_in_both_tables()
+    {
+        var missing = DynamicallyReferencedKeys
+            .Where(k => !Strings.En.ContainsKey(k) || !Strings.Zh.ContainsKey(k))
+            .ToList();
+        Assert.True(missing.Count == 0,
+            $"动态引用的 key 必须双表在册（引用方: SettingsViewModel.ValidateHotkeys）: {string.Join(", ", missing)}");
     }
 
     /// <summary>
