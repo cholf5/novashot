@@ -13,17 +13,13 @@
 - B-7 Library 删除记录时可选连磁盘文件一起删（现仅删 library.json 记录、文件保留——L-2 审计确认的行为裁决， safer 默认；需求来源：删除确认对话框文案语义修正）（P3）
 
 ## To Do
-- C-1 M7 云上传/Library/Updater/Pin（R2=S3 兼容 PUT + GDrive multipart + Library(library.json+缩略图) + Updater + Pin 贴图；凭据键 Prtsc_R2_*/Prtsc_GDrive_*，不迁移 WinShot 凭据）（P1）——仅剩 Updater 子任务，与 R-1 合并执行
-- D-1 M9 延时截图（托盘菜单 3s/5s + Capture.DelaySeconds；overlay 不得先于快照出现；winshot/flameshot 均有而 prtsc 缺）（P1）
 - E-1 M9 屏幕取色器（放大镜 + HEX/RGB 浮签 + 点击复制，可设为描边色；flameshot 招牌交互）（P2）
 - N-1 M9 桌面通知（托盘气球通知，导出/QuickSave/上传/复制触发，ShowNotification 字段已备）（P2）
 - I-1 M9 Ctrl+O 导入图片文件（复用粘贴路径；注意 CapturedImage 所有权坑）（P2）
 - L-1 M10 CLI（prtsc full|region|window --delay --path --clipboard --format；单实例命名管道转发）（P2）
-- L-2 M10 i18n（resx 抽串 + zh-CN 首发，key 一致性单测）（P2）
-- R-1 M10 Velopack 打包（安装器 + 便携版；与 C-1 Updater 子任务协调采用 vpk UpdateManager）（P1）
 
 ## In Progress
-- C-1 M7 云上传/Library/Updater/Pin —— M7b UI 完成（2026-11-01）；剩 Updater（等 R-1 Velopack）
+
 
 ## In Review
 - 
@@ -36,6 +32,7 @@
 - 
 
 ## Done
+- R-1 M10 Velopack 打包 + C-1 Updater（合并执行，C-1 整卡完成）：`VelopackApp.Build().Run()` 进 Main 首行；`scripts/pack-windows.sh`（publish self-contained win-x64 → `vpk [win] pack`，**[win] directive 钉死**防误走宿主打包器；bash 3.2 空数组两态实测）；macOS 交叉打包实跑成功（Setup.exe + Portable.zip + full.nupkg + releases.win.json 落 artifacts/pack/，不入 git）；`assets/app.ico` 脚本化生成；CI `.github/workflows/ci.yml`（三 OS 测试矩阵 + tag release 附 sha256）；Updater：`UpdateConfig.FeedUrl` + 设置页输入框（hint 给 `releases/latest/download/` 正确形态——Velopack 无 GitHub URL 识别，审查者反编译证实）+ `UpdateCheckPolicy` 纯函数（21 例）+ 启动 fire-and-forget 检查（未打包静默、全程吞异常不崩启动）+ 非阻塞更新提示框（安装/跳过此版本/以后再说）；独立 review 1 Important（hint 陷阱）+ 9 Minor 全处置（`bdc7a3b`）；测试 880/880（Core 527 + App 114×2TFM + Mac 80 + Linux 45）；未真机项（VM 安装/更新端到端/CI 首跑）入 handoff 261110（2026-11-10）
 - L-2 M10 i18n 收尾：范围裁决——resx/机制子任务被 UI-1 的 Loc.cs 双语表吸收（卡允许二选一），语言切换进设置页由 S-1 交付，本卡落地剩余两件：① key 一致性单测（En/Zh 集合双向相等 + XAML/代码 274 处引用 ⊆ 定义 + 占位符 `{N}` 多重集相等 + 动态拼 key 显式在册断言，mutation 三向实证有效）；② 硬编码文案审计（17 新 key 抽串、8 处落位、不抽类别口径成文）；回退链（zh 缺→en→key 本身）钉死；顺手修正 Library 删除确认文案与实际行为（只删记录不删文件，文件增强登记 backlog B-7）；独立 review 1 Important（占位符断言缺失）+ 3 Minor 全处置（`f0d2ab5`）；测试 837/837（Core 502 + App 105×2TFM + Mac 80 + Linux 45，PM 实测口径）（2026-11-10）
 - D-1+G-26 延时截图 + Capture Launcher：Core `DelayedCaptureCountdown`（单 Monitor 锁全覆盖状态迁移）+ `CountdownOrchestrator`（pending 绑定轮次号，settle 裁决下沉 Core）+ `CaptureDelayOptions.Resolve`（延时解析纯函数）；托盘「延时截图」3s/5s 子项 + 设置页默认延时（0/3/5 钳制）+ 倒计时角标窗（WorkArea 定位，关窗后 250ms 才抓帧）；取消语义=热键取消本轮/再触发取消旧轮按新意图；G-26 启动器窗口（全屏/区域单选 + X/Y/W/H 越界钳制 + 延时 + 开始截图，走同一咽喉点）；独立 review 报 1 Critical（250ms 间隙竞态→角标入快照）+1 Important（线程池回调违约）全修复（`42100d7`，C-1/I-1 均有「去实现即挂」回归用例）；测试 727/727（Core 502 + App 100×2TFM + Mac 80 + Linux 45）；快照 `artifacts/ui/40-launcher.png`；真机待验项入 handoff 261110 §3 与 QA-1（2026-11-10）
 - S-1 M8 设置中心 GUI：六分区设置窗口（常规/热键/QuickSave/导出/编辑器默认值/捕获），整窗草稿 + 保存/取消语义；语言入口从托盘搬进设置（托盘语言子菜单删除）；热键录制控件（KeyCombo→HotkeyParser spec 串，Esc/纯修饰键/NumPad 拒绝）+ 保存一刻原子发生（自启切换→config Update→热键重注册→语言全局刷新）；新 Core 字段 Capture.IncludeCursor（WGC 光标开关）；独立 reviewer 报 1 Critical + 4 Important 全修复（`19bfde1`：Windows 泵线程权威 `_registeredIds` 防重注册竞态、Linux 补 XUngrabKey、重复热键提示、Loc.ApplyStoredPreference、IncludeCursor 复制）；测试 635+91 全绿；未真机项入 `docs/qa/261102-smoke-checklist.md`（⚑ 段 I/J）；handoff `261102-s1-settings-handoff.md`（2026-11-02）
