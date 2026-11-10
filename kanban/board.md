@@ -6,14 +6,13 @@
 
 ## Backlog
 - B-2 WindowPicker 96×54 缩略图（P3）
-- B-4 crop 后 reshape 手柄（复用 BoxHandles）（P3）
 - B-6 工具栏按钮自定义（flameshot 式可见工具配置）（P3）
-- B-7 Library 删除记录时可选连磁盘文件一起删（现仅删 library.json 记录、文件保留——L-2 审计确认的行为裁决， safer 默认；需求来源：删除确认对话框文案语义修正）（P3）
 
 ## To Do
 
 ## In Progress
-
+- B-4 crop 后 reshape 手柄（复用 BoxHandles）——本会话认领执行中，勿重复领（2026-11-11）
+- B-7 Library 删除记录时可选连磁盘文件一起删（现仅删 library.json 记录、文件保留——L-2 审计确认的行为裁决， safer 默认）——本会话认领执行中，勿重复领（2026-11-11）
 
 ## In Review
 - 
