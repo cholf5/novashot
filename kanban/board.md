@@ -1,12 +1,14 @@
 # Kanban Board — Prtsc
 
 > 建板 2026-11-01（M6d 完成后）。M1–M6d 历史见 Done 列汇总卡与 `docs/handoff/`。
+> 2026-11-10 对账：Backlog 清掉已完成的 B-2/B-6，补 Q-1/V-1/LINUX-2；Done 列补 X-1 漏关卡。
 > 卡片约定沿用 cholf5 看板工作流：目标 / 子任务 / 开发者 / 复杂度(S/M/L) / 验收标准 / 测试用例 / 关联文档 / 依赖，明细在 `issues/<卡号>.md`。
 > 里程碑总表与缺口来源见 `docs/roadmap.md`。
 
 ## Backlog
-- B-2 WindowPicker 96×54 缩略图（P3）
-- B-6 工具栏按钮自定义（flameshot 式可见工具配置）（P3）
+- V-1 v1.0 发布收尾（版本号/tag/CI 首跑/README+用户文档/签名/mac 分发）（P1）
+- Q-1 App 测试宿主栈溢出（RadioButton 组 ↔ TwoWay 绑定互踢环；存量 flake 根因已定位并实测复现）（P2）
+- LINUX-2 Wayland 原生会话（当前只支持 XWayland；见 roadmap 与 LINUX-1 handoff）（P3）
 
 ## To Do
 
@@ -23,6 +25,8 @@
 - 
 
 ## Done
+- 看板对账 + 警告清零（2026-11-10）：board/roadmap/issue 状态与事实对齐（B-2/B-6 移出 Backlog、S-1/X-1 状态纠正、M7/M9/M10 勾完成）；新增 Q-1（栈溢出 flake，含实测崩溃栈）与 V-1（v1.0 发布收尾）两卡承载此前无卡的在办事项；编译器警告 31→0（`SystemDecorations`→`WindowDecorations`、`Watermark`→`PlaceholderText`、`SKFilterQuality`→`SKSamplingOptions`、`Bitmap.Save(string,int?)`→`PngBitmapEncoderOptions.Default`、CS8602/CS8604 可空性收敛、CS0067/CS8778 清理、xUnit1031 两处按「刻意阻塞」加注释豁免）；测试 Core 785 + App 206 + Mac 91 + Linux 46 全绿（App net10.0 腿仍有 Q-1 的偶发 abort：本次 8 跑 3 abort，见 Q-1 卡）
+- X-1 反色工具（GAP-1 已实装，本卡此前漏关）：Core `InvertAnnotation`（选区内反色、区域外像素不动）+ 工具坞 I 热键 + `Tool.Invert`/`Kind.Invert` 双语 + 图标；`InvertAnnotationTests` 覆盖区域内外语义（2026-11-10 补记，功能随 GAP-1 于 2026-11-01 交付）
 - B-2 WindowPicker 96×54 缩略图：Core `PickerThumbnails`（FitSize 等比钳制纯函数——16:9 满盒/方图/竖图/小图不放大/退化 1px；Resize SKSurface 等比绘制镜像 ThumbnailWriter 手法）+ App WindowPickerDialog 改造（Row 升级 INPC 含 Thumbnail/HasThumbnail/Initial 占位首字母，item 模板 108×60 缩略图框，串行逐窗后台 `ICaptureService.CaptureWindow` → 96×54 PNG → Avalonia Bitmap，捕获异常→null→占位不崩，代次三查——循环头/捕获后/Post 闭包内——Refresh/关窗旧结果绝不回写、过期位图闭包兜底 Dispose）；MainWindow 传 `_capture` 接线；测试坑两枚记录 issue（headless 下 await InvokeAsync 绑 UI 泵→改 Post；session 循环线程上 Dispose 自等挂死→改单 Dispatch 内联 GetResult+RunJobs，dotnet-stack 实证）；测试 Core 773→785 + App 203→206×2TFM + Mac 91 + Linux 46 全绿；真机项 QA-1 §P（2026-11-11）
 - B-6 工具栏按钮自定义：Core `ToolCatalog`+`ToolVisibility` 纯函数（Resolve 空表=全开/未知忽略/去重/Select 恒可见/规范序 + ToConfig 全选写空表 + ComputeDockChildVisibility 分隔线组边界发射——新组第一个可见项点亮紧邻其前分隔线，整组隐藏坍缩/悬空全隐）+ config `Editor.VisibleTools`（枚举名表）；App 工具坞命名 ToolDock 构造+Changed 双时点 ApplyToolVisibility（过滤+孤线+当前工具隐藏回落 Select），设置页编辑器分区 15 勾选框 WrapPanel（Select 禁改）+ Loc 双语；**热键裁决：隐藏 ≠ 禁用**（R 隐藏时仍切 Rectangle，测试钉住）；快照 06-editor-dock-filtered.png 真机目检（V/R/T/X+三线，默认态与基线逐位一致）；测试 Core 760→773 + App 193→203×2TFM + Mac 91 + Linux 46 全绿；发现并记录存量 flake 根因=CompositionPanel BgKind 三枚 RadioButton GroupName+TwoWay 互踢环（stash 基线复现，另建议 Q- 卡）；真机项 QA-1 §P（2026-11-11）
 - B-7 Library 删除记录时可选连磁盘文件一起删：Core `LibraryFileDeletePolicy` 决策表（NotRequested/NoLocalFile/FileAlreadyGone/Deleted/FailedButRecordDeleted）+ `LibraryFiles.TryDelete`（尽力删；FileNotFoundException/DirectoryNotFoundException→true 静默——POSIX ENOENT 语义与 Windows no-op 跨平台对齐）+ `LibraryStore.RemoveAsync(id, deleteLocalFile, ct, tryDelete?)`（记录先提交不回滚）；App 确认框 CheckBox（仅 LocalPath 非空时显示、默认不勾）+ VM DeleteAsync(deleteFile) 失败时状态栏警告+logger；裁决=文件删除失败记录保持已删、UI 提示不崩；TDD RED 抓到「删除 IO 未以 deleteLocalFile 为前提」真缺陷（默认模式误删文件）；独立 review 1 Critical（IsChecked 构建时采样——勾选永远失效，改点击一刻读取）+2 Important（TryDelete 过滤器零覆盖补 4 例实证修 POSIX 语义 / 确认框 Close() 误关 owner 的 G-17 既有缺陷顺手修）+6 Minor 全处置；测试 Core 741→760 + App 190→193×2TFM（全量 Core 760 + App 193×2 + Mac 91 + Linux 46）；真机项 QA-1 TC18（2026-11-11）
