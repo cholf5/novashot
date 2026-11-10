@@ -5,8 +5,11 @@ namespace Prtsc.Core.Clipboard;
 /// <summary>
 /// 平台无关的位图剪贴板能力（M6c）。由 Prtsc.Platform.Windows 提供 Win32 实现；
 /// 测试用内存 Fake。语义：
-/// - <see cref="TrySetImage"/>：把不透明位图放到剪贴板（内部转 CF_DIBV5 + CF_DIB）。拷贝即快照，调用方保有位图所有权。
-/// - <see cref="TryGetImage"/>：取回剪贴板位图（DIB 格式）；无位图/格式不符返回 null。返回值归调用方 Dispose。
+/// - <see cref="TrySetImage"/>：把不透明位图放到剪贴板（Windows 内部转 CF_DIBV5 + CF_DIB，
+///   B-1 起像素 ≤4MP 时另尽力附注册格式 "PNG"——只认 PNG 字节的读者互操作，alpha 也得以保留；超界只放 DIB，I-1 阈值）。
+///   拷贝即快照，调用方保有位图所有权。
+/// - <see cref="TryGetImage"/>：取回剪贴板位图（DIB 优先；缺 DIB 或解不动时回退注册格式 "PNG"，B-1）；
+///   无位图/格式不符返回 null。返回值归调用方 Dispose。
 /// </summary>
 public interface IClipboardService
 {

@@ -44,6 +44,13 @@ internal static class User32
     public const uint CF_HDROP = 15;
     public const uint GMEM_MOVEABLE = 0x0002;
 
+    /// <summary>B-1：注册格式名 "PNG"——浏览器/Electron 应用（Chrome 右键复制图片等）的 PNG 字节载荷格式。</summary>
+    public const string PngFormatName = "PNG";
+
+    /// <summary>注册自定义剪贴板格式。同名注册进程内恒返同 ID；失败返 0（调用方按不可用处理）。</summary>
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint RegisterClipboardFormatW(string lpszFormat);
+
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern nint DragQueryFileW(nint hDrop, uint iFile, System.Text.StringBuilder? lpszFile, uint cch);
 

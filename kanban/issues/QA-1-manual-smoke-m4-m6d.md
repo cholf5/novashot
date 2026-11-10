@@ -24,6 +24,10 @@ M4 起所有功能只过了「编译 + 单测」，从未真机验证。v1.0 前
 - TC7 Copy → Word / 微信 / Chrome 粘贴互通；Chrome/Electron 复制 → Ctrl+V（已知风险：非 DIB 格式可能失败，B-1）
 - TC8 Ctrl+Q 落盘到 `~/Pictures/Prtsc`（自定义目录 + 三种命名模式）
 
+**B-1（PNG 剪贴板格式，2026-11-10 追加）**
+- TC13 Chrome 右键复制图片 → Prtsc Ctrl+V 进编辑器（读路径：DIB 缺失/解不动时回退注册格式 "PNG"，TC7 已知风险闭环）；顺带回归 TC7 老读者粘贴不受影响
+- TC14 Prtsc Copy → 只认 PNG 字节的读者（Figma 等）粘贴成功且透明背景不拍平（写路径：CF_DIBV5+CF_DIB+"PNG" 三格式同放，"PNG" 尽力放、放置失败不报错；像素 ≤4MP 才附 "PNG"，>4MP 只放 DIB——UI 线程同步编码阈值，I-1）；再验 Word/微信粘贴不受多放 "PNG" 格式影响
+
 **M6d（裁剪/取色）**
 - TC9 X 拖框裁剪 + 比例 ComboBox 吸附 + 越界标注 clip 表现 + 撤销裁剪恢复
 - TC10 "A" 边缘取色：浅色窗口截图 → 背景变对应纯色
