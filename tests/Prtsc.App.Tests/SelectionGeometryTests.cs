@@ -252,3 +252,43 @@ public class SelectionGeometryTests
         Assert.Equal(new Point(1840, 208), pos);
     }
 }
+
+// ---------- ClampAndNormalizeTo（B-3 跨屏：任意原点 bounds） ----------
+
+public class ClampAndNormalizeToTests
+{
+    [Fact]
+    public void Clamps_To_Arbitrary_Origin_Bounds()
+    {
+        // bounds 原点可为负（虚拟桌面 union 在活动帧左上方之外）
+        var bounds = new Rect(-1000, 0, 2000, 800);
+        var r = G.ClampAndNormalizeTo(new Rect(-500, -50, 1800, 900), bounds);
+        // x: -500..1300 → 钳到 -500..1000（宽 1500）；y: -50..850 → 0..800
+        Assert.Equal(new Rect(-500, 0, 1500, 800), r);
+    }
+
+    [Fact]
+    public void Normalizes_Negative_Size()
+    {
+        var bounds = new Rect(0, 0, 100, 100);
+        var r = G.ClampAndNormalizeTo(new Rect(80, 90, -200, -180), bounds);
+        Assert.Equal(new Rect(0, 0, 80, 90), r);
+    }
+
+    [Fact]
+    public void OriginZero_Equals_Legacy_ClampAndNormalize()
+    {
+        var r = new Rect(-10, -10, 200, 200);
+        Assert.Equal(G.ClampAndNormalize(r, 100, 100), G.ClampAndNormalizeTo(r, new Rect(0, 0, 100, 100)));
+    }
+
+    [Fact]
+    public void Fully_Outside_Bounds_Collapses_To_Edge()
+    {
+        // 选框整体在 bounds 右侧：钳到右缘零宽（渲染层据 Intersects 早退铺满暗化）
+        var bounds = new Rect(0, 0, 100, 100);
+        var r = G.ClampAndNormalizeTo(new Rect(150, 20, 50, 50), bounds);
+        Assert.Equal(new Rect(100, 20, 0, 50), r);
+        Assert.False(r.Width > 0);
+    }
+}

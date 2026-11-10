@@ -5,9 +5,18 @@ namespace Prtsc.App.Controls;
 /// <summary>
 /// SelectionAdorner 交互中的纯几何计算，独立成 static helper 便于单元测试。
 /// 坐标全为 DIP，Rect 语义与 Avalonia 一致。
+/// B-3 起同时服务 SelectionSession（跨屏权威选框的拖拽数学），钳制边界可为任意原点。
 /// </summary>
 public static class SelectionGeometry
 {
+    // ---- 命中/交互常量（adorner 与 session 共用，单一出处） ----
+    /// <summary>handle 命中盒半边长 = 视觉 8/2 + 命中扩 4（SelectionAdorner.HandleVisual 与 HandleHitPad 的合成）。</summary>
+    public const double GripHitHalfPad = 8;
+    /// <summary>边线拖动的允许偏离。</summary>
+    public const double EdgeHitSlop = 6;
+    /// <summary>选框最小边（DIP）；释放时小于此值清空。</summary>
+    public const double MinSize = 4;
+
     /// <summary>Grip 类型 —— 4 角、4 边中点、内部、外部。</summary>
     public enum Grip { NW, N, NE, E, SE, S, SW, W, Inside, Outside }
 
@@ -23,11 +32,18 @@ public static class SelectionGeometry
 
     /// <summary>把 rect 裁进 [0, w] x [0, h]，并归一化（负宽/高翻转）。</summary>
     public static Avalonia.Rect ClampAndNormalize(Avalonia.Rect r, double w, double h)
+        => ClampAndNormalizeTo(r, new Avalonia.Rect(0, 0, w, h));
+
+    /// <summary>
+    /// 把 rect 裁进任意原点的 bounds（B-3 跨屏：虚拟桌面 union 映射进活动帧后原点可为负），
+    /// 并归一化（负宽/高翻转）。bounds 退化（零宽/高）时结果钳到该边。
+    /// </summary>
+    public static Avalonia.Rect ClampAndNormalizeTo(Avalonia.Rect r, Avalonia.Rect bounds)
     {
-        var x1 = Math.Clamp(r.X, 0, w);
-        var y1 = Math.Clamp(r.Y, 0, h);
-        var x2 = Math.Clamp(r.Right, 0, w);
-        var y2 = Math.Clamp(r.Bottom, 0, h);
+        var x1 = Math.Clamp(r.X, bounds.X, bounds.Right);
+        var y1 = Math.Clamp(r.Y, bounds.Y, bounds.Bottom);
+        var x2 = Math.Clamp(r.Right, bounds.X, bounds.Right);
+        var y2 = Math.Clamp(r.Bottom, bounds.Y, bounds.Bottom);
         if (x2 < x1) (x1, x2) = (x2, x1);
         if (y2 < y1) (y1, y2) = (y2, y1);
         return new Avalonia.Rect(x1, y1, x2 - x1, y2 - y1);

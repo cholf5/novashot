@@ -19,9 +19,11 @@ namespace Prtsc.App.Views;
 /// M2-1：拖拽 / 8 handles / 边线 / 移动 / 光标 / clamp
 /// M2-2：键盘微调 / Ctrl 锁比例 / Shift 中心对称
 /// M2-3a：多屏 N 实例（外部 MainWindow 组织）
+/// M2-3b：B-3 跨屏——<see cref="SelectionSession"/> 承载权威选框（物理像素 + 活动帧 DIP），
+///         本窗口把指针/键盘事件转发进会话、把会话广播映射回本屏 adorner；确认输出物理 region
 /// M2-4：GeometrySettled 去抖
-/// M2-5：Enter/双击 → 提交（DIP→物理像素）
-/// M3-1：FloatingToolRing 悬浮工具环，跟随选框
+/// M2-5：Enter/双击 → 提交（物理像素 region；无选框回退本屏整屏）
+/// M3-1：FloatingToolRing 悬浮工具环，跟随选框（跨屏时只显示在选框中心所在屏）
 /// E-1 M9：C 进/出取色模式（<see cref="ColorMagnifier"/>）；点击 = 复制 HEX + 记会话历史 +
 ///         抛 <see cref="StrokePicked"/>（外层经 StylePanel 路径写入描边色）+ 回选框
 /// </summary>
@@ -30,6 +32,7 @@ public partial class OverlayWindow : Window
     private readonly DisplayInfo _display;
     private readonly IClipboardService? _clipboard;
     private readonly ColorHistory? _colorHistory;
+    private readonly SelectionSession _session;
     private SelectionAdorner? _adorner;
     private FloatingToolRing? _ring;
     private ColorMagnifier? _magnifier;
@@ -50,11 +53,14 @@ public partial class OverlayWindow : Window
     public OverlayWindow() : this(null!, default!) { }
 
     public OverlayWindow(SKBitmap desktopBitmap, DisplayInfo display,
-        IClipboardService? clipboard = null, ColorHistory? colorHistory = null)
+        IClipboardService? clipboard = null, ColorHistory? colorHistory = null,
+        SelectionSession? session = null)
     {
         _display = display;
         _clipboard = clipboard;
         _colorHistory = colorHistory;
+        // B-3：外部（MainWindow）注入跨屏会话；独立构造（测试/单窗）时退化为单屏会话，行为与旧本地数学等价
+        _session = session ?? new SelectionSession(new[] { display });
 
         InitializeComponent();
 
@@ -80,6 +86,8 @@ public partial class OverlayWindow : Window
             _adorner.CommitRequested += (_, _) => TryConfirmSelection();
             _adorner.SelectionChanged += (_, _) => UpdateRingPosition();
             _adorner.GeometrySettled += (_, _) => UpdateRingPosition();
+            _adorner.Session = _session;
+            _adorner.DisplayIndex = display.Index;
         }
         if (_ring != null)
         {
@@ -95,6 +103,9 @@ public partial class OverlayWindow : Window
 
         _copiedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
         _copiedTimer.Tick += (_, _) => ExitPickMode();
+
+        // B-3：会话广播 → 本屏 adorner（映射后的矩形可越界，渲染按切片/裁剪规则出图）
+        _session.Changed += ApplySessionSelection;
 
         Opened += (_, _) =>
         {
@@ -122,8 +133,17 @@ public partial class OverlayWindow : Window
         Closed += (_, _) =>
         {
             _copiedTimer?.Stop();
+            _session.Changed -= ApplySessionSelection;
             if (_magnifier != null) { _magnifier.IsVisible = false; _magnifier.Source = null; }
         };
+    }
+
+    /// <summary>B-3：会话权威选框变化 → 写回本屏 adorner（映射后的矩形）并刷新工具环归属。</summary>
+    private void ApplySessionSelection(object? sender, EventArgs e)
+    {
+        if (_adorner != null)
+            _adorner.SelectionRect = _session.SelectionInFrame(_display.Index);
+        UpdateRingPosition();
     }
 
     /// <summary>基于当前选框重新定位/显隐悬浮工具环。</summary>
@@ -132,7 +152,13 @@ public partial class OverlayWindow : Window
         if (_ring is null || _adorner is null) return;
 
         var sel = _adorner.SelectionRect;
-        if (sel is null || sel.Value.Width < 4 || sel.Value.Height < 4)
+        // B-3：跨屏时环只挂在选框中心所在屏；单屏会话恒等本屏，行为不变。
+        // 最小尺寸判据用会话物理尺寸而非本屏映射宽（B-3 review Minor-1）：映射宽随宿主屏
+        // scale 缩放，高缩放屏上 4–7 物理像素的合法窄选框映射后 <4 会误失环；
+        // 释放后 <4 DIP 已被清空，物理门与旧单屏行为在实际可达态上等价
+        var phys = _session.ConfirmRegion();
+        if (sel is null || phys is null || phys.Value.Width < 4 || phys.Value.Height < 4
+            || _session.RingDisplayIndex != _display.Index)
         {
             _ring.IsVisible = false;
             return;
@@ -158,7 +184,7 @@ public partial class OverlayWindow : Window
                 ExitPickMode(); // 取色模式下 Esc 先退模式；「清除选框 / 取消整个捕获」语义维持既有
                 if (_adorner?.SelectionRect is not null)
                 {
-                    _adorner.ClearSelection();
+                    _session.Clear(); // B-3：清的是会话权威态——跨屏时所有 overlay 的选框一并消失
                     e.Handled = true;
                     return;
                 }
@@ -250,28 +276,8 @@ public partial class OverlayWindow : Window
 
     private void TryConfirmSelection()
     {
-        var sel = _adorner?.SelectionRect;
-        if (sel is { } dipRect && dipRect.Width >= 1 && dipRect.Height >= 1)
-        {
-            var phys = DipToPhysical(dipRect, _display);
-            Confirm(phys);
-        }
-        else
-        {
-            Confirm(_display.Bounds);
-        }
-    }
-
-    private static PixelRect DipToPhysical(Rect dip, DisplayInfo d)
-    {
-        var s = d.ScaleFactor;
-        var x = (int)Math.Round(d.Bounds.X + dip.X * s);
-        var y = (int)Math.Round(d.Bounds.Y + dip.Y * s);
-        var w = (int)Math.Round(dip.Width * s);
-        var h = (int)Math.Round(dip.Height * s);
-        if (w < 1) w = 1;
-        if (h < 1) h = 1;
-        return new PixelRect(x, y, w, h);
+        // B-3：权威选框在会话（物理像素）；无选框回退本屏整屏（既有语义）
+        Confirm(_session.ConfirmRegion() ?? _display.Bounds);
     }
 
     private void Confirm(PixelRect region)

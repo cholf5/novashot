@@ -562,7 +562,8 @@ public partial class MainWindow : Window
     /// Region 捕获：每个物理显示器一个 <see cref="OverlayWindow"/>；
     /// 先抓帧再显示 overlay，避免 overlay 自身被拍进画面。
     /// 首个 Confirmed/Cancelled 决定整会话结果，其余 overlay 一并关闭。
-    /// M2-3a：每个 overlay 只处理本屏内的选框；跨屏选择留待 M2-3b（共享坐标器）。
+    /// M2-3a：每屏一个 overlay；B-3（M2-3b）：共享 <see cref="SelectionSession"/> 权威选框，
+    /// 选框可跨屏拖拽，确认的物理 region 由 CaptureRegion 跨屏拼接。
     /// </summary>
     public async Task CaptureRegionAsync()
     {
@@ -651,11 +652,14 @@ public partial class MainWindow : Window
             catch { clipboard = new FakeClipboardService(); }
             var colorHistory = AppServices.Services.GetService<Prtsc.Core.Editor.ColorHistory>();
 
+            // B-3：一次捕获会话一个跨屏选框协调器（按枚举快照构造，逐 overlay 注入）
+            var selectionSession = new SelectionSession(displays);
+
             for (int i = 0; i < displays.Count; i++)
             {
                 var display = displays[i];
                 var shot = displayShots[i];
-                var overlay = new OverlayWindow(shot.Bitmap, display, clipboard, colorHistory);
+                var overlay = new OverlayWindow(shot.Bitmap, display, clipboard, colorHistory, selectionSession);
                 overlay.Confirmed += (_, region) => OnAnyConfirmed(region);
                 overlay.Cancelled += (_, _) => OnAnyCancelled();
                 overlay.StrokePicked += (_, color) => _vm.PendingStrokeColor = color;

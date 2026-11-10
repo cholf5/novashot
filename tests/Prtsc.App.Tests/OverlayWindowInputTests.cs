@@ -60,8 +60,14 @@ public class OverlayWindowInputTests
         {
             var overlay = NewOverlay(out var adorner);
 
-            // 摆一个选框让工具环出现（环盖在选框上边缘 = Canvas 层有实际子元素）
-            adorner!.SelectionRect = new Rect(200, 200, 400, 300);
+            // 真实拖拽摆一个选框让工具环出现（环盖在选框上边缘 = Canvas 层有实际子元素）；
+            // B-3 起选框权威态在 SelectionSession，直接赋值 adorner.SelectionRect 不再进会话态
+            overlay.MouseMove(new Point(200, 200));
+            overlay.MouseDown(new Point(200, 200), MouseButton.Left);
+            overlay.MouseMove(new Point(600, 500), RawInputModifiers.LeftMouseButton);
+            overlay.MouseUp(new Point(600, 500), MouseButton.Left, RawInputModifiers.LeftMouseButton);
+            Assert.NotNull(adorner!.SelectionRect);
+
             overlay.UpdateLayout();
             var ring = overlay.FindControl<FloatingToolRing>("ToolRing");
             Assert.NotNull(ring);
@@ -79,6 +85,63 @@ public class OverlayWindowInputTests
             Assert.Equal(220, sel.Y, 0.5);
 
             overlay.Close();
+        }, CancellationToken.None);
+    }
+
+    // ------------------------------------------------------------------------
+    //  B-3 M2-3b：跨屏拖选——两个 overlay 共享一个 SelectionSession
+    // ------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CrossScreenDrag_SelectionBroadcastsToBothOverlays_AndConfirmsPhysicalRegion()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(TestAppHeadlessBootstrap));
+        await session.Dispatch(() =>
+        {
+            var displayA = new DisplayInfo(0, "A", new PixelRect(0, 0, 1000, 800),
+                new PixelRect(0, 0, 1000, 800), 1.0, IsPrimary: true);
+            var displayB = new DisplayInfo(1, "B", new PixelRect(1000, 0, 1000, 800),
+                new PixelRect(1000, 0, 1000, 800), 2.0, IsPrimary: false);
+            var coordinator = new SelectionSession(new[] { displayA, displayB });
+
+            var bmpA = TestBitmaps.MakeSolid(1000, 800);
+            var overlayA = new OverlayWindow(bmpA, displayA, session: coordinator);
+            overlayA.Closed += (_, _) => bmpA.Dispose();
+            var bmpB = TestBitmaps.MakeSolid(1000, 800);
+            var overlayB = new OverlayWindow(bmpB, displayB, session: coordinator);
+            overlayB.Closed += (_, _) => bmpB.Dispose();
+
+            PixelRect? confirmed = null;
+            overlayA.Confirmed += (_, region) => confirmed = region;
+
+            overlayA.Show();
+            overlayB.Show();
+            overlayA.UpdateLayout();
+            overlayB.UpdateLayout();
+
+            var adornerA = overlayA.FindControl<SelectionAdorner>("Adorner");
+            var adornerB = overlayB.FindControl<SelectionAdorner>("Adorner");
+            Assert.NotNull(adornerA);
+            Assert.NotNull(adornerB);
+
+            // 在屏 A 按下并向右拖出界外（界外即屏 B）：捕获窗口继续收到越界本地坐标
+            overlayA.MouseMove(new Point(900, 100));
+            overlayA.MouseDown(new Point(900, 100), MouseButton.Left);
+            overlayA.MouseMove(new Point(1500, 300), RawInputModifiers.LeftMouseButton);
+
+            // 广播：A 显示本帧矩形；B 显示映射进自己帧的（界外起点的）矩形
+            Assert.Equal(new Rect(900, 100, 600, 200), adornerA.SelectionRect);
+            Assert.Equal(new Rect(-50, 50, 300, 100), adornerB.SelectionRect);
+
+            // 工具环只跟选框中心所在屏（B）：A 隐、B 显（B-3 review Minor-4：窗口级装配只有半个断言不行）
+            Assert.False(overlayA.FindControl<FloatingToolRing>("ToolRing")!.IsVisible);
+            Assert.True(overlayB.FindControl<FloatingToolRing>("ToolRing")!.IsVisible);
+
+            overlayA.MouseUp(new Point(1500, 300), MouseButton.Left, RawInputModifiers.LeftMouseButton);
+
+            // Enter 确认 → 物理像素 region（跨屏拼接由 CaptureRegion 完成）
+            overlayA.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+            Assert.Equal(new PixelRect(900, 100, 600, 200), confirmed);
         }, CancellationToken.None);
     }
 

@@ -17,19 +17,17 @@ namespace Prtsc.App.Controls;
 /// - 光标随命中区自动切换
 /// - 坐标一律 DIP，Confirm 时由外部换算物理像素
 ///
-/// 交互纯几何逻辑都委派给 <see cref="SelectionGeometry"/> 便于单元测试。
+/// B-3 M2-3b：交互纯几何与权威选框状态移入 <see cref="SelectionSession"/>（跨屏共享，
+/// 每屏 overlay 的本控件只持有「权威选框映射到本屏帧」的渲染矩形——可越出本屏界，
+/// 越界段由窗口裁剪）。本控件职责收敛为：渲染 + 原始指针/键盘事件转发 + 光标反馈。
 ///
-/// M2-1：拖拽创建 / 8 handles / 边线拖动 / 内部移动 / 光标 / clamp
-/// M2-2：键盘微调 / Ctrl 锁比例 / Shift 中心对称
+/// M2-2：键盘微调 / Ctrl 锁比例 / Shift 中心对称（数学在 SelectionGeometry/Session）
 /// M2-4：GeometrySettled 400ms 去抖
 /// </summary>
 public sealed class SelectionAdorner : Control, ICustomHitTest
 {
     // ---- 视觉常量（DIP）----
     private const double HandleVisual = 8;
-    private const double HandleHitPad = 4;   // 命中盒相对视觉扩大量（每边）
-    private const double EdgeHitSlop  = 6;   // 边线拖动的允许偏离
-    private const double MinSize      = 4;   // 选框最小边
 
     // ---- 画笔 ----
     // E-1 M9：静态渲染资源一律用 Immutable 变体——mutable Brush/Pen 是 AvaloniaObject（线程仿亲），
@@ -55,6 +53,8 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     private readonly DispatcherTimer _settleTimer;
 
     // ---- 状态 ----
+    // 渲染输入：权威选框映射到本屏帧的矩形（OverlayWindow 经 session 广播写入；可越界）。
+    // 会话态不在本控件——指针/键盘事件转发给 Session。
     private Rect? _selection;
     public Rect? SelectionRect
     {
@@ -69,12 +69,11 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
         }
     }
 
-    private DragMode _mode = DragMode.None;
-    private SelectionGeometry.Grip _activeGrip;
-    private Point _dragStart;
-    private Rect  _dragStartRect;
+    /// <summary>B-3：跨屏会话（OverlayWindow 装配；null 时本控件不响应指针/键盘）。</summary>
+    public SelectionSession? Session { get; set; }
 
-    private enum DragMode { None, Creating, Moving, Resizing }
+    /// <summary>本 overlay 对应的显示器 Index（= DisplayInfo.Index，会话按键寻屏）。</summary>
+    public int DisplayIndex { get; set; }
 
     public SelectionAdorner()
     {
@@ -110,32 +109,40 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     {
         var w = Bounds.Width;
         var h = Bounds.Height;
+        var view = new Rect(0, 0, w, h);
 
         if (_selection is not { } sel)
         {
-            ctx.DrawRectangle(DimBrush, null, new Rect(0, 0, w, h));
+            ctx.DrawRectangle(DimBrush, null, view);
             return;
         }
 
-        sel = SelectionGeometry.ClampAndNormalize(sel, w, h);
+        // B-3：sel 是权威选框在本屏帧的映射，可整体越界（选框在另一屏）→ 本屏铺满暗化；
+        // 相交时可见切片 vis = sel ∩ view，暗化 = 窗口内切片之外的区域。
+        if (!sel.Intersects(view))
+        {
+            ctx.DrawRectangle(DimBrush, null, view);
+            return;
+        }
+        var vis = SelectionGeometry.ClampAndNormalizeTo(sel, view);
 
-        // 环绕暗化——四条外围矩形，避开选框
-        ctx.DrawRectangle(DimBrush, null, new Rect(0, 0, w, sel.Y));
-        ctx.DrawRectangle(DimBrush, null, new Rect(0, sel.Bottom, w, Math.Max(0, h - sel.Bottom)));
-        ctx.DrawRectangle(DimBrush, null, new Rect(0, sel.Y, sel.X, sel.Height));
-        ctx.DrawRectangle(DimBrush, null, new Rect(sel.Right, sel.Y, Math.Max(0, w - sel.Right), sel.Height));
+        // 环绕暗化——四条外围矩形，避开可见切片
+        ctx.DrawRectangle(DimBrush, null, new Rect(0, 0, w, vis.Y));
+        ctx.DrawRectangle(DimBrush, null, new Rect(0, vis.Bottom, w, Math.Max(0, h - vis.Bottom)));
+        ctx.DrawRectangle(DimBrush, null, new Rect(0, vis.Y, vis.X, vis.Height));
+        ctx.DrawRectangle(DimBrush, null, new Rect(vis.Right, vis.Y, Math.Max(0, w - vis.Right), vis.Height));
 
-        // 选框描边
+        // 选框描边：画真实全局矩形，越界段由窗口裁剪（跨屏时邻屏补齐另外的段）
         ctx.DrawRectangle(null, SelectionPen, sel);
 
-        // 8 handles
+        // 8 handles：画真实全局角点，落在别的屏的手柄不在本屏出现
         foreach (var c in EnumerateHandleCenters(sel))
         {
             var r = new Rect(c.X - HandleVisual / 2, c.Y - HandleVisual / 2, HandleVisual, HandleVisual);
             ctx.DrawRectangle(HandleFillBrush, HandleStrokePen, r);
         }
 
-        // 尺寸标签
+        // 尺寸标签：数字用真实选框，锚点用可见切片（选框顶缘越出本屏时标签仍贴在屏内）
         var label = new FormattedText(
             $"{(int)Math.Round(sel.Width)} × {(int)Math.Round(sel.Height)}",
             CultureInfo.InvariantCulture,
@@ -144,9 +151,9 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
             12,
             LabelFgBrush);
         var labelSize = new Size(label.Width + 10, label.Height + 4);
-        var labelY = sel.Y - labelSize.Height - 4;
-        if (labelY < 0) labelY = sel.Y + 4; // 顶到上边就贴到选框内侧
-        var labelRect = new Rect(new Point(sel.X, labelY), labelSize);
+        var labelY = vis.Y - labelSize.Height - 4;
+        if (labelY < 0) labelY = vis.Y + 4; // 顶到上边就贴到切片内侧
+        var labelRect = new Rect(new Point(vis.X, labelY), labelSize);
         ctx.DrawRectangle(LabelBgBrush, null, labelRect);
         ctx.DrawText(label, new Point(labelRect.X + 5, labelRect.Y + 2));
     }
@@ -164,58 +171,28 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     }
 
     // ------------------------------------------------------------------------
-    //  Pointer handling
+    //  Pointer handling（事件转发给 Session；权威态在会话，广播经 OverlayWindow 写回 _selection）
     // ------------------------------------------------------------------------
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         var p = e.GetPosition(this);
 
-        if (_mode == DragMode.None)
+        if (Session is { } s)
         {
-            Cursor = new Cursor(CursorFor(HitTestGrip(p)));
+            if (s.HasActiveDrag) s.Drag(DisplayIndex, p, e.KeyModifiers);
+            else Cursor = new Cursor(CursorFor(HitTestGrip(p)));
             base.OnPointerMoved(e);
             return;
         }
-
-        var newSel = ComputeDrag(p, e.KeyModifiers);
-        SelectionRect = newSel;
         base.OnPointerMoved(e);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (_selection is not { } sel) return;
-
-        var step = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 10.0 : 1.0;
-        var dx = 0.0;
-        var dy = 0.0;
-        switch (e.Key)
-        {
-            case Key.Left:  dx = -step; break;
-            case Key.Right: dx = +step; break;
-            case Key.Up:    dy = -step; break;
-            case Key.Down:  dy = +step; break;
-            default: return;
-        }
-
-        var w = Bounds.Width;
-        var h = Bounds.Height;
-
-        // Ctrl+方向：调整右下角（缩放）；否则平移整框
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
-        {
-            var nw = Math.Clamp(sel.Width + dx, MinSize, Math.Max(MinSize, w - sel.X));
-            var nh = Math.Clamp(sel.Height + dy, MinSize, Math.Max(MinSize, h - sel.Y));
-            SelectionRect = new Rect(sel.X, sel.Y, nw, nh);
-        }
-        else
-        {
-            var nx = Math.Clamp(sel.X + dx, 0, Math.Max(0, w - sel.Width));
-            var ny = Math.Clamp(sel.Y + dy, 0, Math.Max(0, h - sel.Height));
-            SelectionRect = new Rect(nx, ny, sel.Width, sel.Height);
-        }
-        e.Handled = true;
+        if (Session is not { } s || _selection is null) return;
+        if (s.Nudge(e.Key, e.KeyModifiers.HasFlag(KeyModifiers.Control), e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
+            e.Handled = true;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -234,32 +211,8 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
             return;
         }
 
-        var grip = HitTestGrip(p);
-
-        if (grip == SelectionGeometry.Grip.Outside || _selection is null)
-        {
-            _mode = DragMode.Creating;
-            _activeGrip = SelectionGeometry.Grip.SE;
-            _dragStart = p;
-            _dragStartRect = new Rect(p, new Size(0, 0));
-            SelectionRect = _dragStartRect;
-        }
-        else if (grip == SelectionGeometry.Grip.Inside)
-        {
-            _mode = DragMode.Moving;
-            _activeGrip = SelectionGeometry.Grip.Inside;
-            _dragStart = p;
-            _dragStartRect = _selection.Value;
-        }
-        else
-        {
-            _mode = DragMode.Resizing;
-            _activeGrip = grip;
-            _dragStart = p;
-            _dragStartRect = _selection.Value;
-        }
-
-        Cursor = new Cursor(CursorFor(_activeGrip));
+        Session?.Press(DisplayIndex, p, e.KeyModifiers);
+        Cursor = new Cursor(CursorFor(Session?.ActiveGrip ?? HitTestGrip(p)));
         e.Pointer.Capture(this);
         e.Handled = true;
     }
@@ -267,15 +220,7 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (_mode == DragMode.None) return;
-
-        // 太小的框视为无效，清空
-        if (_selection is { } s && (s.Width < MinSize || s.Height < MinSize))
-        {
-            SelectionRect = null;
-        }
-
-        _mode = DragMode.None;
+        Session?.Release(DisplayIndex);
         e.Pointer.Capture(null);
         Cursor = new Cursor(_selection is null
             ? StandardCursorType.Cross
@@ -285,14 +230,16 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
-        _mode = DragMode.None;
+        // 捕获丢失（如窗口被外部关闭）等价释放：会话态必须退出拖拽，否则后续 Press 被永久忽略。
+        // 正常释放后 Capture(null) 也会触发本事件——Release 幂等（_mode==None 直接返回）。
+        Session?.Release(DisplayIndex);
     }
 
     // ------------------------------------------------------------------------
     //  Hit-testing wrappers（委派到 SelectionGeometry）
     // ------------------------------------------------------------------------
     private SelectionGeometry.Grip HitTestGrip(Point p) =>
-        SelectionGeometry.HitTest(_selection, p, HandleVisual / 2 + HandleHitPad, EdgeHitSlop);
+        SelectionGeometry.HitTest(_selection, p, SelectionGeometry.GripHitHalfPad, SelectionGeometry.EdgeHitSlop);
 
     private static StandardCursorType CursorFor(SelectionGeometry.Grip g) => g switch
     {
@@ -304,39 +251,4 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
         SelectionGeometry.Grip.Outside                         => StandardCursorType.Cross,
         _                                                      => StandardCursorType.Arrow,
     };
-
-    // ------------------------------------------------------------------------
-    //  Drag computation
-    // ------------------------------------------------------------------------
-    private Rect ComputeDrag(Point p, KeyModifiers mods)
-    {
-        var w = Bounds.Width;
-        var h = Bounds.Height;
-        var dx = p.X - _dragStart.X;
-        var dy = p.Y - _dragStart.Y;
-        var s = _dragStartRect;
-
-        // 平移直接 clamp 后返回，不参与 Ctrl/Shift
-        if (_activeGrip == SelectionGeometry.Grip.Inside)
-        {
-            var nx = Math.Clamp(s.X + dx, 0, Math.Max(0, w - s.Width));
-            var ny = Math.Clamp(s.Y + dy, 0, Math.Max(0, h - s.Height));
-            return new Rect(nx, ny, s.Width, s.Height);
-        }
-
-        var r = SelectionGeometry.ApplyDrag(s, dx, dy, _activeGrip);
-
-        if (mods.HasFlag(KeyModifiers.Control))
-            r = SelectionGeometry.ApplyAspectLock(r, s, _activeGrip);
-
-        if (mods.HasFlag(KeyModifiers.Shift))
-            r = SelectionGeometry.ApplyCenterSymmetric(r, s, _activeGrip);
-
-        return SelectionGeometry.ClampAndNormalize(r, w, h);
-    }
-
-    // ------------------------------------------------------------------------
-    //  Public helpers（供 OverlayWindow 用）
-    // ------------------------------------------------------------------------
-    public void ClearSelection() => SelectionRect = null;
 }
