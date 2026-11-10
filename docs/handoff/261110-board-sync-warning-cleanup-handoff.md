@@ -78,3 +78,13 @@ App 的 windows TFM 本机（macOS）无法执行，仅确认编译通过（0 wa
 **踩坑（写回归用例时踩到的）**：把 `CapturedImage` 放进 `Build()` 的 `using` 里 → 返回后位图已释放，Skia 在布局/测量阶段直接 abort 宿主，无异常无堆栈，极易误判成 Q-1 复发。正解：位图必须活到窗口关闭之后；已写进测试注释。**排查手法备注**：先用 `File.AppendAllText` 打点定位到「崩在 `RaiseEvent` 内部」，再降到独立 console 宿主（`Avalonia.Headless` 直接可跑）看它反而正常，才揪出是测试自己的生命周期 bug。
 
 **未覆盖**：App 的 windows TFM 本机跑不了，只在 CI/Windows 上验证；`SettingsWindowXamlTests` 的跨线程 Radio 孤例（U-1 记录）本轮没再现（修后 25 连跑未复现），若后续又在 Windows 腿出现，按同一口径查是否有残留 TwoWay。
+
+## 7. README + 用户文档（V-1 的 4/5 项，同批续做）
+
+仓库此前**没有 README**，也没有任何面向用户的手册（只有面向开发者的 handoff / 看板 / QA 清单）。
+
+- `README.md`（根）：一句话定位 + 特性清单（捕获/15 工具表/合成输出/云与历史/CLI/设置/i18n）+ 平台支持矩阵与四条已知限制（Wayland、未签名、mac 屏幕录制权限、mac/Linux 无系统通知）+ 安装（Setup/Portable/源码 + Linux 需 xclip）+ 快速上手与两层快捷键表（编辑器 / overlay）+ CLI 用法与选项表 + 配置文件与数据目录（三平台、四类文件）+ 从源码构建与 `pack-windows.sh` + 测试命令与当前用例数（785/209/91/46）+ 项目结构 + 文档索引 + 许可（如实写「尚未添加 LICENSE」）。
+- `docs/user/`：`README.md`（索引 + 术语 + 默认热键）+ 7 篇——`01-capture`（三种捕获、overlay 操作表、跨屏、窗口选择器、延时、启动器）、`02-annotate`（工具热键表、通用操作、Style/Canvas 面板逐项、crop reshape）、`03-compose-export`（顶栏、合成参数三行为、三种落盘、QuickSave 命名、剪贴板读写策略、Pin、导入）、`04-cloud-library`（R2/Drive 配置步骤、测试连接、上传时机、Library 操作、删除策略表、数据位置）、`05-settings`（六分区逐项 + 托盘菜单 + config.json）、`06-cli`（模式表、选项表、单实例语义、退出码、cron/PowerShell 示例）、`07-troubleshooting`（黑帧/权限/Wayland、热键失效、xclip、SmartScreen、toast 不弹、更新不提示、粘贴失败、重置、报问题模板）。
+- 事实核对方式：文档里的路径、范围值、键位、文案全部对照源码（`PrtscConfig` / `FilenamePatterns` / `CompositionPanel.axaml` 滑杆范围 / `MainWindow.axaml` KeyBindings / `CliArgs.HelpText` / `Loc.cs`）确认，不凭印象写。
+- 顺手修一处用户可见不一致：设置页 QuickSave 三种模式示例写的是 `prtsc-20261102-094213` / `prtsc-20261102` / `prtsc-0042`，实际实现是 `prtsc_2026-11-02_09-42-13` / `prtsc_2026-11-02` / `prtsc_001`（分隔符、时间形态、序号位数都不同）→ 双语 Loc 同步改正。
+- 未做：英文版 README/user docs（当前仓库文档体系全中文，按「与代码库一致」处理）；LICENSE 需拍板。

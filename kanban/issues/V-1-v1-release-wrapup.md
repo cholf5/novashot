@@ -16,6 +16,13 @@
 6. **签名方案拍板**：产物未签名 → SmartScreen 拦。选项：EV 证书 / Azure Trusted Signing / 明确「不签」并写进 README 的已知限制。
 7. **macOS 分发渠道**：vpk osx 腿 / .app bundle / Homebrew，三选一或明确「本版不发 mac 包」。
 
+**进度（2026-11-10）**
+
+- [x] 4. README：仓库根 `README.md` 已写（特性 / 平台矩阵与已知限制 / 安装 / 快速上手 / 快捷键 / CLI / 配置与数据目录 / 构建与打包 / 测试 / 项目结构 / 文档索引）。
+- [x] 5. 用户文档：`docs/user/` 八页（索引、捕获、标注、合成导出、云与历史、设置、CLI、故障排查），README 已互链。
+- 顺手修正：设置页 QuickSave 三种命名模式的示例文案与实现不一致（`prtsc-20261102-094213` → 实际 `prtsc_2026-11-02_09-42-13` / `prtsc_001`），双语同步。
+- [ ] 1/2/3/6/7 待远端或真机：版本号、CI 首跑、tag+release、签名、mac 分发。另需拍板 **LICENSE**（仓库当前没有，README 已如实标注）。
+
 ## 验收标准
 
 - [ ] GitHub Actions 三个 test job 首次全绿（附 run 链接）。
