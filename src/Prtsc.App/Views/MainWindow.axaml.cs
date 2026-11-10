@@ -777,7 +777,7 @@ public partial class MainWindow : Window
     {
         _logger.LogInformation("Capture Window requested");
 
-        var picker = new WindowPickerDialog(_windowService);
+        var picker = new WindowPickerDialog(_windowService, _capture);
         WindowInfo? target = null;
         if (IsVisible)
         {

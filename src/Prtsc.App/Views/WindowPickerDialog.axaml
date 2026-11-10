@@ -29,10 +29,26 @@
                Padding="6" DoubleTapped="OnListDoubleTapped">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="local:WindowPickerDialog+Row">
-            <StackPanel Margin="8,9" Spacing="3">
-              <TextBlock Text="{Binding Title}" FontSize="12.5" TextTrimming="CharacterEllipsis" />
-              <TextBlock Classes="mono hint" FontSize="10" Text="{Binding SubText}" />
-            </StackPanel>
+            <Grid Margin="8,7" ColumnDefinitions="108,*">
+              <!-- B-2 缩略图：96×54 框（等比缩小居中），失败降级为进程首字母占位 -->
+              <Border Width="108" Height="60" CornerRadius="6" ClipToBounds="True"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource Bg.Mat}"
+                      BorderBrush="{DynamicResource Line}" BorderThickness="1">
+                <Panel>
+                  <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="3"
+                         IsVisible="{Binding HasThumbnail}" />
+                  <TextBlock Text="{Binding Initial}" FontSize="20" FontWeight="SemiBold"
+                             Classes="mono" Opacity="0.45"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                             IsVisible="{Binding !HasThumbnail}" />
+                </Panel>
+              </Border>
+              <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="3">
+                <TextBlock Text="{Binding Title}" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="mono hint" FontSize="10" Text="{Binding SubText}" />
+              </StackPanel>
+            </Grid>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
