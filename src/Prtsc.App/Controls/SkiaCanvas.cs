@@ -53,6 +53,11 @@ public sealed class SkiaCanvas : Control
     private IAnnotationTool? _activeTool;
     private EditorViewModel? _subscribedEditor;
 
+    // B-4：crop reshape 拖拽态（X 工具 + 已应用裁剪框的手柄拖拽）。非 IAnnotationTool——
+    // 拖拽每步实时 ApplyCrop，Esc/CaptureLost 恢复 _cropReshapeOriginal。
+    private HandleKind? _cropHandleDrag;
+    private SKRect _cropReshapeOriginal;
+
     // M6d 起：三层坐标换算（image/content/DIP）的唯一实现在 EditorViewModel
     // （ImageToContent/ContentToImage/ImageRectToContent）——crop 激活时 content 原点 = crop 原点。
 
@@ -69,7 +74,15 @@ public sealed class SkiaCanvas : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Handled || _activeTool is null || e.Key != Key.Escape) return;
+        if (e.Handled || e.Key != Key.Escape) return;
+        // B-4：reshape 拖拽中的 Esc——恢复拖拽起始框（画布有焦点时先于 MainWindow 的 Deselect 生效）
+        if (_cropHandleDrag is not null)
+        {
+            CancelCropReshape();
+            e.Handled = true;
+            return;
+        }
+        if (_activeTool is null) return;
         _activeTool.Cancel();
         _activeTool = null;
         InvalidateVisual();
@@ -103,6 +116,7 @@ public sealed class SkiaCanvas : Control
             _subscribedEditor.PropertyChanged += OnEditorPropertyChanged;
         }
         _activeTool = null;
+        _cropHandleDrag = null; // B-4（review M2）：Editor 换替时 reshape 态一并失效，防旧起始框写入新 editor
         InvalidateVisual();
         ViewportInvalidated?.Invoke(this, EventArgs.Empty);
     }
@@ -143,7 +157,8 @@ public sealed class SkiaCanvas : Control
             editor.EditingText,
             ComputeViewportMatrix(editor, bounds),
             CropPreviewRect,
-            new SKSize(editor.ContentWidth, editor.ContentHeight)));
+            new SKSize(editor.ContentWidth, editor.ContentHeight),
+            cropToolActive: editor.CurrentTool == ToolKind.Crop));
     }
 
     /// <summary>
@@ -219,6 +234,23 @@ public sealed class SkiaCanvas : Control
 
         Focus();
 
+        // B-4：crop 激活时先试手柄命中——命中即进入 reshape 拖拽（不新建框）；
+        // 已在拖拽中则忽略二次 press，防 _cropReshapeOriginal 被覆写成中间态（review M1）
+        if (editor.CurrentTool == ToolKind.Crop && _cropHandleDrag is null &&
+            editor.CompositionState.CropRect is { } cropRect)
+        {
+            var handleRadius = DipToImageDistance(ComputeViewportMatrix(editor, Bounds), HandleHitRadiusDip);
+            if (CropReshape.HitTest(cropRect, img.Value, handleRadius) is { } kind)
+            {
+                _cropHandleDrag = kind;
+                _cropReshapeOriginal = cropRect;
+                e.Pointer.Capture(this);
+                InvalidateVisual();
+                e.Handled = true;
+                return;
+            }
+        }
+
         // 双击 + Select 工具 + 命中 TextAnnotation → 进入内联编辑
         if (e.ClickCount == 2 && editor.CurrentTool == ToolKind.Select)
         {
@@ -275,6 +307,23 @@ public sealed class SkiaCanvas : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+
+        // B-4：reshape 拖拽——每步实时写回 CropRect（比例吸附在 Core DragTo 内）
+        if (_cropHandleDrag is { } dragKind)
+        {
+            var reshapeEditor = Editor;
+            var reshapeImg = DipToImage(e.GetPosition(this));
+            if (reshapeEditor is not null && reshapeImg is { } p && reshapeEditor.CompositionState.CropRect is { } current)
+            {
+                var (rw, rh) = reshapeEditor.PendingCropRatio;
+                reshapeEditor.ApplyCrop(CropReshape.DragTo(current, dragKind, p,
+                    new SKRect(0, 0, reshapeEditor.Document.Width, reshapeEditor.Document.Height), rw, rh));
+                InvalidateVisual();
+                e.Handled = true;
+            }
+            return;
+        }
+
         if (_activeTool is null) return;
         var img = DipToImage(e.GetPosition(this));
         if (img is null) return;
@@ -338,6 +387,27 @@ public sealed class SkiaCanvas : Control
     {
         base.OnPointerReleased(e);
         var editor = Editor;
+
+        // B-4：reshape 提交——move 已实时写回，up 点再精确收尾一次（笔类输入 up 可能与末次 move 不同）
+        if (_cropHandleDrag is { } dragKind)
+        {
+            _cropHandleDrag = null;
+            e.Pointer.Capture(null);
+            if (editor is not null)
+            {
+                var up = DipToImage(e.GetPosition(this));
+                if (up is { } p && editor.CompositionState.CropRect is { } current)
+                {
+                    var (rw, rh) = editor.PendingCropRatio;
+                    editor.ApplyCrop(CropReshape.DragTo(current, dragKind, p,
+                        new SKRect(0, 0, editor.Document.Width, editor.Document.Height), rw, rh));
+                }
+            }
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
+
         if (_activeTool is null || editor is null) return;
 
         var img = DipToImage(e.GetPosition(this));
@@ -378,8 +448,18 @@ public sealed class SkiaCanvas : Control
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        CancelCropReshape();
         _activeTool?.Cancel();
         _activeTool = null;
+        InvalidateVisual();
+    }
+
+    /// <summary>B-4：放弃 reshape 拖拽，恢复拖拽起始框（Esc / 捕获丢失共用）。</summary>
+    private void CancelCropReshape()
+    {
+        if (_cropHandleDrag is null) return;
+        _cropHandleDrag = null;
+        Editor?.ApplyCrop(_cropReshapeOriginal);
         InvalidateVisual();
     }
 
@@ -499,11 +579,13 @@ public sealed class SkiaCanvas : Control
         private readonly AnnotationBase? _editingText;
         private readonly SKMatrix _matrix;
         private readonly SKRect? _cropPreviewRect;
+        private readonly bool _cropToolActive;
         private readonly SKSize _contentSize;
 
         public DrawOp(Rect bounds, AnnotationDocument doc, Prtsc.Core.Editor.EditorState state,
                       AnnotationBase? preview, AnnotationBase? selection, AnnotationBase? editingText,
-                      SKMatrix matrix, SKRect? cropPreviewRect = null, SKSize contentSize = default)
+                      SKMatrix matrix, SKRect? cropPreviewRect = null, SKSize contentSize = default,
+                      bool cropToolActive = false)
         {
             Bounds = bounds;
             _doc = doc;
@@ -513,6 +595,7 @@ public sealed class SkiaCanvas : Control
             _editingText = editingText;
             _matrix = matrix;
             _cropPreviewRect = cropPreviewRect;
+            _cropToolActive = cropToolActive;
             if (contentSize.Width > 0 && contentSize.Height > 0)
             {
                 _contentSize = contentSize;
@@ -566,9 +649,21 @@ public sealed class SkiaCanvas : Control
             if (_selection is not null && !ReferenceEquals(_selection, _editingText))
                 DrawSelectionOverlay(canvas, _selection);
 
-            // M6d: 裁剪 overlay——框外暗遮罩 + 白框（编辑器 chrome，永不导出）
-            if (_cropPreviewRect is { } cropRect)
+            // M6d/B-4: 裁剪 overlay——框外暗遮罩 + 白框（编辑器 chrome，永不导出）。
+            // B-4：crop 工具激活且已有应用过的裁剪框（无预览拖拽）→ overlay 常驻 + 8 手柄供拖拽。
+            SKRect? cropOverlayRect = _cropPreviewRect;
+            var showCropHandles = false;
+            if (cropOverlayRect is null && _cropToolActive && _state.CropRect is { } applied)
+            {
+                cropOverlayRect = applied;
+                showCropHandles = true;
+            }
+            if (cropOverlayRect is { } cropRect)
+            {
                 DrawCropOverlay(canvas, cropRect);
+                if (showCropHandles)
+                    DrawCropHandles(canvas, cropRect);
+            }
         }
 
         /// <summary>内容区（= 导出图尺寸）在 DIP 空间的矩形，用于铺透明占位格。</summary>
@@ -613,6 +708,33 @@ public sealed class SkiaCanvas : Control
             }
 
             canvas.RestoreToCount(restore);
+        }
+
+        /// <summary>B-4：应用态裁剪框的 8 手柄（BoxHandles 拓扑 → DIP 方块，不随视口缩放变形）。</summary>
+        private void DrawCropHandles(SKCanvas canvas, SKRect imageCropRect)
+        {
+            using var fillPaint = new SKPaint
+            {
+                Color = HandleFillColor,
+                Style = SKPaintStyle.Fill,
+                IsAntialias = false,
+            };
+            using var strokePaint = new SKPaint
+            {
+                Color = HandleStrokeColor,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
+                IsAntialias = false,
+            };
+
+            var half = HandleVisualSizeDip * 0.5f;
+            foreach (var h in BoxHandles.GetHandles(imageCropRect))
+            {
+                var pt = MapImageToDip(h.ImagePos);
+                var r = new SKRect(pt.X - half, pt.Y - half, pt.X + half, pt.Y + half);
+                canvas.DrawRect(r, fillPaint);
+                canvas.DrawRect(r, strokePaint);
+            }
         }
 
         /// <summary>image 空间点 → 内容空间（含 crop 原点 + padding）→ DIP。</summary>
