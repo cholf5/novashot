@@ -17,13 +17,14 @@
 - 
 
 ## Testing / QA
-- QA-1 真机人工冒烟（**UI-1 改版后清单要重写**：dock 15 工具点选/hover/热键 + 面板 tab + 色块选中环 + 滑杆 + ⋯ 菜单 + ToolTip + 最近 4 张点击回编辑器 + zh/en 切换全窗口 + 托盘语言菜单；再叠加原 M4–M6d 项：选择/撤销、裁剪(X/比例/A 取色)、Copy/Ctrl+V/Ctrl+Q、Word/微信/Chrome 剪贴板互通、三种捕获、托盘、WindowPicker）（P0）——**2026-11-10 已追加 §K 通知 / §L 导入 / §M 延时+Launcher / §N 取色器 / §O CLI 五段**（M9/M10 真机项入清单，待真机执行）
+- QA-1 真机人工冒烟（**UI-1 改版后清单要重写**：dock 15 工具点选/hover/热键 + 面板 tab + 色块选中环 + 滑杆 + ⋯ 菜单 + ToolTip + 最近 4 张点击回编辑器 + zh/en 切换全窗口 + 托盘语言菜单；再叠加原 M4–M6d 项：选择/撤销、裁剪(X/比例/A 取色)、Copy/Ctrl+V/Ctrl+Q、Word/微信/Chrome 剪贴板互通、三种捕获、托盘、WindowPicker）（P0）——**2026-11-10 已追加 §K 通知 / §L 导入 / §M 延时+Launcher / §N 取色器 / §O CLI 五段；2026-11-11 追加 §P B-6+B-2 / §Q Windows 深色标题栏**（M9/M10 真机项入清单，待真机执行）
 - QA-L1 Linux 真机冒烟（X11 三捕获/热键/xclip 两环境/自启/多屏负坐标/KDE+GNOME；清单见 handoff 261101-linux1 §6）（P1）
 
 ## Blocked
 - 
 
 ## Done
+- B-9 Windows 深色标题栏：`WindowsCaptionTheme`（DWM `DWMWA_USE_IMMERSIVE_DARK_MODE` 20 → 1809–1903 回落 19；Light 显式清零；写入后 `SetWindowPos(SWP_FRAMECHANGED)` 强制重算 caption——只写属性时 DWM 会把重组合推迟到下一次 frame，表现为「启动白条、拖动才黑」）+ App `CaptionTheme` 挂 Avalonia 全局 `Window.WindowOpenedEvent`（ShowCore 首行、早于首次合成与建 HWND 后的第一次绘制；主窗/设置/云设置/Library/Picker/更新提示/角标全覆盖）+ 运行期 `ActualThemeVariantChanged` 补写 + 明暗裁决 Actual→窗口 Requested→应用 Requested→浅色（WindowOpened 时 Actual 可能仍是 Default）+ 幂等注册/零句柄跳过；测试 App 212（net10.0）+ 218（windows TFM）全绿，真机项 QA-1 §Q（2026-11-11）
 - Q-1 App 测试宿主栈溢出：根因= `CompositionPanel` 背景三态 chip 的 `GroupName="BgKind"` + `IsChecked` **TwoWay** 互踢环（组管理器取消兄弟 → 回写 VM → `OnPropertyChanged(string.Empty)` 整表通知 → 绑定重新发布 → 再进 IsCheckedChanged）；修法= **IsChecked 降为 OneWay 回显 + 输入走 Click（Tag 承载状态）**，级联调用 VM 既有咽喉点 `Apply`，环的结构前提（目标侧写回源）消除；顺查全仓 `GroupName=` 组合（Settings/Launcher 本就 Click 无绑定、工具坞本就 OneWay）；新增 `BackgroundKindChipTests` 3 例（目标侧不回写 / 点击切态+互斥回显+`CanvasStateChanged` 恰一次 / 100 次连切不递归）；**A/B 压测：修前 15 跑 3 abort（186/187/187），修后 25 连跑 0 abort**；Core 785 + App 209×net10.0 + Mac 91 + Linux 46 全绿；快照 UiSnapshot 通过（面板 Gradient 选中态目检正常）（2026-11-10）
 - 看板对账 + 警告清零（2026-11-10）：board/roadmap/issue 状态与事实对齐（B-2/B-6 移出 Backlog、S-1/X-1 状态纠正、M7/M9/M10 勾完成）；新增 Q-1（栈溢出 flake，含实测崩溃栈）与 V-1（v1.0 发布收尾）两卡承载此前无卡的在办事项；编译器警告 31→0（`SystemDecorations`→`WindowDecorations`、`Watermark`→`PlaceholderText`、`SKFilterQuality`→`SKSamplingOptions`、`Bitmap.Save(string,int?)`→`PngBitmapEncoderOptions.Default`、CS8602/CS8604 可空性收敛、CS0067/CS8778 清理、xUnit1031 两处按「刻意阻塞」加注释豁免）；测试 Core 785 + App 206 + Mac 91 + Linux 46 全绿（App net10.0 腿仍有 Q-1 的偶发 abort：本次 8 跑 3 abort，见 Q-1 卡）；同批落地 **README.md + docs/user 八页用户手册**（V-1 的 4/5 项，逐项对照源码核对），顺手改正设置页 QuickSave 命名模式示例与实际格式不符（双语）
 - X-1 反色工具（GAP-1 已实装，本卡此前漏关）：Core `InvertAnnotation`（选区内反色、区域外像素不动）+ 工具坞 I 热键 + `Tool.Invert`/`Kind.Invert` 双语 + 图标；`InvertAnnotationTests` 覆盖区域内外语义（2026-11-10 补记，功能随 GAP-1 于 2026-11-01 交付）

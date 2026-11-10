@@ -10,6 +10,7 @@ using Prtsc.App.Logging;
 using Prtsc.App.Localization;
 using Prtsc.App.ViewModels;
 using Prtsc.App.Views;
+using Prtsc.App.Windowing;
 using Prtsc.Core.Autostart;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Cli;
@@ -53,6 +54,9 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // B-9：深色标题栏钩子必须在任何窗口 Show 之前注册（主窗在下方创建）
+            CaptionTheme.AttachAll();
+
             _logger = AppServices.GetRequiredService<ILogger<App>>();
 
             // 同步 config：先 Load 一次

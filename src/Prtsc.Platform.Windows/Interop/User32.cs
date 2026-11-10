@@ -206,6 +206,17 @@ internal static class User32
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(nint hWnd);
 
+    // ---- B-9 深色标题栏：写 DWM 属性后强制重算非客户区 frame ----
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOMOVE = 0x0002;
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_FRAMECHANGED = 0x0020;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetWindowPos(
+        nint hWnd, nint hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
     /// <summary>
     /// Windows 平台上安全读取 GetWindowLong：64bit 走 Ptr 版本，32bit 走普通版本。
     /// </summary>
