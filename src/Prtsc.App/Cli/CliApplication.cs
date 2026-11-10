@@ -44,10 +44,19 @@ public static class CliApplication
             return CliRunResult.With(CliExitCodes.Usage);
         }
 
+        // 不变式：Success 必带 Command（CliParseResult.Ok/Fail 成对构造）。这里收敛可空性：
+        // 万一未来出现漏填 Command 的构造路径，退成可读错误而非 NRE。
+        var command = parse.Command;
+        if (command is null)
+        {
+            Console.Error.WriteLine("prtsc: internal error: parsed command is missing.");
+            return CliRunResult.With(CliExitCodes.Failure);
+        }
+
         // 1) 单实例探测：已有实例 → 转发整条原始命令行，按响应退出（gui 在接收方映射为 activate）。
         //    review I-1：TryForwardAsync 内置廉价闸门（无实例 0 等待）；gui/无参 冷启动另用短连接超时，
         //    防 Unix stale socket 残留把探测拖满 500ms——GUI 冷启动上限 ~0.1s（BASE 即时启动）。
-        var connectTimeoutMs = parse.Command.Mode == CliCaptureMode.Gui
+        var connectTimeoutMs = command.Mode == CliCaptureMode.Gui
             ? CliPipeClient.GuiConnectTimeoutMs
             : CliPipeClient.DefaultConnectTimeoutMs;
         CliForwardResult forward;
@@ -60,7 +69,7 @@ public static class CliApplication
         {
             // 终审必修③：连接成功后的 write/read IOException 等传输异常不再裸抛——
             // 记日志（gui/无参也已预配置 file-only logger）+ stderr 一行，统一转失败退出码
-            Log.Error(ex, "CLI forwarding failed for mode {Mode}", parse.Command.Mode);
+            Log.Error(ex, "CLI forwarding failed for mode {Mode}", command.Mode);
             Console.Error.WriteLine($"prtsc: forwarding to the running instance failed: {ex.Message}");
             return CliRunResult.With(CliExitCodes.Failure);
         }
@@ -81,13 +90,13 @@ public static class CliApplication
         }
 
         // 2) 无实例：gui → 回 Program 走现行 GUI 启动路径
-        if (parse.Command.Mode == CliCaptureMode.Gui)
+        if (command.Mode == CliCaptureMode.Gui)
             return new CliRunResult(CliRunOutcome.LaunchGui, CliExitCodes.Success);
 
         // 3) 无实例的交互模式：headless 做不了，明确报错退出（不启动 GUI）
-        if (parse.Command.IsInteractive)
+        if (command.IsInteractive)
         {
-            if (parse.Command.Mode == CliCaptureMode.Region)
+            if (command.Mode == CliCaptureMode.Region)
             {
                 Console.Error.WriteLine(
                     "prtsc: headless region capture requires --geometry X,Y,W,H (physical pixels, virtual-desktop coordinates).");
@@ -98,13 +107,13 @@ public static class CliApplication
                     "prtsc: window capture needs interactive selection; start the GUI first ('prtsc gui') and run this command again.");
             }
             Console.Error.WriteLine("Run 'prtsc --help' for usage.");
-            return CliRunResult.With(parse.Command.Mode == CliCaptureMode.Region
+            return CliRunResult.With(command.Mode == CliCaptureMode.Region
                 ? CliExitCodes.Usage
                 : CliExitCodes.Failure);
         }
 
         // 4) headless 执行（full / region+geometry）
-        return CliRunResult.With(RunHeadless(parse.Command, configDir));
+        return CliRunResult.With(RunHeadless(command, configDir));
     }
 
     private static int RunHeadless(CliCommand command, string configDir)

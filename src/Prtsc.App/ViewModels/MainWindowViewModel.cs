@@ -242,9 +242,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task SaveFlushAsync()
     {
+        // 调用链上 TakeConfigDirty 已保证非 null（_configDirty 只在 _configStore 非 null 时置位）；
+        // 这里显式收敛可空性，避免 await 期间字段被换掉的假想路径。
+        var store = _configStore;
+        if (store is null) return;
         try
         {
-            await _configStore.SaveAsync().ConfigureAwait(false);
+            await store.SaveAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -261,10 +265,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void FlushConfigSaveSync()
     {
         CancelConfigDebounce();
-        if (!TakeConfigDirty()) return;
+        var store = _configStore;
+        if (!TakeConfigDirty() || store is null) return;
         try
         {
-            _configStore.SaveAsync().GetAwaiter().GetResult();
+            store.SaveAsync().GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {

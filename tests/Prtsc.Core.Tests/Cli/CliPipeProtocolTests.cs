@@ -19,7 +19,7 @@ public class CliPipeProtocolTests
 
         Assert.True(CliPipeProtocol.TryDecodeRequest(frame, out var args, out var error));
         Assert.Null(error);
-        Assert.Equal(["full", "--clipboard"], args);
+        Assert.Equal(["full", "--clipboard"], args!);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class CliPipeProtocolTests
         var frame = CliPipeProtocol.EncodeRequest(["full", "-c"]);
         var withoutTerminator = frame[..^1];
         Assert.True(CliPipeProtocol.TryDecodeRequest(withoutTerminator, out var args, out _));
-        Assert.Equal(["full", "-c"], args);
+        Assert.Equal(["full", "-c"], args!);
     }
 
     // ---------- 请求容错 ----------

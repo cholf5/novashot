@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
@@ -150,6 +151,10 @@ public class UiSnapshotTests
             overrideDirectory: libDir);
         for (var i = 0; i < 3; i++)
         {
+            // 刻意的同步阻塞（xUnit1031）：本测试是快照生成器，全程在自建的 headless UI 线程上
+            // 手工泵 Dispatcher.RunJobs；改成 async 会让续体落到线程池线程，RunJobs 会抛 invalid thread。
+            // 无 SynchronizationContext，阻塞不死锁。
+#pragma warning disable xUnit1031
             var entry = Task.Run(() => store.AddAsync(new Prtsc.Core.Library.LibraryEntry
             {
                 CreatedAt = DateTimeOffset.Now.AddMinutes(-12 * i),
@@ -162,7 +167,10 @@ public class UiSnapshotTests
                 Provider = i == 0 ? "r2" : null,
             })).GetAwaiter().GetResult();
 
-            using var thumb = MakeFakeShot().Resize(new SKImageInfo(240, 150), SKFilterQuality.High);
+            // 缩略图缩放：SKSamplingOptions 替换已废弃的 SKFilterQuality（High≈Cubic，语义对齐）
+            using var thumb = MakeFakeShot().Resize(new SKImageInfo(240, 150),
+                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+#pragma warning restore xUnit1031
             Prtsc.Core.Library.ThumbnailWriter.Write(thumbsDir, $"thumb_{entry.Id}.png", thumb);
         }
 
@@ -254,7 +262,8 @@ public class UiSnapshotTests
         var frame = window.CaptureRenderedFrame();
         if (frame is null) return;
         var path = Path.Combine(OutDir, fileName);
-        frame.Save(path);
+        // 显式 PNG 编码选项（Bitmap.Save(string,int?) 已废弃）；快照恒为 PNG，质量参数无意义
+        frame.Save(path, PngBitmapEncoderOptions.Default);
         Console.WriteLine($"snapshot → {path}");
     }
 

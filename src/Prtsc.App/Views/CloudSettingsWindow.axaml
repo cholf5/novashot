@@ -85,7 +85,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.PublicUrl}" />
-            <TextBox Text="{Binding R2PublicUrl}" Watermark="{DynamicResource L.Cloud.PublicUrlHint}" />
+            <TextBox Text="{Binding R2PublicUrl}" PlaceholderText="{DynamicResource L.Cloud.PublicUrlHint}" />
           </StackPanel>
           <StackPanel>
             <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.Directory}" />
@@ -113,7 +113,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.FolderId}" />
-            <TextBox Text="{Binding GDriveFolderId}" Watermark="{DynamicResource L.Cloud.FolderIdHint}" />
+            <TextBox Text="{Binding GDriveFolderId}" PlaceholderText="{DynamicResource L.Cloud.FolderIdHint}" />
           </StackPanel>
         </StackPanel>
 

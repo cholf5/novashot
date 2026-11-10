@@ -106,7 +106,7 @@ public class UploadCoordinatorTests : IDisposable
         var store = new JsonConfigStore(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<JsonConfigStore>.Instance,
             overrideDirectory: _tempDir);
-        store.LoadAsync().GetAwaiter().GetResult();
+        await store.LoadAsync();
         store.Update(c =>
         {
             c.Cloud.Provider = "r2";
@@ -134,7 +134,7 @@ public class UploadCoordinatorTests : IDisposable
         var store = new JsonConfigStore(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<JsonConfigStore>.Instance,
             overrideDirectory: _tempDir);
-        store.LoadAsync().GetAwaiter().GetResult();
+        await store.LoadAsync();
         store.Update(c =>
         {
             c.Cloud.Provider = "r2";
@@ -187,7 +187,7 @@ public class UploadCoordinatorTests : IDisposable
         var store = new JsonConfigStore(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<JsonConfigStore>.Instance,
             overrideDirectory: _tempDir);
-        store.LoadAsync().GetAwaiter().GetResult();
+        await store.LoadAsync();
         store.Update(c =>
         {
             c.Cloud.Provider = "r2";

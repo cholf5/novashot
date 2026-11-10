@@ -213,7 +213,7 @@ public class MacClipboardServicePixelGuardTests
     public void PixelCountOverCap_Rejected()
     {
         // B-8 探针构造的恶意 IFD：0x7FFF0000² 天文数字；0x10000² ≈ 4G 像素（BGRA ~17GB 分配）
-        Assert.False(MacClipboardService.IsPixelCopySafe(0x7FFF0000, 0x7FFF0000, (nint)(0x7FFF0000L * 4)));
+        Assert.False(MacClipboardService.IsPixelCopySafe(0x7FFF0000, 0x7FFF0000, unchecked((nint)(0x7FFF0000L * 4))));
         Assert.False(MacClipboardService.IsPixelCopySafe(0x10000, 0x10000, (nint)(0x10000L * 4)));
     }
 

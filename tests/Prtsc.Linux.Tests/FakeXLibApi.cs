@@ -20,7 +20,11 @@ internal sealed class FakeXLibApi : IXLibApi
     public nint EventWindowHandle { get; private set; }
     public bool Activated { get; private set; }
 
-    public event EventHandler<string>? XError;
+    /// <summary>
+    /// 假实现不产生 X 错误（真实现仅在 Xlib 异步错误回调时触发）：显式空访问器——保持接口契约，
+    /// 同时不留下永不触发的事件字段（CS0067）。
+    /// </summary>
+    public event EventHandler<string>? XError { add { } remove { } }
 
     public bool Open() { Opened = true; return true; }
     public void Close() => Opened = false;

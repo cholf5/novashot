@@ -6,7 +6,7 @@
         mc:Ignorable="d"
         x:Class="Prtsc.App.Views.OverlayWindow"
         Title="Prtsc.Overlay"
-        SystemDecorations="None"
+        WindowDecorations="None"
         CanResize="False"
         ShowInTaskbar="False"
         Topmost="True"
