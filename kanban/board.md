@@ -8,7 +8,6 @@
 - B-2 WindowPicker 96×54 缩略图（P3）
 - B-4 crop 后 reshape 手柄（复用 BoxHandles）（P3）
 - B-6 工具栏按钮自定义（flameshot 式可见工具配置）（P3）
-- B-8 Mac 剪贴板解码畸形载荷防护（B-1 审查发现的崩溃面，TryGetImage 裸 SKBitmap.Decode）（P2）
 - B-7 Library 删除记录时可选连磁盘文件一起删（现仅删 library.json 记录、文件保留——L-2 审计确认的行为裁决， safer 默认；需求来源：删除确认对话框文案语义修正）（P3）
 
 ## To Do
@@ -28,6 +27,7 @@
 - 
 
 ## Done
+- B-8 Mac 剪贴板解码畸形载荷防护：粘贴入口 `PasteFromClipboard` 无外层兜底（子任务 1 裁决）→ 服务边界内转 null；PNG 路径换 Core `PngCodec.Decode`，TIFF 路径（NSBitmapImageRep 手工拷贝，ImageIO 对畸形头会"编"出 rep）新增 `IsPixelCopySafe` 预拷贝守卫：正几何+单边上限先行（防 64 位 NSInteger 乘法 unchecked 回绕绕过比较）+行宽 `[w*4, w*16]`+总像素 ≤1e8，SKBitmap 分配失败返 null，拷贝偏移 64 位（int 截断/回绕 = OOB 读，收尾审查追修）；服务级真板 Manual 用例（垃圾/仅魔数/砍半 PNG/构造 IFD 天文数字 TIFF）+ 守卫决策表纯单测；真板 Manual 类收敛到 RealPasteboard collection 串行锁（NSPasteboard 全局单例，并行互踩实测）；真机覆盖=Manual 用例本机 macOS 26.5.2 实跑全绿，不另开 QA-1 项；Mac 91/91（82 自动 + 9 Manual）（2026-11-10）
 - B-1 粘贴支持 PNG 剪贴板格式：读侧候选序下沉 Core `ClipboardImageFormats.SelectReadOrder` 决策表（DIBV5 > DIB > "PNG" 回退；RegisterClipboardFormat 静态注册失败按不可用降级）+ `PngCodec` Decode/Encode（畸形字节 catch 兜住返 null——SKBitmap.Decode 3.119.4 实证抛 `ArgumentNullException('codec')`，剪贴板载荷不可信）；写侧裁决=**做**：DIBV5+DIB 恒放之外追加注册格式 "PNG"（保 alpha，对齐 Mac TIFF+PNG 双格式兄弟平台），**超 4MP 阈值跳过**（UI 线程同步编码实测 1080p ~72ms / 4K ~278ms / 4K 噪声 ~992ms；`ShouldAttemptInteropEncode` 纯函数钉住含 60000×60000 int 乘法回绕陷阱）；行为微变「解码失败继续试下一候选」（严格更稳）；独立 review 1 Important（大图编码卡 UI 线程→阈值修复）+ 4 Minor 全处置（M-4 Mac 裸解码崩溃面另开 B-8 卡）；真机项 QA-1 TC13/TC14（2026-11-10）；测试 1178→1194（Core 709→725）PM 实测
 - L-1 M10 CLI：`prtsc gui|full|region|window --delay --path --clipboard --format`（region 需 `--geometry X,Y,W,H`）；Program.Main 分流——捕获命令不进 Avalonia、退出码 0/1/2、Velopack 钩子共存（对照 v1.2.161 源码证实）；命名管道单实例（原始命令行整条转发，GUI 进程内同一 `CliCaptureExecutor` 执行 headless 导出，无第二套实现；plain gui 也单实例转发 activate）；Core `CliArgs`/协议编解码/执行器全纯函数单测；**实弹 macOS：`full --clipboard` headless 1.23s（<2s 验收线）exit 0 剪贴板实有图，GUI 转发全通无闪现，退出码电池全对**；review 报 2 Important（gui 冷启动 +0.5s 探测、MacCaptureService 跨线程竞态）+8 Minor，修复后 gui 冷启动 0.06s 还原 BASE 级、`_rawIds` 快照语义结构性消除竞态（`3781fda`）；测试 1170/1170（Core 705 + App 168×2TFM + Mac 83 + Linux 46）；Windows/Linux 真机 CLI 留 QA-1（2026-11-10）
 - I-1 M9 Ctrl+O 导入图片：Ctrl+O 热键（置于 editor guard **前**——空闲态可用是本卡主路径，审查判定成立）+ ⋯ 菜单入口（原卡「工具环按钮」取舍已记录）；`OpenFilePickerAsync` 单选（图片档默认 + All files 档——macOS NSOpenPanel 硬拦任意扩展所需，审查判定合理）；扩展名判定下沉 Core `ImageFileTypes`（HDROP 粘贴共用，零残留）；复用 `ImportImageFile`（G-11 共建，语义零改动，CaptureSource.File）；取消静默；审查零 Critical/Important（7 Minor 记录，含 headless 测试绕开 WgcCaptureService WinRT 探测的坑记入 handoff）；测试 1038/1038（Core 592 + App 159×2TFM + Mac 82 + Linux 46）（2026-11-10）
