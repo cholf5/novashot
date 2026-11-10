@@ -1,7 +1,8 @@
 # B-3 跨屏选框
 
-- **优先级**: P2 ｜ **复杂度**: M ｜ **状态**: Backlog ｜ **来源**: M6d 交接遗留 backlog
-- **关联**: `src/Prtsc.Platform.Windows/Capture/VirtualDesktop.cs`、`Screens`（Avalonia）
+- **优先级**: P2 ｜ **复杂度**: M ｜ **状态**: In Progress（2026-11-10 会话②认领执行中——**另一会话在做 B-8，请勿重复领 B-3**） ｜ **来源**: M6d 交接遗留 backlog
+- **关联**: `src/Prtsc.App/Views/OverlayWindow.axaml.cs`、`src/Prtsc.App/Views/MainWindow.axaml.cs`（M2-3a 每屏一 overlay 已在，注释「跨屏选择留待 M2-3b」即本卡）、`src/Prtsc.App/Controls/SelectionAdorner.cs`/`SelectionGeometry.cs`、三平台 `CaptureRegion`
+- **开工勘误（2026-11-10）**: 卡面「overlay 只覆盖主屏」已过时——M2-3a 起每屏一个 overlay（`MainWindow.CaptureRegionAsync` N 实例）；子任务 1（每屏 overlay 协同路线已选定）与子任务 3（Mac `MacDisplayGeometry.IntersectingDisplays` / Linux 同名 / Windows `WgcCaptureService.CaptureVirtualRect` 多屏合成 + GDI BitBlt 走虚拟屏 DC，三平台 CaptureRegion 均已支持跨屏 region 拼接）已在库。**本卡实际缺口 = 子任务 2 + 跨屏拖选的选框 UI 协同（M2-3b 共享坐标器）**。
 
 ## 目标
 

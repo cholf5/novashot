@@ -6,7 +6,6 @@
 
 ## Backlog
 - B-2 WindowPicker 96×54 缩略图（P3）
-- B-3 跨屏选框（多显示器 overlay 覆盖虚拟桌面）（P2）
 - B-4 crop 后 reshape 手柄（复用 BoxHandles）（P3）
 - B-6 工具栏按钮自定义（flameshot 式可见工具配置）（P3）
 - B-8 Mac 剪贴板解码畸形载荷防护（B-1 审查发现的崩溃面，TryGetImage 裸 SKBitmap.Decode）（P2）
@@ -15,6 +14,7 @@
 ## To Do
 
 ## In Progress
+- B-3 跨屏选框 M2-3b：跨屏拖选共享坐标器（**本会话（B-3 执行会话）认领，勿重复领**；2026-11-10 开工——保留 M2-3a 每屏一 overlay，权威选框 = 物理像素坐标会话协调器 + 逐屏 DIP 映射；三平台 CaptureRegion 跨屏合成已就绪，本卡只补选框 UI 协同）
 
 
 ## In Review
