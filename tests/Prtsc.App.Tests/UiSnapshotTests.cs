@@ -103,6 +103,29 @@ public class UiSnapshotTests
         Save(window, "04-capture-zh.png");
         window.Close();
 
+        // B-6：工具坞按 Editor.VisibleTools 过滤后的编辑器（Select/Rect/Text/Crop 四组并存的裁法）
+        Prtsc.App.Localization.Loc.SetPreference("en", Application.Current!);
+        Prtsc.App.AppServices.GetRequiredService<Prtsc.Core.Config.IConfigStore>()
+            .Update(c => c.Editor.VisibleTools = new List<string> { "Select", "Rectangle", "Text", "Crop" });
+        var filteredWindow = new MainWindow
+        {
+            Width = 1200,
+            Height = 800,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Position = new Avalonia.PixelPoint(0, 0),
+        };
+        filteredWindow.Show();
+        if (filteredWindow.DataContext is MainWindowViewModel vmFiltered)
+        {
+            vmFiltered.EnterEditor(new CapturedImage(MakeFakeShot(),
+                new Prtsc.Core.Common.PixelRect(0, 0, 1400, 900), 1.0, CaptureSource.Fullscreen));
+        }
+        Pump(filteredWindow);
+        Save(filteredWindow, "06-editor-dock-filtered.png");
+        filteredWindow.Close();
+        Prtsc.App.AppServices.GetRequiredService<Prtsc.Core.Config.IConfigStore>()
+            .Update(c => c.Editor.VisibleTools = new List<string>());
+
         // 面板特写
         var editor = new EditorViewModel(new CapturedImage(MakeFakeShot(),
             new Prtsc.Core.Common.PixelRect(0, 0, 1400, 900), 1.0, CaptureSource.Fullscreen));

@@ -275,7 +275,7 @@
             <Border.BoxShadow>
               <BoxShadows>0 14 34 -10 #CC000000</BoxShadows>
             </Border.BoxShadow>
-            <StackPanel Orientation="Horizontal" Spacing="2">
+            <StackPanel Name="ToolDock" Orientation="Horizontal" Spacing="2">
 
               <RadioButton Classes="tool" GroupName="Tool" Tag="Select" Click="OnToolChanged"
                            ToolTip.Tip="{DynamicResource L.Tool.Select}"

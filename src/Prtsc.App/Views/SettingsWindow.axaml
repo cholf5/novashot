@@ -255,6 +255,29 @@
                 <ComboBoxItem Content="{DynamicResource L.Settings.Editor.BorderInside}" />
               </ComboBox>
             </StackPanel>
+
+            <!-- B-6 工具栏按钮可见性 -->
+            <Border Height="1" Background="{DynamicResource Line}" Margin="0,2" />
+            <StackPanel Spacing="6">
+              <TextBlock Classes="h2" FontSize="12.5" Text="{DynamicResource L.Settings.Editor.ToolbarTools}" />
+              <TextBlock Classes="hint" TextWrapping="Wrap"
+                         Text="{DynamicResource L.Settings.Editor.ToolbarToolsHint}" />
+              <ItemsControl ItemsSource="{Binding ToolItems}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox Margin="0,0,14,4" MinWidth="96"
+                              Content="{Binding Label}"
+                              IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                              IsEnabled="{Binding !IsFixed}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
 

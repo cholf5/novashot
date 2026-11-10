@@ -105,6 +105,12 @@ public sealed class EditorConfig
     public string BorderColor { get; set; } = "#000000";
     public int BorderOpacity { get; set; } = 100;
     public string BorderType { get; set; } = "center"; // outside|center|inside
+
+    /// <summary>
+    /// B-6 工具坞可见工具（ToolKind 枚举名）。空表 = 全开（默认，向前兼容——
+    /// 日后新增工具自动出现）；解析口径见 <see cref="Prtsc.Core.Annotation.Tools.ToolVisibility.Resolve"/>。
+    /// </summary>
+    public List<string> VisibleTools { get; set; } = new();
 }
 
 public sealed class UpdateConfig

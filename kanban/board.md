@@ -11,7 +11,6 @@
 ## To Do
 
 ## In Progress
-- B-6 工具栏按钮自定义（flameshot 式可见工具配置）（P3）—— 本会话认领执行中，勿重复领
 - B-2 WindowPicker 96×54 缩略图（P3）—— 本会话认领执行中，勿重复领
 
 ## In Review
@@ -25,6 +24,7 @@
 - 
 
 ## Done
+- B-6 工具栏按钮自定义：Core `ToolCatalog`+`ToolVisibility` 纯函数（Resolve 空表=全开/未知忽略/去重/Select 恒可见/规范序 + ToConfig 全选写空表 + ComputeDockChildVisibility 分隔线组边界发射——新组第一个可见项点亮紧邻其前分隔线，整组隐藏坍缩/悬空全隐）+ config `Editor.VisibleTools`（枚举名表）；App 工具坞命名 ToolDock 构造+Changed 双时点 ApplyToolVisibility（过滤+孤线+当前工具隐藏回落 Select），设置页编辑器分区 15 勾选框 WrapPanel（Select 禁改）+ Loc 双语；**热键裁决：隐藏 ≠ 禁用**（R 隐藏时仍切 Rectangle，测试钉住）；快照 06-editor-dock-filtered.png 真机目检（V/R/T/X+三线，默认态与基线逐位一致）；测试 Core 760→773 + App 193→203×2TFM + Mac 91 + Linux 46 全绿；发现并记录存量 flake 根因=CompositionPanel BgKind 三枚 RadioButton GroupName+TwoWay 互踢环（stash 基线复现，另建议 Q- 卡）；真机项 QA-1 §P（2026-11-11）
 - B-7 Library 删除记录时可选连磁盘文件一起删：Core `LibraryFileDeletePolicy` 决策表（NotRequested/NoLocalFile/FileAlreadyGone/Deleted/FailedButRecordDeleted）+ `LibraryFiles.TryDelete`（尽力删；FileNotFoundException/DirectoryNotFoundException→true 静默——POSIX ENOENT 语义与 Windows no-op 跨平台对齐）+ `LibraryStore.RemoveAsync(id, deleteLocalFile, ct, tryDelete?)`（记录先提交不回滚）；App 确认框 CheckBox（仅 LocalPath 非空时显示、默认不勾）+ VM DeleteAsync(deleteFile) 失败时状态栏警告+logger；裁决=文件删除失败记录保持已删、UI 提示不崩；TDD RED 抓到「删除 IO 未以 deleteLocalFile 为前提」真缺陷（默认模式误删文件）；独立 review 1 Critical（IsChecked 构建时采样——勾选永远失效，改点击一刻读取）+2 Important（TryDelete 过滤器零覆盖补 4 例实证修 POSIX 语义 / 确认框 Close() 误关 owner 的 G-17 既有缺陷顺手修）+6 Minor 全处置；测试 Core 741→760 + App 190→193×2TFM（全量 Core 760 + App 193×2 + Mac 91 + Linux 46）；真机项 QA-1 TC18（2026-11-11）
 - B-4 crop 后 reshape 手柄：Core `CropReshape`（HitTest=BoxHandles 拓扑距离命中 slop 同 SelectTool 口径；DragTo=手柄钳制[图像内+不越对边≥MinPx=4]→ApplyHandle→比例吸附[锚定对边/对角——区别于 SnapToRatio 的 TopLeft 锚定；边手柄 span 不足收窄保比例、极端几何比例让位钳制]→MinPx+ClampToImage 兑底）+ SkiaCanvas 接线（press 命中即进 reshape 不新建框、move 实时 ApplyCrop、up 精确收尾、Esc/CaptureLost 恢复拖拽起始框、渲染门控=无预览+crop 工具+已应用框时 overlay 常驻+8 手柄）；独立 review 1 Critical（应用态框可被 SnapToRatio 压到 MinPx 以下→对边钳制区间反转 Math.Clamp 抛异常崩 dispatcher，ClampOrdered 修复+sub-MinPx 回归用例）+4 Minor 全处置（二次 press 守卫/Editor 换替清态/注释两级 fallback 口径/MinPx↔MinAreaPx 互引）；测试 Core 725→741（全量 Core 741 + App 190×2TFM + Mac 91 + Linux 46）；真机项 QA-1 TC17（2026-11-11）
 - B-3 跨屏选框 M2-3b：新 `SelectionSession` 跨屏权威选框协调器（权威选框 = 活动帧 DIP；输入按上报屏换算物理像素再映射——指针捕获期间越界本地坐标线性换算成立；渲染按目标屏各自 ScaleFactor 映射出可越界矩形，窗口裁剪即得切片视觉；钳制边界 = 虚拟桌面 union；确认输出物理 region 交 CaptureRegion 既有跨屏拼接）+ `ClampAndNormalizeTo` 任意原点 bounds；SelectionAdorner 状态机迁入 Session 收敛为渲染+转发，OverlayWindow 事件转发/广播写回/环归属 RingDisplayIndex（选框中心所在屏），MainWindow 每会话一 Session 注入全部 overlay；单屏 N=1 与旧本地数学逐位等价（守卫用例）；独立 review 0 Critical/Important + 4 Minor 全处置（环显隐门改物理尺寸、端点量化语义钉住、锚点同网格量化、跨屏用例补 B 屏环断言）；真机双屏冒烟入 QA-1 TC15/TC16；App 190/190×2TFM + Core 725 + Mac 91 全绿（2026-11-10）

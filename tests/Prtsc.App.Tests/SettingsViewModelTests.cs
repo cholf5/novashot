@@ -215,4 +215,61 @@ public class SettingsViewModelTests
         Assert.False(vm.IncludeCursor);
         Assert.Equal(1, vm.CaptureDelayIndex); // D-1：3 秒 → 下标 1
     }
+
+    // —— B-6 工具栏按钮可见性 ——
+
+    [Fact]
+    public void ToolItems_DefaultConfig_AllChecked_SelectFixed()
+    {
+        var (vm, _, _) = Create();
+
+        Assert.Equal(15, vm.ToolItems.Count);
+        Assert.All(vm.ToolItems, i => Assert.True(i.IsChecked));
+        var select = vm.ToolItems.Single(i => i.Kind == Prtsc.Core.Annotation.Tools.ToolKind.Select);
+        Assert.True(select.IsFixed);
+        Assert.All(vm.ToolItems.Where(i => !i.IsFixed), i => Assert.False(i.IsFixed));
+    }
+
+    [Fact]
+    public void ToolItems_LoadFromPartialConfig_ReflectsVisibility()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "prtsc-settings-tests", Guid.NewGuid().ToString("N"));
+        var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: dir);
+        store.Update(c => c.Editor.VisibleTools = new List<string> { "select", "Nonexistent", "crop" });
+
+        var vm = new SettingsViewModel(store, new StubAutostartService());
+
+        Assert.True(vm.ToolItems.Single(i => i.Kind == Prtsc.Core.Annotation.Tools.ToolKind.Select).IsChecked);
+        Assert.True(vm.ToolItems.Single(i => i.Kind == Prtsc.Core.Annotation.Tools.ToolKind.Crop).IsChecked);
+        Assert.False(vm.ToolItems.Single(i => i.Kind == Prtsc.Core.Annotation.Tools.ToolKind.Rectangle).IsChecked);
+    }
+
+    [Fact]
+    public void Save_PartialSelection_WritesVisibleTools()
+    {
+        var (vm, store, _) = Create();
+        vm.ToolItems.Single(i => i.Kind == Prtsc.Core.Annotation.Tools.ToolKind.Rectangle).IsChecked = false;
+        vm.ToolItems.Single(i => i.Kind == Prtsc.Core.Annotation.Tools.ToolKind.Mosaic).IsChecked = false;
+
+        Assert.True(vm.Save());
+
+        var resolved = Prtsc.Core.Annotation.Tools.ToolVisibility.Resolve(store.Current.Editor.VisibleTools);
+        Assert.Equal(13, resolved.Count); // 15 - 2（Select 恒在）
+        Assert.DoesNotContain(Prtsc.Core.Annotation.Tools.ToolKind.Rectangle, resolved);
+        Assert.DoesNotContain(Prtsc.Core.Annotation.Tools.ToolKind.Mosaic, resolved);
+    }
+
+    [Fact]
+    public void Save_AllChecked_WritesEmptyList_DefaultAll()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "prtsc-settings-tests", Guid.NewGuid().ToString("N"));
+        var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: dir);
+        store.Update(c => c.Editor.VisibleTools = new List<string> { "Select", "Crop" });
+
+        var vm = new SettingsViewModel(store, new StubAutostartService());
+        foreach (var item in vm.ToolItems) item.IsChecked = true;
+
+        Assert.True(vm.Save());
+        Assert.Empty(store.Current.Editor.VisibleTools); // 全选 → 规范空表（向前兼容新增工具）
+    }
 }

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Prtsc.App.Localization;
+using Prtsc.Core.Annotation.Tools;
 using Prtsc.Core.Autostart;
 using Prtsc.Core.Capture;
 using Prtsc.Core.Config;
@@ -75,6 +76,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private int _borderOpacity = 100;
     [ObservableProperty] private int _borderTypeIndex = 1;
 
+    // —— B-6 工具栏按钮可见性（勾选草稿，保存一刻写回 config）——
+    public List<ToolVisibilityItem> ToolItems { get; } = new();
+
     [ObservableProperty] private string _saveHint = "";
 
     public SettingsViewModel(IConfigStore store)
@@ -123,6 +127,22 @@ public sealed partial class SettingsViewModel : ObservableObject
         BorderColor = c.Editor.BorderColor;
         BorderOpacity = c.Editor.BorderOpacity;
         BorderTypeIndex = MapTo(BorderTypes, c.Editor.BorderType);
+
+        LoadToolItems(c.Editor.VisibleTools);
+    }
+
+    /// <summary>B-6：按 config 初始化工具勾选草稿（空表=全开；Select 恒勾且禁改——默认工具有落点）。</summary>
+    private void LoadToolItems(List<string> visibleTools)
+    {
+        ToolItems.Clear();
+        var visible = ToolVisibility.Resolve(visibleTools);
+        foreach (var entry in ToolCatalog.All)
+        {
+            ToolItems.Add(new ToolVisibilityItem(entry.Kind, Loc.T($"Tool.{entry.Kind}"))
+            {
+                IsChecked = visible.Contains(entry.Kind), // Resolve 保证 Select 恒在内
+            });
+        }
     }
 
     /// <summary>校验 → 自启 → 一次 Update 写全部字段（Changed 触发 App 层热键/语言副作用）。失败时 config 不动。</summary>
@@ -182,6 +202,9 @@ public sealed partial class SettingsViewModel : ObservableObject
             c.Editor.BorderColor = BorderColor.Trim();
             c.Editor.BorderOpacity = BorderOpacity;
             c.Editor.BorderType = BorderTypes[Math.Clamp(BorderTypeIndex, 0, BorderTypes.Length - 1)];
+            // B-6：勾选草稿 → config（全选存空表=默认全开；部分勾选存枚举名）
+            c.Editor.VisibleTools = ToolVisibility.ToConfig(
+                ToolItems.Where(i => i.IsChecked).Select(i => i.Kind));
         });
         _ = _store.SaveAsync();
         SaveHint = Loc.T("Settings.Hint.Saved");
@@ -208,5 +231,28 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         var i = Array.IndexOf(table, value);
         return i < 0 ? 0 : i;
+    }
+}
+
+/// <summary>
+/// B-6 设置页工具勾选项。<see cref="ToolKind.Select"/> 恒可见（config 决策也强制），
+/// UI 上禁改以对齐口径。
+/// </summary>
+public sealed partial class ToolVisibilityItem : ObservableObject
+{
+    public ToolKind Kind { get; }
+    public string Label { get; }
+
+    /// <summary>Select 恒可见：勾选锁死 + 控件禁用。</summary>
+    public bool IsFixed { get; }
+
+    [ObservableProperty] private bool _isChecked;
+
+    public ToolVisibilityItem(ToolKind kind, string label)
+    {
+        Kind = kind;
+        Label = label;
+        IsFixed = kind == ToolKind.Select;
+        _isChecked = true; // LoadToolItems 会立即覆盖
     }
 }

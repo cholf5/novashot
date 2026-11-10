@@ -69,6 +69,10 @@ public partial class MainWindow : Window
         // G-16：恢复上次窗口尺寸（配置有效值才覆盖默认 1200×800）
         ApplyPersistedWindowSize();
 
+        // B-6：工具坞按 Editor.VisibleTools 过滤；设置页保存（任何 Update）后重算
+        ApplyToolVisibility();
+        _configStore.Changed += OnConfigChangedForToolDock;
+
         // 标题 + 主窗口「最近 4 张」
         ApplyLocalizedTitle();
         _ = _vm.RefreshRecentAsync();
@@ -91,6 +95,56 @@ public partial class MainWindow : Window
             _logger.LogWarning(ex, "ApplyPersistedWindowSize failed; keeping AXAML default");
         }
     }
+
+    /// <summary>
+    /// B-6 工具坞可见性：按 <c>Editor.VisibleTools</c>（Core <see cref="ToolVisibility"/> 决策表）
+    /// 设置各 RadioButton/分隔线 IsVisible。编辑器打开且当前工具被隐藏时回落 Select（默认工具有落点）。
+    /// </summary>
+    private void ApplyToolVisibility()
+    {
+        var dock = this.FindControl<StackPanel>("ToolDock");
+        if (dock is null) return;
+
+        List<(bool IsSeparator, string? Tag)> children;
+        try
+        {
+            children = dock.Children.Select(c => (c is not RadioButton,
+                (c as RadioButton)?.Tag as string)).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ApplyToolVisibility: dock children read failed");
+            return;
+        }
+
+        bool[] visible;
+        try
+        {
+            visible = ToolVisibility.ComputeDockChildVisibility(
+                children, ToolVisibility.Resolve(_configStore.Current.Editor.VisibleTools));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ApplyToolVisibility: resolve failed; keeping current state");
+            return;
+        }
+
+        for (var i = 0; i < dock.Children.Count && i < visible.Length; i++)
+            dock.Children[i].IsVisible = visible[i];
+
+        // 当前工具被隐藏 → 回落 Select（Resolve 保证 Select 恒可见）
+        if (_vm.Editor is { } editor
+            && dock.Children.OfType<RadioButton>()
+                .Where(rb => rb.IsVisible)
+                .Select(rb => rb.Tag as string)
+                .All(t => t != editor.CurrentTool.ToString()))
+        {
+            editor.CurrentTool = ToolKind.Select;
+        }
+    }
+
+    private void OnConfigChangedForToolDock(object? sender, PrtscConfig cfg) => ApplyToolVisibility();
+
 
     private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
     {
