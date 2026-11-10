@@ -42,6 +42,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     private readonly LibraryStore _store;
     private readonly string _thumbsDirectory;
     private readonly ILogger? _logger;
+    private readonly Func<string, bool>? _tryDelete;
 
     [ObservableProperty]
     private System.Collections.ObjectModel.ObservableCollection<LibraryEntryViewModel> _entries = [];
@@ -52,11 +53,13 @@ public sealed partial class LibraryViewModel : ObservableObject
     [ObservableProperty]
     private string _countText = "";
 
-    public LibraryViewModel(LibraryStore store, string thumbsDirectory, ILogger? logger = null)
+    public LibraryViewModel(LibraryStore store, string thumbsDirectory, ILogger? logger = null,
+        Func<string, bool>? tryDelete = null)
     {
         _store = store;
         _thumbsDirectory = thumbsDirectory;
         _logger = logger;
+        _tryDelete = tryDelete;
     }
 
     public LibraryEntryViewModel? SelectedEntry => Selected;
@@ -90,14 +93,22 @@ public sealed partial class LibraryViewModel : ObservableObject
         _ => Localization.Loc.T("Library.CountMany", count),
     };
 
-    public async Task<bool> DeleteAsync(LibraryEntryViewModel item)
+    /// <summary>B-7：删除记录；deleteFile=true 时连磁盘文件一起删（默认 false = 现状只删记录）。
+    /// 文件删除失败：记录保持已删（不回滚），状态栏提示但不崩。</summary>
+    public async Task<bool> DeleteAsync(LibraryEntryViewModel item, bool deleteFile = false)
     {
-        var ok = await _store.RemoveAsync(item.Entry.Id);
-        if (ok)
+        var (removed, fileResult) = await _store.RemoveAsync(item.Entry.Id, deleteFile,
+            tryDelete: _tryDelete);
+        if (removed)
         {
             Entries.Remove(item);
             CountText = FormatCount(Entries.Count);
+            if (fileResult == LibraryFileDeleteResult.FailedButRecordDeleted)
+            {
+                _logger?.LogWarning("Library file delete failed (record removed): {Path}", item.Entry.LocalPath);
+                CountText = Localization.Loc.T("Library.FileDeleteFailed");
+            }
         }
-        return ok;
+        return removed;
     }
 }

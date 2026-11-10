@@ -262,6 +262,8 @@ internal static class Strings
         ["Library.DeleteConfirmRecord"] = "Delete \"{0}\"?",
         ["Library.DeleteFileStays"] = "The image file stays on disk.",
         ["Library.DeleteRecordOnly"] = "Only the library record is removed.",
+        ["Library.DeleteAlsoFile"] = "Also delete the image file from disk",
+        ["Library.FileDeleteFailed"] = "Record deleted, but the file could not be deleted",
 
         // ---- cloud settings ----
         ["Cloud.NoneTitle"] = "Nothing is uploaded",
@@ -618,6 +620,8 @@ internal static class Strings
         ["Library.DeleteConfirmRecord"] = "确定删除「{0}」？",
         ["Library.DeleteFileStays"] = "图片文件仍保留在磁盘上。",
         ["Library.DeleteRecordOnly"] = "仅删除历史记录。",
+        ["Library.DeleteAlsoFile"] = "同时删除磁盘上的图片文件",
+        ["Library.FileDeleteFailed"] = "记录已删除，但文件删除失败",
 
         // ---- cloud settings ----
         ["Cloud.NoneTitle"] = "当前不上传",

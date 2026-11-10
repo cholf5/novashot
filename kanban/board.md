@@ -11,7 +11,7 @@
 ## To Do
 
 ## In Progress
-- B-7 Library 删除记录时可选连磁盘文件一起删（现仅删 library.json 记录、文件保留——L-2 审计确认的行为裁决， safer 默认）——本会话认领执行中，勿重复领（2026-11-11）
+
 
 ## In Review
 - 
@@ -24,6 +24,7 @@
 - 
 
 ## Done
+- B-7 Library 删除记录时可选连磁盘文件一起删：Core `LibraryFileDeletePolicy` 决策表（NotRequested/NoLocalFile/FileAlreadyGone/Deleted/FailedButRecordDeleted）+ `LibraryFiles.TryDelete`（尽力删；FileNotFoundException/DirectoryNotFoundException→true 静默——POSIX ENOENT 语义与 Windows no-op 跨平台对齐）+ `LibraryStore.RemoveAsync(id, deleteLocalFile, ct, tryDelete?)`（记录先提交不回滚）；App 确认框 CheckBox（仅 LocalPath 非空时显示、默认不勾）+ VM DeleteAsync(deleteFile) 失败时状态栏警告+logger；裁决=文件删除失败记录保持已删、UI 提示不崩；TDD RED 抓到「删除 IO 未以 deleteLocalFile 为前提」真缺陷（默认模式误删文件）；独立 review 1 Critical（IsChecked 构建时采样——勾选永远失效，改点击一刻读取）+2 Important（TryDelete 过滤器零覆盖补 4 例实证修 POSIX 语义 / 确认框 Close() 误关 owner 的 G-17 既有缺陷顺手修）+6 Minor 全处置；测试 Core 741→760 + App 190→193×2TFM（全量 Core 760 + App 193×2 + Mac 91 + Linux 46）；真机项 QA-1 TC18（2026-11-11）
 - B-4 crop 后 reshape 手柄：Core `CropReshape`（HitTest=BoxHandles 拓扑距离命中 slop 同 SelectTool 口径；DragTo=手柄钳制[图像内+不越对边≥MinPx=4]→ApplyHandle→比例吸附[锚定对边/对角——区别于 SnapToRatio 的 TopLeft 锚定；边手柄 span 不足收窄保比例、极端几何比例让位钳制]→MinPx+ClampToImage 兑底）+ SkiaCanvas 接线（press 命中即进 reshape 不新建框、move 实时 ApplyCrop、up 精确收尾、Esc/CaptureLost 恢复拖拽起始框、渲染门控=无预览+crop 工具+已应用框时 overlay 常驻+8 手柄）；独立 review 1 Critical（应用态框可被 SnapToRatio 压到 MinPx 以下→对边钳制区间反转 Math.Clamp 抛异常崩 dispatcher，ClampOrdered 修复+sub-MinPx 回归用例）+4 Minor 全处置（二次 press 守卫/Editor 换替清态/注释两级 fallback 口径/MinPx↔MinAreaPx 互引）；测试 Core 725→741（全量 Core 741 + App 190×2TFM + Mac 91 + Linux 46）；真机项 QA-1 TC17（2026-11-11）
 - B-3 跨屏选框 M2-3b：新 `SelectionSession` 跨屏权威选框协调器（权威选框 = 活动帧 DIP；输入按上报屏换算物理像素再映射——指针捕获期间越界本地坐标线性换算成立；渲染按目标屏各自 ScaleFactor 映射出可越界矩形，窗口裁剪即得切片视觉；钳制边界 = 虚拟桌面 union；确认输出物理 region 交 CaptureRegion 既有跨屏拼接）+ `ClampAndNormalizeTo` 任意原点 bounds；SelectionAdorner 状态机迁入 Session 收敛为渲染+转发，OverlayWindow 事件转发/广播写回/环归属 RingDisplayIndex（选框中心所在屏），MainWindow 每会话一 Session 注入全部 overlay；单屏 N=1 与旧本地数学逐位等价（守卫用例）；独立 review 0 Critical/Important + 4 Minor 全处置（环显隐门改物理尺寸、端点量化语义钉住、锚点同网格量化、跨屏用例补 B 屏环断言）；真机双屏冒烟入 QA-1 TC15/TC16；App 190/190×2TFM + Core 725 + Mac 91 全绿（2026-11-10）
 - B-8 Mac 剪贴板解码畸形载荷防护：粘贴入口 `PasteFromClipboard` 无外层兜底（子任务 1 裁决）→ 服务边界内转 null；PNG 路径换 Core `PngCodec.Decode`，TIFF 路径（NSBitmapImageRep 手工拷贝，ImageIO 对畸形头会"编"出 rep）新增 `IsPixelCopySafe` 预拷贝守卫：正几何+单边上限先行（防 64 位 NSInteger 乘法 unchecked 回绕绕过比较）+行宽 `[w*4, w*16]`+总像素 ≤1e8，SKBitmap 分配失败返 null，拷贝偏移 64 位（int 截断/回绕 = OOB 读，收尾审查追修）；服务级真板 Manual 用例（垃圾/仅魔数/砍半 PNG/构造 IFD 天文数字 TIFF）+ 守卫决策表纯单测；真板 Manual 类收敛到 RealPasteboard collection 串行锁（NSPasteboard 全局单例，并行互踩实测）；真机覆盖=Manual 用例本机 macOS 26.5.2 实跑全绿，不另开 QA-1 项；Mac 91/91（82 自动 + 9 Manual）（2026-11-10）

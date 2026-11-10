@@ -30,7 +30,7 @@ public partial class LibraryWindow : Window
     {
         _clipboard = clipboard;
         _logger = logger ?? AppServices.GetRequiredService<ILogger<LibraryWindow>>();
-        _vm = new LibraryViewModel(store, thumbsDirectory);
+        _vm = new LibraryViewModel(store, thumbsDirectory, _logger);
         DataContext = _vm;
         InitializeComponent();
         _ = _vm.LoadAsync();
@@ -75,11 +75,19 @@ public partial class LibraryWindow : Window
     {
         if (_vm.SelectedEntry is not { } item) return;
 
-        // G-17（winshot）：删除带确认，防误触（记录本身可直接重建；本地文件不会动，仍留在磁盘上）
+        // G-17（winshot）：删除带确认，防误触（记录本身可直接重建；本地文件不会动，仍留在磁盘上）。
+        // B-7：有本地文件时提供「同时删除磁盘文件」勾选（默认不勾 = safer 现状不变）。
         var file = item.Entry.LocalPath;
         var detail = string.IsNullOrEmpty(file)
             ? Prtsc.App.Localization.Loc.T("Library.DeleteRecordOnly")
             : Prtsc.App.Localization.Loc.T("Library.DeleteFileStays");
+        var alsoFileCheckBox = string.IsNullOrEmpty(file)
+            ? null
+            : new CheckBox
+            {
+                Content = Prtsc.App.Localization.Loc.T("Library.DeleteAlsoFile"),
+                IsChecked = false,
+            };
         var dialog = new Window
         {
             Title = Prtsc.App.Localization.Loc.T("Library.DeleteConfirmTitle"),
@@ -87,44 +95,51 @@ public partial class LibraryWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
             ShowInTaskbar = false,
-            Content = new StackPanel
-            {
-                Margin = new Avalonia.Thickness(20),
-                Spacing = 14,
-                Children =
-                {
-                    new Avalonia.Controls.TextBlock
-                    {
-                        Text = Prtsc.App.Localization.Loc.T("Library.DeleteConfirmRecord", item.Entry.FileName)
-                               + "\n" + detail,
-                        MaxWidth = 420,
-                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    },
-                    new StackPanel
-                    {
-                        Orientation = Avalonia.Layout.Orientation.Horizontal,
-                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                        Spacing = 8,
-                        Children =
-                        {
-                            CancelButton(Prtsc.App.Localization.Loc.T("Common.Cancel")),
-                            OkButtonForDelete(item),
-                        },
-                    },
-                },
-            },
         };
+        var contentPanel = new StackPanel { Margin = new Avalonia.Thickness(20), Spacing = 14 };
+        foreach (var child in BuildDeleteDialogChildren(dialog, item, detail, alsoFileCheckBox))
+            contentPanel.Children.Add(child);
+        dialog.Content = contentPanel;
         await dialog.ShowDialog(this);
     }
 
-    private Button CancelButton(string label)
+    private System.Collections.Generic.List<Avalonia.Controls.Control> BuildDeleteDialogChildren(
+        Window dialog, ViewModels.LibraryEntryViewModel item, string detail, CheckBox? alsoFileCheckBox)
+    {
+        var children = new System.Collections.Generic.List<Avalonia.Controls.Control>
+        {
+            new Avalonia.Controls.TextBlock
+            {
+                Text = Prtsc.App.Localization.Loc.T("Library.DeleteConfirmRecord", item.Entry.FileName)
+                       + "\n" + detail,
+                MaxWidth = 420,
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            },
+        };
+        if (alsoFileCheckBox is not null) children.Add(alsoFileCheckBox);
+        children.Add(new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Spacing = 8,
+            Children =
+            {
+                CancelButton(dialog, Prtsc.App.Localization.Loc.T("Common.Cancel")),
+                OkButtonForDelete(dialog, item, alsoFileCheckBox),
+            },
+        });
+        return children;
+    }
+
+    private Button CancelButton(Window dialog, string label)
     {
         var b = new Button { Content = label, Padding = new Avalonia.Thickness(14, 5) };
-        b.Click += (_, _) => Close();
+        // review I2：G-17 起误用 Close()（关掉的是 Library 主窗口 owner）；正确语义是关确认框
+        b.Click += (_, _) => dialog.Close();
         return b;
     }
 
-    private Button OkButtonForDelete(ViewModels.LibraryEntryViewModel item)
+    private Button OkButtonForDelete(Window dialog, ViewModels.LibraryEntryViewModel item, CheckBox? alsoFileCheckBox)
     {
         var b = new Button
         {
@@ -133,9 +148,11 @@ public partial class LibraryWindow : Window
         };
         b.Click += async (_, _) =>
         {
-            Close();
-            if (await _vm.DeleteAsync(item))
-                _logger.LogDebug("Library entry deleted: {Id}", item.Entry.Id);
+            // review C1：勾选状态必须在点击一刻读取（构建时采样会让勾选永远失效）
+            var deleteFile = alsoFileCheckBox?.IsChecked == true;
+            dialog.Close();
+            if (await _vm.DeleteAsync(item, deleteFile))
+                _logger.LogDebug("Library entry deleted: {Id} (file: {File})", item.Entry.Id, deleteFile);
         };
         return b;
     }

@@ -91,6 +91,39 @@ public sealed class LibraryStore
         }
     }
 
+    /// <summary>B-7：按 Id 删除，可选连磁盘文件一起删。
+    /// 顺序裁决：记录先提交（library.json 是记录索引，文件删除失败不回滚）；
+    /// 文件删除失败仅影响返回的 File 结果，由 UI 提示。
+    /// tryDelete 供测试注入失败/验证调用时机；null 走真实 IO（LibraryFiles.TryDelete，失败吞异常返 false）。</summary>
+    public async Task<(bool RecordRemoved, LibraryFileDeleteResult File)> RemoveAsync(
+        string id, bool deleteLocalFile, CancellationToken ct = default, Func<string, bool>? tryDelete = null)
+    {
+        await _ioLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var entries = await LoadInternalAsync(ct).ConfigureAwait(false);
+            var entry = entries.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.Ordinal));
+            if (entry is null)
+                return (false, LibraryFileDeleteResult.NotRequested);
+
+            var next = entries.Where(e => !string.Equals(e.Id, id, StringComparison.Ordinal)).ToList();
+            await SaveInternalAsync(next, ct).ConfigureAwait(false);
+
+            var hasPath = !string.IsNullOrEmpty(entry.LocalPath);
+            var exists = hasPath && File.Exists(entry.LocalPath);
+            // 删除 IO 只能在勾选后发生——决策先行，副作用后置（默认 false 绝不动磁盘文件）
+            var deleted = deleteLocalFile && exists && (tryDelete ?? LibraryFiles.TryDelete)(entry.LocalPath);
+            var file = LibraryFileDeletePolicy.Decide(deleteLocalFile, entry.LocalPath, exists, deleted);
+            if (file == LibraryFileDeleteResult.FailedButRecordDeleted)
+                _logger?.LogWarning("Library: record {Id} removed but file delete failed at {Path}", entry.Id, entry.LocalPath);
+            return (true, file);
+        }
+        finally
+        {
+            _ioLock.Release();
+        }
+    }
+
     private async Task<List<LibraryEntry>> LoadInternalAsync(CancellationToken ct)
     {
         if (!File.Exists(FilePath))
