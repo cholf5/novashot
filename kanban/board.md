@@ -11,7 +11,8 @@
 ## To Do
 
 ## In Progress
-
+- B-6 工具栏按钮自定义（flameshot 式可见工具配置）（P3）—— 本会话认领执行中，勿重复领
+- B-2 WindowPicker 96×54 缩略图（P3）—— 本会话认领执行中，勿重复领
 
 ## In Review
 - 
