@@ -54,7 +54,27 @@ App 的 windows TFM 本机（macOS）无法执行，仅确认编译通过（0 wa
 
 ## 5. 未做（留给后续卡）
 
-- **Q-1 修复**：三枚 RadioButton 改 `Click`/代码置位或 OneWay+代码写（方案已列在卡里，未动手——改动面在面板选中态语义，应单独一轮 TDD + 压力验证）。
+- ~~**Q-1 修复**~~ → 已做，见 §6。
 - **V-1**：版本号、tag、CI 首跑、README/用户文档、签名、mac 分发——都需要远端或真机权限。
-- **QA-1 / QA-L1**：88 项真机清单仍是 0/88。
-- 本机 `main` 仍领先 `origin/main` 8 个 commit（本批再 +2），未推送。
+- **QA-1 / QA-L1**：88 项真机清单仍是 0/88（§F 新增一条 Q-1 修复后的背景 chip 手感冒烟项）。
+- 本机 `main` 仍领先 `origin/main` 10 个 commit（本批再 +1），未推送。
+
+## 6. Q-1 修复（同批续做）
+
+**改动**：`CompositionPanel` 背景三态 chip 的 `IsChecked` 从 `TwoWay` 降为 `OneWay`，输入改走 `Click` + `Tag`，code-behind 调 VM 既有咽喉点 `Apply`；三枚 chip 加 `Name`（供测试按名查）与 `Tag`。保留 `GroupName`（与工具坞 `GroupName="Tool"` + OneWay 的同口径）。
+
+**为什么这样修**：环的结构前提是「目标侧能写回源」。断掉回写后，组管理器取消兄弟只是纯视觉更新，通知链不会重新进入 `IsCheckedChanged`。没选「换自定义单选控件」是因为改动面大、收益小。
+
+**验证（A/B 同机同命令）**：
+
+| 阶段 | 结果 |
+|---|---|
+| 修前（stash 掉两处源码后重建） | 15 跑 **3 abort**（停在 186/187/187） |
+| 修后 | 15 跑 **0 abort** + 另 10 跑 0 abort（共 25 连跑） |
+| 新增回归 | `BackgroundKindChipTests` 3 例（目标侧不回写 / 点击切态+互斥回显+`CanvasStateChanged` 恰一次 / 100 次连切不递归） |
+| 全量 | Core 785 + App 209（206+3）×net10.0 + Mac 91 + Linux 46；`dotnet build` 0 warning / 0 error |
+| 快照 | `PRTSC_SNAPSHOT=1 … --filter UiSnapshot` 通过，`03-editor-canvas-tab-en.png` 目检 Gradient 选中态正常 |
+
+**踩坑（写回归用例时踩到的）**：把 `CapturedImage` 放进 `Build()` 的 `using` 里 → 返回后位图已释放，Skia 在布局/测量阶段直接 abort 宿主，无异常无堆栈，极易误判成 Q-1 复发。正解：位图必须活到窗口关闭之后；已写进测试注释。**排查手法备注**：先用 `File.AppendAllText` 打点定位到「崩在 `RaiseEvent` 内部」，再降到独立 console 宿主（`Avalonia.Headless` 直接可跑）看它反而正常，才揪出是测试自己的生命周期 bug。
+
+**未覆盖**：App 的 windows TFM 本机跑不了，只在 CI/Windows 上验证；`SettingsWindowXamlTests` 的跨线程 Radio 孤例（U-1 记录）本轮没再现（修后 25 连跑未复现），若后续又在 Windows 腿出现，按同一口径查是否有残留 TwoWay。

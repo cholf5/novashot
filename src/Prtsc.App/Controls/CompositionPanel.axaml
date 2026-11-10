@@ -22,13 +22,16 @@
 
       <Border Background="#26000000" CornerRadius="8" Padding="3" Margin="0,0,0,9">
         <Grid ColumnDefinitions="*,*,*">
-          <RadioButton Classes="chip" GroupName="BgKind" Content="{DynamicResource L.Common.None}"
+          <RadioButton Name="BgNoneChip" Classes="chip" GroupName="BgKind" Tag="None" Content="{DynamicResource L.Common.None}"
                        ToolTip.Tip="{DynamicResource L.Panel.BackgroundNoneTip}"
-                       IsChecked="{Binding IsBgNone, Mode=TwoWay}" />
-          <RadioButton Grid.Column="1" Classes="chip" GroupName="BgKind" Content="{DynamicResource L.Common.Solid}"
-                       IsChecked="{Binding IsBgSolid, Mode=TwoWay}" />
-          <RadioButton Grid.Column="2" Classes="chip" GroupName="BgKind" Content="{DynamicResource L.Common.Gradient}"
-                       IsChecked="{Binding IsBgGradient, Mode=TwoWay}" />
+                       Click="OnBgKindClick"
+                       IsChecked="{Binding IsBgNone, Mode=OneWay}" />
+          <RadioButton Name="BgSolidChip" Grid.Column="1" Classes="chip" GroupName="BgKind" Tag="Solid" Content="{DynamicResource L.Common.Solid}"
+                       Click="OnBgKindClick"
+                       IsChecked="{Binding IsBgSolid, Mode=OneWay}" />
+          <RadioButton Name="BgGradientChip" Grid.Column="2" Classes="chip" GroupName="BgKind" Tag="Gradient" Content="{DynamicResource L.Common.Gradient}"
+                       Click="OnBgKindClick"
+                       IsChecked="{Binding IsBgGradient, Mode=OneWay}" />
         </Grid>
       </Border>
 

@@ -7,7 +7,6 @@
 
 ## Backlog
 - V-1 v1.0 发布收尾（版本号/tag/CI 首跑/README+用户文档/签名/mac 分发）（P1）
-- Q-1 App 测试宿主栈溢出（RadioButton 组 ↔ TwoWay 绑定互踢环；存量 flake 根因已定位并实测复现）（P2）
 - LINUX-2 Wayland 原生会话（当前只支持 XWayland；见 roadmap 与 LINUX-1 handoff）（P3）
 
 ## To Do
@@ -25,6 +24,7 @@
 - 
 
 ## Done
+- Q-1 App 测试宿主栈溢出：根因= `CompositionPanel` 背景三态 chip 的 `GroupName="BgKind"` + `IsChecked` **TwoWay** 互踢环（组管理器取消兄弟 → 回写 VM → `OnPropertyChanged(string.Empty)` 整表通知 → 绑定重新发布 → 再进 IsCheckedChanged）；修法= **IsChecked 降为 OneWay 回显 + 输入走 Click（Tag 承载状态）**，级联调用 VM 既有咽喉点 `Apply`，环的结构前提（目标侧写回源）消除；顺查全仓 `GroupName=` 组合（Settings/Launcher 本就 Click 无绑定、工具坞本就 OneWay）；新增 `BackgroundKindChipTests` 3 例（目标侧不回写 / 点击切态+互斥回显+`CanvasStateChanged` 恰一次 / 100 次连切不递归）；**A/B 压测：修前 15 跑 3 abort（186/187/187），修后 25 连跑 0 abort**；Core 785 + App 209×net10.0 + Mac 91 + Linux 46 全绿；快照 UiSnapshot 通过（面板 Gradient 选中态目检正常）（2026-11-10）
 - 看板对账 + 警告清零（2026-11-10）：board/roadmap/issue 状态与事实对齐（B-2/B-6 移出 Backlog、S-1/X-1 状态纠正、M7/M9/M10 勾完成）；新增 Q-1（栈溢出 flake，含实测崩溃栈）与 V-1（v1.0 发布收尾）两卡承载此前无卡的在办事项；编译器警告 31→0（`SystemDecorations`→`WindowDecorations`、`Watermark`→`PlaceholderText`、`SKFilterQuality`→`SKSamplingOptions`、`Bitmap.Save(string,int?)`→`PngBitmapEncoderOptions.Default`、CS8602/CS8604 可空性收敛、CS0067/CS8778 清理、xUnit1031 两处按「刻意阻塞」加注释豁免）；测试 Core 785 + App 206 + Mac 91 + Linux 46 全绿（App net10.0 腿仍有 Q-1 的偶发 abort：本次 8 跑 3 abort，见 Q-1 卡）
 - X-1 反色工具（GAP-1 已实装，本卡此前漏关）：Core `InvertAnnotation`（选区内反色、区域外像素不动）+ 工具坞 I 热键 + `Tool.Invert`/`Kind.Invert` 双语 + 图标；`InvertAnnotationTests` 覆盖区域内外语义（2026-11-10 补记，功能随 GAP-1 于 2026-11-01 交付）
 - B-2 WindowPicker 96×54 缩略图：Core `PickerThumbnails`（FitSize 等比钳制纯函数——16:9 满盒/方图/竖图/小图不放大/退化 1px；Resize SKSurface 等比绘制镜像 ThumbnailWriter 手法）+ App WindowPickerDialog 改造（Row 升级 INPC 含 Thumbnail/HasThumbnail/Initial 占位首字母，item 模板 108×60 缩略图框，串行逐窗后台 `ICaptureService.CaptureWindow` → 96×54 PNG → Avalonia Bitmap，捕获异常→null→占位不崩，代次三查——循环头/捕获后/Post 闭包内——Refresh/关窗旧结果绝不回写、过期位图闭包兜底 Dispose）；MainWindow 传 `_capture` 接线；测试坑两枚记录 issue（headless 下 await InvokeAsync 绑 UI 泵→改 Post；session 循环线程上 Dispose 自等挂死→改单 Dispatch 内联 GetResult+RunJobs，dotnet-stack 实证）；测试 Core 773→785 + App 203→206×2TFM + Mac 91 + Linux 46 全绿；真机项 QA-1 §P（2026-11-11）

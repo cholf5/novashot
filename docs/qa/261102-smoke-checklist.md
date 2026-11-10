@@ -63,6 +63,7 @@
 - [ ] Style tab：色块选中环（首次进编辑器那次重点看，`RefreshSwatchStates` 依赖 Loaded 遍历）⚑(§8.5)；描边宽度 1–16、字号 12–72
 - [ ] 选中几何后 `SelectionKindLabel` 文案正确（ArrowStraight/ArrowCurved 分支顺序已修，真机扫一眼）
 - [ ] Canvas tab：实心/渐变预设可选；阴影/描边/内嵌三组 CheckBox + 滑杆联动；边框样式 ComboBox（外/中/内）；裁剪比例 ComboBox
+- [ ] 背景三态 chip（None / Solid / Gradient）互斥切换：点哪个就是哪个、选中环只在当前档，切回 None 时棋盘格预览出现；连续快速点十几下不卡不乱（Q-1 修复后输入改走 Click + 单向回显，真机验证交互手感）
 - [ ] 文字编辑态下 TextBox 拿焦点时热键不抢输入
 
 ## G. 导出 / Pin / 上传 / Library

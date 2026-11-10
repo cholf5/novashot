@@ -33,7 +33,7 @@
 
 ## 缺口来源（winshot / flameshot 对比结论）
 
-> 2026-11-01 二次扫描后更新：下述“两边都有而 prtsc 缺”里，QuickSave 复制路径、CF_HDROP 文件粘贴、CloseToTray/MinimizeToTray/窗口尺寸持久化、编辑器默认值接线、IncludeBackground、Library 删除确认/复制路径、云连接测试已搬完（GAP-1）；M9/M10 各项已于 2026-11-10 交付。剩余看 Backlog：V-1（发布收尾）、Q-1（栈溢出 flake）、LINUX-2（Wayland）。
+> 2026-11-01 二次扫描后更新：下述“两边都有而 prtsc 缺”里，QuickSave 复制路径、CF_HDROP 文件粘贴、CloseToTray/MinimizeToTray/窗口尺寸持久化、编辑器默认值接线、IncludeBackground、Library 删除确认/复制路径、云连接测试已搬完（GAP-1）；M9/M10 各项已于 2026-11-10 交付。剩余看 Backlog：V-1（发布收尾）、LINUX-2（Wayland）（Q-1 栈溢出 flake 已于 2026-11-10 修复，见 Done）。
 
 - **两边都有而 prtsc 缺**：延时截图（D-1 ✅）、设置 GUI（S-1 ✅）、桌面通知（N-1 ✅ Windows；mac/Linux 原生通知明确不做）、CLI（L-1 ✅）、i18n（L-2 ✅）。
 - **flameshot 独有值得抄**：屏幕取色器（E-1 ✅）、Pin 贴图（已并入 C-1 ✅）、工具栏按钮自定义（B-6 ✅）、反色（X-1 ✅ GAP-1 实装）、 Capture Launcher（G-26 ✅ 与 D-1 合并做）、侧面板色轮/Hex 编辑（并入 S-1 ✅）、放大镜（并入 E-1 ✅）。
@@ -43,4 +43,4 @@
 
 ## 顺序建议
 
-QA-1 冒烟随时可做且是 P0；Q-1 的栈溢出应排在 V-1 之前修（否则 CI/发布门的测试会随机 abort）；V-1 的版本号/tag 与 README 可并行起草，但打 tag 必须等 Q-1 与真机冒烟 P0 段清了。
+QA-1 冒烟随时可做且是 P0；Q-1 已修（App 测试 25 连跑无 abort），发布门的测试稳定性不再是阻塞项；V-1 的版本号/tag 与 README 可并行起草，打 tag 前把真机冒烟 P0 段清掉即可。
