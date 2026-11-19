@@ -1,6 +1,6 @@
 # 06 命令行
 
-`prtsc` 与 GUI 共用同一份配置、同一套捕获/导出实现。Windows 上就是安装目录里的 `Prtsc.exe`（可自行加进 PATH），macOS/Linux 用源码构建出的可执行文件。
+`prtsc` 与 GUI 共用同一份配置、同一套捕获/导出实现。Windows 上就是安装目录里的 `Prtsc.exe`（可自行加进 PATH）；macOS 上是 `Prtsc.app/Contents/MacOS/Prtsc`；Linux 用源码构建出的可执行文件。
 
 ## 模式
 
