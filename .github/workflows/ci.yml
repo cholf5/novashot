@@ -3,21 +3,25 @@
 # 测试矩阵 = 三个 runner 各跑自己平台能跑的腿（划分对齐本地基线口径
 # Core 785 / App 209×2TFM / Mac 91 / Linux 46）：
 #   windows-latest → Core + App 的 windows TFM 腿（App 的 net10.0 腿带 mac 平台 P/Invoke，Windows 上不跑）
-#   ubuntu-latest  → Core + Linux.Tests + App 的 net10.0 腿
+#   ubuntu-latest  → Core + Linux.Tests + App 的 net10.0 腿 + Xvfb 启动冒烟
 #   macos-latest   → Mac.Tests + App 的 net10.0 腿
 #
-# tag push（v*）追加 release job：版本号断言（tag == Directory.Build.props <Version>）
-# → scripts/pack-windows.sh（windows-latest 上跑，self-contained win-x64）
-# → Setup.exe / Portable.zip / nupkg + sha256 清单传 GitHub Release。
-# 更新 feed（releases.win.json / RELEASES / full.nupkg）就在这批产物里，Release 页面即 vpk feed 托管点。
+# 打包 = 两条腿（脚本都能在任一宿主上跑，但各自有顺手的宿主）：
+#   pack-windows → windows-latest：scripts/pack-windows.sh（Velopack）+ 安装器静默装/卸冒烟
+#   pack-macos   → macos-latest：scripts/pack-macos.sh（.app bundle，ad-hoc 封签）
+#
+# 触发：
+#   push/PR      → 只跑测试（纯文档改动不触发；tag push 不评估 path filter，GitHub 文档保证）
+#   tag v*       → 测试 → 打包 → Release（版本号断言 tag == Directory.Build.props <Version>）
+#   dispatch     → 测试 → 打包 → 冒烟，**不上传 Release**（这就是打包 dry-run）
+#
+# 更新 feed（releases.win.json / RELEASES / full.nupkg）与安装包同批上传，Release 页面即 vpk feed 托管点。
 name: ci
 
 on:
   push:
     branches: [main]
     tags: ['v*']
-    # 纯文档改动不跑测试（README / 用户手册 / 看板 / 发布说明）。
-    # GitHub 不对 tag push 评估 path filter（文档保证），所以这片过滤与 tags 共存是安全的。
     paths-ignore:
       - '**.md'
       - 'LICENSE'
@@ -31,8 +35,8 @@ on:
       - '.gitignore'
       - 'docs/**'
       - 'kanban/**'
-  # 手动触发：release job 的**打包 dry-run**（实弹跑 pack/冒烟，不上传 Release）。
-  # 首跑风险的处置办法——不用先打 tag 就能把 pack-windows.sh 与安装器冒烟验一遍。
+  # 手动触发 = 打包 dry-run：实弹跑 pack-windows.sh / pack-macos.sh 与两处冒烟，不建 Release。
+  # 这是「CI 首跑」风险的处置办法——不用先打 tag 就能把打包链路验一遍。
   workflow_dispatch:
 
 # 同一 ref 的旧跑批让位：连续 push 只留最新一条（tag 各自成组，互不取消）。
@@ -40,9 +44,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# 顶层最小权限（review M9）：test job 只读；release job 用 job 级 permissions: contents: write 覆盖
+# 顶层最小权限（review M9）：测试 job 只读；release job 用 job 级 contents: write 覆盖
 permissions:
   contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
 
 jobs:
   test-windows:
@@ -52,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Core + App (windows TFM)
         run: |
           dotnet test tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj
@@ -65,7 +72,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
       # libfontconfig1 是 libSkiaSharp.so 的动态依赖：ubuntu-24.04 runner 上没有它，
       # 加载 Skia 的用例会集体抛 DllNotFoundException（报错只提 libSkiaSharp，不提 fontconfig，
       # 首跑时看着像本机漏了原生库）。fonts-noto-cjk 保证 headless 文本渲染不走逐字形回退扫描。
@@ -77,6 +84,38 @@ jobs:
           dotnet test tests/Prtsc.Linux.Tests/Prtsc.Linux.Tests.csproj
           dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0
 
+      # Linux 启动冒烟：没人双击过 Linux 版本，这是 CI 能做的最近似的事。
+      # 走 CLI（L-1 的捕获命令不进 Avalonia、不弹窗），在虚拟 X 上真抓一帧落盘——
+      # 抓的是 XGetImage 全链路（XOpenDisplay → XRandR 显示器 → 取像素 → Skia 编码 → 落盘），
+      # 比「进程存活 20 秒」有内容得多。
+      - name: Smoke test (xvfb + headless capture)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb x11-utils >/dev/null
+          dotnet publish src/Prtsc.App -c Release -f net10.0 -r linux-x64 --self-contained true -o smoke/app
+          chmod +x smoke/app/Prtsc
+
+          Xvfb :99 -screen 0 1280x1024x24 >/dev/null 2>&1 &
+          export DISPLAY=:99
+          # 等 X server **接受连接**再起应用：Xvfb 的 socket 是异步创建的，首连会撞空
+          # （XOpenDisplay 失败在一条本来绿的构建上）。xdpyinfo 是最便宜的 readiness 探针。
+          for _ in $(seq 1 50); do
+            xdpyinfo -display :99 >/dev/null 2>&1 && break
+            sleep 0.2
+          done
+          xdpyinfo -display :99 >/dev/null 2>&1 || { echo "::error::Xvfb did not become ready"; exit 1; }
+
+          mkdir -p smoke/out
+          ./smoke/app/Prtsc full --path "$PWD/smoke/out" > smoke/cli.log 2>&1 || {
+            echo "::error::prtsc full exited non-zero"; cat smoke/cli.log; exit 1; }
+          cat smoke/cli.log
+
+          PNG=$(find smoke/out -type f -name '*.png' | head -1)
+          [ -n "$PNG" ] || { echo "::error::no capture file produced"; ls -la smoke/out; exit 1; }
+          SIZE=$(stat -c%s "$PNG")
+          echo "captured: $PNG ($SIZE bytes)"
+          [ "$SIZE" -gt 1024 ] || { echo "::error::capture file suspiciously small ($SIZE bytes)"; exit 1; }
+
   test-macos:
     runs-on: macos-latest
     timeout-minutes: 30
@@ -84,49 +123,115 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Mac + App (net10.0 leg)
         run: |
           dotnet test tests/Prtsc.Mac.Tests/Prtsc.Mac.Tests.csproj
           dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0
 
-  release:
-    # 仅 tag push（v*）打包发布。需要 tag 与仓库版本一致，防呆。
-    if: startsWith(github.ref, 'refs/tags/v')
+  # Windows 打包腿。tag push 与手动 dispatch 都跑；只是「上传 Release」那一步只在 tag 上，
+  # 所以 dispatch 就是一次实弹 dry-run（打包 + 冒烟 + 校验和，产物留在 run 的 artifacts 里）。
+  pack-windows:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: [test-windows, test-linux, test-macos]
     runs-on: windows-latest
-    # 打包 + 冒烟 + 上传串行在一条腿里，比三个测试 job 长；30 分钟紧，给 45。
-    timeout-minutes: 45
-    permissions:
-      contents: write # gh release 上传产物
-    env:
-      TAG: ${{ github.ref_name }}
+    timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      # 版本单调性检查（简单断言）：tag v0.2.0 必须等于 Directory.Build.props 的 <Version>0.2.0</Version>
-      - name: Assert tag == build version
+      # 版本唯一出处 = Directory.Build.props <Version>；tag push 时顺便断言 tag 与它一致
+      # （tag v0.2.0 必须配 <Version>0.2.0</Version>）。dispatch 时没有 tag，只读不作断言。
+      - name: Read version (assert tag when tagging)
+        id: version
         shell: pwsh
         run: |
           $props = Get-Content Directory.Build.props -Raw
           if ($props -notmatch '<Version>([^<]+)</Version>') { throw "no <Version> in Directory.Build.props" }
           $version = $Matches[1].Trim()
-          $tagVersion = $env:TAG -replace '^v', ''
-          Write-Host "tag=$env:TAG version=$version"
-          if ($tagVersion -ne $version) {
-            throw "tag version ($tagVersion) != Directory.Build.props Version ($version) — bump <Version> before tagging"
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+            Write-Host "tag=$env:GITHUB_REF_NAME version=$version"
+            if ($tagVersion -ne $version) {
+              throw "tag version ($tagVersion) != Directory.Build.props Version ($version) — bump <Version> before tagging"
+            }
+          } else {
+            Write-Host "dry-run on $env:GITHUB_REF, version=$version (no tag assertion)"
           }
-          "PACK_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       # 打包（脚本同样可跑在 mac/linux——vpk 交叉打包；CI 用 windows 宿主更直白）
       - name: Pack (vpk)
         shell: bash
         run: |
           dotnet tool install --global vpk
-          ./scripts/pack-windows.sh --version "$PACK_VERSION"
+          ./scripts/pack-windows.sh --version "${{ steps.version.outputs.version }}"
+
+      # 静默装 / 卸冒烟。硬教训：这里**不能**用 Start-Process -Wait——它等的是整棵进程树，
+      # 而安装器的 postinstall 会把应用当子进程拉起来，那一对组合会挂到 job 超时。
+      # 一律「等句柄 + 显式超时」。
+      # Velopack 的 Setup.exe 参数以官方文档为准（--silent 静默安装），实弹以本步骤为准：
+      # 参数不对会在这一步就红，而不是等用户装的时候才发现。
+      - name: Smoke test installer (silent install + uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = (Resolve-Path "artifacts/pack/Prtsc-win-Setup.exe").Path
+          $dir = Join-Path $env:LOCALAPPDATA "Prtsc"
+          $exe = Join-Path $dir "Prtsc.exe"
+
+          function Invoke-Bounded([string]$file, [string[]]$arguments, [int]$timeoutMs) {
+            Write-Host "run: $file $($arguments -join ' ')"
+            $process = Start-Process -FilePath $file -ArgumentList $arguments -PassThru
+            if (-not $process.WaitForExit($timeoutMs)) {
+              $process | Stop-Process -Force -ErrorAction SilentlyContinue
+              throw "timed out after ${timeoutMs}ms: $file"
+            }
+            Write-Host "exit code: $($process.ExitCode)"
+            if ($process.ExitCode -ne 0) { throw "$file exited with $($process.ExitCode)" }
+          }
+
+          function Wait-ForFile([string]$path, [bool]$exists, [int]$seconds) {
+            for ($i = 0; $i -lt ($seconds * 2); $i++) {
+              if ((Test-Path $path) -eq $exists) { return }
+              Start-Sleep -Milliseconds 500
+            }
+            throw "file did not reach exists=$exists within ${seconds}s: $path"
+          }
+
+          try {
+            Invoke-Bounded $setup @("--silent") 600000
+            if (-not (Test-Path $exe)) { throw "installed exe missing: $exe" }
+            Write-Host "installed: $exe"
+            Get-ChildItem $dir | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+
+            # 安装器可能已经把应用拉起来（postinstall）。先杀掉，免得卸载撞文件锁。
+            Get-Process -Name Prtsc -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 2
+
+            $uninstaller = Join-Path $dir "Update.exe"
+            if (Test-Path $uninstaller) {
+              # Velopack 的卸载入口是装目录里的 Update.exe；它会把清理动作交给一个延迟子进程，
+              # 所以退出码 0 只代表「已受理」——文件消失要等，用 Wait-ForFile 轮询。
+              Invoke-Bounded $uninstaller @("--uninstall") 300000
+            } else {
+              Invoke-Bounded $setup @("--uninstall") 300000
+            }
+            Get-Process -Name Prtsc -ErrorAction SilentlyContinue | Stop-Process -Force
+            Wait-ForFile $exe $false 60
+            Write-Host "uninstalled cleanly"
+          } catch {
+            Write-Host "::group::diagnostics"
+            Write-Host "LOCALAPPDATA=$env:LOCALAPPDATA"
+            if (Test-Path $dir) { Get-ChildItem $dir -Recurse -Depth 2 | Select-Object FullName | Out-String | Write-Host }
+            try { & $setup --help 2>&1 | Out-String | Write-Host } catch { Write-Host "setup --help failed: $_" }
+            Write-Host "::endgroup::"
+            throw
+          }
 
       # sha256 清单随产物一起上传（用户侧校验）
       - name: Checksums
@@ -136,14 +241,55 @@ jobs:
           shasum -a 256 Prtsc-win-Setup.exe Prtsc-win-Portable.zip Prtsc-*.full.nupkg > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Upload to GitHub Release
-        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-win
+          path: |
+            artifacts/pack/Prtsc-win-Setup.exe
+            artifacts/pack/Prtsc-win-Portable.zip
+            artifacts/pack/*.full.nupkg
+            artifacts/pack/releases.win.json
+            artifacts/pack/RELEASES
+            artifacts/pack/SHA256SUMS.txt
+          if-no-files-found: error
+
+  # 建 Release + 上传资产。只在 tag push 上跑——dispatch 是 dry-run，产物留在 run 的 artifacts 里。
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [pack-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # checkout 只为取 docs/release/notes/<tag>.md（手写发版说明）；没有就回落 --generate-notes。
+      # 首版没有上一个 tag 时 generate-notes 会把全部提交抖出来，所以首个版本必须提供手写文件。
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pack-*
+          merge-multiple: true
+          path: dist
+      # 校验和在这里重新生成一遍，覆盖**全部**资产（Windows 三个 + macOS 两个 + feed 文件）：
+      # 打包腿各自只能算自己那几件，而用户 `sha256sum -c SHA256SUMS.txt` 要的是一份完整清单。
+      - name: Regenerate checksums over all assets
+        run: |
+          cd dist
+          rm -f SHA256SUMS.txt
+          for f in *; do [ -f "$f" ] && sha256sum "$f" >> SHA256SUMS.txt; done
+          cat SHA256SUMS.txt
+      # 不给 --title 时 Release 标题是空串，一律给「Prtsc vX.Y.Z」。
+      # --verify-tag：tag 不在远端就早点炸，而不是建一个指向默认分支的空 Release。
+      - name: Create release and upload assets
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          # 重复 push 同一 tag 时幂等：release 已存在就 --clobber 覆盖上传
-          gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --verify-tag --title "Prtsc $TAG" --generate-notes
-          (cd artifacts/pack && gh release upload "$TAG" \
-            Prtsc-win-Setup.exe Prtsc-win-Portable.zip Prtsc-*.full.nupkg \
-            releases.win.json RELEASES SHA256SUMS.txt --clobber)
+          set -euo pipefail
+          NOTES_FILE="docs/release/notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$NOTES_FILE" ]; then NOTES_ARG="--notes-file $NOTES_FILE"; else NOTES_ARG="--generate-notes"; fi
+          # 重复 push 同一 tag 时幂等：Release 已存在就不再 create（--clobber 覆盖上传）。
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Prtsc ${GITHUB_REF_NAME}" $NOTES_ARG
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name'
