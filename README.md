@@ -57,13 +57,14 @@
 | 剪贴板 | ✔ | ✔（NSPasteboard） | ✔（依赖 `xclip`） |
 | 开机自启 | ✔（注册表 Run） | ✔（launchd） | ✔（XDG Autostart） |
 | 桌面通知 | ✔ | —（静默，接口预留） | —（静默，接口预留） |
-| 安装包 | Setup.exe / Portable.zip | 源码构建 | 源码构建 |
+| 安装包 | Setup.exe / Portable.zip | `.app`（zip） | 源码构建 |
 
-**已知限制**
+**已知限制**（完整清单与绕法见 [`docs/release/known-limitations.md`](docs/release/known-limitations.md)）
+- **产物没有代码签名**：Windows SmartScreen 提示「未知发布者」→「更多信息 → 仍要运行」；macOS 提示
+  「无法验证开发者」，最省事是 `xattr -cr /Applications/Prtsc.app`（macOS 26 上右键「打开」已失效）
 - **Wayland**：仅在 XWayland 会话下可用，原生 Wayland 截图协议未支持（看板 LINUX-2）
-- **Windows 产物未签名**：SmartScreen 会拦，首次运行需「更多信息 → 仍要运行」
-- **macOS 需要屏幕录制权限**：系统设置 → 隐私与安全性 → 屏幕录制；未授权时捕获会给出中文指引并失败
-- macOS / Linux 暂无系统级通知；macOS 暂未提供正式分发包
+- **macOS 需要屏幕录制权限**：系统设置 → 隐私与安全性 → 屏幕录制，勾选后重启应用
+- **只有 Windows 有系统级通知与应用内更新**；macOS / Linux 换版本要手动替换，Linux 本版只发源码构建
 
 ## 安装
 
@@ -75,9 +76,21 @@
 
 便携版不检查更新（没有 `Update.exe`，属预期行为）。
 
-**macOS / Linux**
+**macOS**
 
-暂无预编译包，按[从源码构建](#从源码构建)自行构建；Linux 请先装 `xclip`：
+从 Releases 下载 `Prtsc-<版本>-osx-arm64.zip`（Apple Silicon）或 `-osx-x64.zip`（Intel），解压得到
+`Prtsc.app`，拖进「应用程序」。产物是 ad-hoc 签名、未公证，首次打开会被 Gatekeeper 拦一次：
+
+```bash
+xattr -cr /Applications/Prtsc.app     # 抹掉隔离标记，之后双击直接开
+```
+
+然后授权「屏幕录制」（系统设置 → 隐私与安全性 → 屏幕录制 → 勾选 Prtsc），重启应用即可按热键截图。
+macOS 版不参与应用内更新：换版本 = 退出 → 替换 `.app` → 重开。
+
+**Linux**
+
+本版只发源码构建，按[从源码构建](#从源码构建)自行构建；先装 `xclip`：
 
 ```bash
 sudo apt install xclip        # Debian/Ubuntu
@@ -169,21 +182,24 @@ dotnet run --project src/Prtsc.App -f net10.0-windows10.0.19041.0   # Windows
 dotnet run --project src/Prtsc.App -f net10.0                        # macOS / Linux
 ```
 
-**Windows 打包**（Velopack；可在 macOS/Linux 交叉打包）
+**打包**
 
 ```bash
-dotnet tool install --global vpk
+dotnet tool install --global vpk        # Windows 打包需要（vpk 也可在 macOS/Linux 上交叉打包）
 scripts/pack-windows.sh                 # 版本号取 Directory.Build.props
-scripts/pack-windows.sh --version 0.2.0 # 或显式指定
+scripts/pack-windows.sh --version 1.0.0 # 或显式指定
+scripts/pack-macos.sh                   # macOS .app（本机架构）；--rids "osx-arm64 osx-x64" 两个架构
 ```
 
-产物在 `artifacts/pack/`：`Prtsc-win-Setup.exe`、`Prtsc-win-Portable.zip`、`*.nupkg`、`releases.win.json`（更新 feed）。
+Windows 产物在 `artifacts/pack/`：`Prtsc-win-Setup.exe`、`Prtsc-win-Portable.zip`、`*.nupkg`、
+`releases.win.json` / `RELEASES`（更新 feed）。macOS 产物是同目录的 `Prtsc-<版本>-osx-<arch>.zip`
+（`.app` bundle + ad-hoc 封签）。发版流程与资产契约见 [`docs/release/ci-release.md`](docs/release/ci-release.md)。
 
 ## 测试
 
 ```bash
 dotnet test tests/Prtsc.Core.Tests       # 785 例（纯逻辑：几何/合成/导出/配置/CLI 协议…）
-dotnet test tests/Prtsc.App.Tests -f net10.0   # 209 例（headless UI 接线）
+dotnet test tests/Prtsc.App.Tests -f net10.0   # 212 例（headless UI 接线；windows TFM 腿 218 例）
 dotnet test tests/Prtsc.Mac.Tests        # 91 例（含真粘贴板 Manual 用例）
 dotnet test tests/Prtsc.Linux.Tests      # 46 例（Fake X11）
 ```
@@ -194,7 +210,14 @@ dotnet test tests/Prtsc.Linux.Tests      # 46 例（Fake X11）
 PRTSC_SNAPSHOT=1 dotnet test tests/Prtsc.App.Tests -f net10.0 --filter UiSnapshot
 ```
 
-CI（`.github/workflows/ci.yml`）在 Windows / Linux / macOS 三平台跑对应测试腿；推 `v*` tag 会校验 `tag == Directory.Build.props <Version>`，然后打包并上传 Release。
+CI（`.github/workflows/ci.yml`）在 Windows / Linux / macOS 三平台跑对应测试腿，test-linux 末尾还会在 Xvfb
+里真抓一帧做启动冒烟。推 `v*` tag 会校验 `tag == Directory.Build.props <Version>`，然后打 Windows / macOS 包、
+跑安装器与封签冒烟，再建 Release 并上传。发版走一条命令：
+
+```bash
+scripts/release.sh 1.0.0 --watch        # bump 版本 → tag → push → 盯 CI 与资产
+gh workflow run ci.yml                  # 或者先做一次打包 dry-run（不建 Release）
+```
 
 ## 项目结构
 
@@ -215,8 +238,11 @@ kanban/                    看板与卡（board.md + issues/）
 - 路线图与里程碑：[`docs/roadmap.md`](docs/roadmap.md)
 - 开发看板：[`kanban/board.md`](kanban/board.md)
 - 真机冒烟清单：[`docs/qa/261102-smoke-checklist.md`](docs/qa/261102-smoke-checklist.md)
+- 发版流程与资产契约：[`docs/release/ci-release.md`](docs/release/ci-release.md)；已知限制：[`docs/release/known-limitations.md`](docs/release/known-limitations.md)
 - 历次交接与踩坑记录：[`docs/handoff/`](docs/handoff/)
 
 ## 许可
 
-仓库目前**尚未添加 LICENSE 文件**（发布前需拍板）。随包分发的 IBM Plex 字体按 SIL OFL 授权，见 `src/Prtsc.App/Assets/Fonts/OFL.txt`。
+[AGPL-3.0-or-later](LICENSE)。改名再分发请更换品牌标识。
+
+随包分发的 IBM Plex 字体按 SIL OFL 授权，见 `src/Prtsc.App/Assets/Fonts/OFL.txt`。

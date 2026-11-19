@@ -253,10 +253,58 @@ jobs:
             artifacts/pack/SHA256SUMS.txt
           if-no-files-found: error
 
+  # macOS 打包腿。产 .app bundle + ad-hoc 封签 + zip（scripts/pack-macos.sh）。
+  # 不用 `vpk [osx] pack`：它出的是 .pkg（或带 UpdateMac 助手的 bundle），没有 Apple 证书时
+  # 无法做到「可放行的未验证开发者」——.pkg 会被 Gatekeeper 直接判 damaged。取舍写在脚本头注释里。
+  pack-macos:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [test-windows, test-linux, test-macos]
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # 版本唯一出处同上；tag push 时断言 tag 与 <Version> 一致（两个打包腿各断言一次，互不依赖）
+      - name: Assert tag == build version
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1 | tr -d '[:space:]')
+          [ -n "$VERSION" ] || { echo "::error::no <Version> in Directory.Build.props"; exit 1; }
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              TAG=${GITHUB_REF_NAME#v}
+              [ "$TAG" = "$VERSION" ] || { echo "::error::tag $GITHUB_REF_NAME does not match <Version>$VERSION"; exit 1; } ;;
+            *) echo "dry-run on $GITHUB_REF, version=$VERSION (no tag assertion)" ;;
+          esac
+
+      - name: Pack (.app bundle, ad-hoc signed)
+        run: ./scripts/pack-macos.sh --rids "osx-arm64 osx-x64"
+
+      # 封签要经得起「解压之后」的复核：zip 里损了扩展属性/符号链接的话，下载到本机就是 damaged。
+      # 所以这里真的解一遍再 codesign --verify --strict。
+      - name: Verify seals survive the zip
+        run: |
+          set -euo pipefail
+          for zip in artifacts/pack/*osx-*.zip; do
+            rm -rf /tmp/verify && mkdir -p /tmp/verify
+            ditto -x -k "$zip" /tmp/verify
+            codesign --verify --strict /tmp/verify/Prtsc.app
+            echo "ok: $zip"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-macos
+          path: artifacts/pack/*osx-*.zip
+          if-no-files-found: error
+
   # 建 Release + 上传资产。只在 tag push 上跑——dispatch 是 dry-run，产物留在 run 的 artifacts 里。
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [pack-windows]
+    needs: [pack-windows, pack-macos]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

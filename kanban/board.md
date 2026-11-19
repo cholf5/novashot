@@ -2,16 +2,17 @@
 
 > 建板 2026-11-01（M6d 完成后）。M1–M6d 历史见 Done 列汇总卡与 `docs/handoff/`。
 > 2026-11-10 对账：Backlog 清掉已完成的 B-2/B-6，补 Q-1/V-1/LINUX-2；Done 列补 X-1 漏关卡。
+> 2026-11-20：V-1 移入 In Progress —— 工程基线 / CI 修复 / 发版自动化 / mac 打包 / 文档已落地，剩「打 tag 发版 + 真机冒烟」等人执行。
 > 卡片约定沿用 cholf5 看板工作流：目标 / 子任务 / 开发者 / 复杂度(S/M/L) / 验收标准 / 测试用例 / 关联文档 / 依赖，明细在 `issues/<卡号>.md`。
 > 里程碑总表与缺口来源见 `docs/roadmap.md`。
 
 ## Backlog
-- V-1 v1.0 发布收尾（版本号/tag/CI 首跑/README+用户文档/签名/mac 分发）（P1）
 - LINUX-2 Wayland 原生会话（当前只支持 XWayland；见 roadmap 与 LINUX-1 handoff）（P3）
 
 ## To Do
 
 ## In Progress
+- V-1 v1.0 发布收尾（P1）—— 已完成：README + `docs/user` 八页用户手册、LICENSE=AGPL-3.0-or-later + `TreatWarningsAsErrors=true` + AVLN5001 定级 + `AGENTS.md` 基线、CI 两处首跑红（test-linux 装 libfontconfig1+CJK / test-windows 删临时目录退避重试）、CI 加固（paths-ignore / concurrency / timeout / `--verify-tag`）、`scripts/release.sh` 一键发版 + `docs/release/notes/v1.0.0.md` 手写首版说明、CI 打包 dry-run（`workflow_dispatch`）+ Windows 装/卸冒烟 + Linux Xvfb 抓帧冒烟、mac 分发=`scripts/pack-macos.sh`（.app + ad-hoc 封签 + zip；本机实跑：启动到托盘、CLI 抓帧成功、`codesign --verify --strict` 通过）、`docs/release/{ci-release,known-limitations}.md`；签名结论=**不签**（写进 README 与 known-limitations）；**剩**：干净 VM 安装/更新端到端、QA-1/QA-L1 真机清单、`scripts/release.sh 1.0.0` 打 tag（发版动作，待冒烟清完由用户执行）
 
 ## In Review
 - 

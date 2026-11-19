@@ -25,7 +25,7 @@
 
 | 里程碑 | 内容 | 看板卡 | 状态 |
 |---|---|---|---|
-| M11 | **v1.0 收尾门**：① 真机人工冒烟（QA-1 清单 A–P 共 88 项，勾选数 0；QA-L1 Linux 段未领）；② 发布收尾（版本号 0.1.0 → 发布版、tag、CI 首跑、README + 用户文档、签名方案、mac 分发渠道） | QA-1 / QA-L1 / V-1 | 收尾门（代码侧已无半成品，`dotnet build` 0 warning / 0 error） |
+| M11 | **v1.0 收尾门**：① 真机人工冒烟（QA-1 清单 A–P 共 88 项，勾选数 0；QA-L1 Linux 段未领）；② 发布收尾（版本号 0.1.0 → 发布版、tag、CI 首跑、README + 用户文档、签名方案、mac 分发渠道） | QA-1 / QA-L1 / V-1 | 收尾门（代码侧已无半成品，`dotnet build` 0 warning / 0 error）；**2026-11-20 工程侧收口**：LICENSE / 警告纪律 / AGENTS.md / CI 两处首跑红已修 / `scripts/release.sh` + CI 打包 dry-run + 装/卸与 Xvfb 抓帧冒烟 / mac `.app` 打包（ad-hoc 封签）/ `docs/release` 三件；剩「`release.sh 1.0.0` 打 tag」与真机冒烟 |
 
 ### 与旧交接文档编号的映射
 

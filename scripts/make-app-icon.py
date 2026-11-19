@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
-"""R-1: 生成 Prtsc 品牌 Windows 图标 assets/app.ico（vpk --icon 用）。
+"""R-1/E-14: 生成 Prtsc 品牌图标 —— assets/app.ico（vpk --icon）与 assets/app-icon.png（macOS icns）。
 
 品牌语言对齐截图编辑器默认背景渐变（EditorConfig.BackgroundColor 默认值
 linear-gradient(135deg, #667eea 0%, #764ba2 100%)）：靛蓝→紫渐变圆角方块 + 白色相机剪影。
 
 可复现：python3 scripts/make-app-icon.py
-依赖：Pillow（PIL）。输出 ICO 内含 16/32/48/64/128/256 六档（PIL 从 256 主图缩放）。
+依赖：Pillow（PIL）。
+输出：
+  assets/app.ico       ICO 内含 16/32/48/64/128/256 六档（从 1024 主图缩放）
+  assets/app-icon.png  1024×1024 满幅主图（Windows/通用）
+  assets/app-icon-macos.png
+                       Apple 图标网格版：830px 内容居中于 1024 画布、四周 97px 透明边距。
+                       macOS 的 Dock 图标自带这个留白，满幅图会被画得比邻居大一圈。
+                       scripts/pack-macos.sh 用它现场生成 .icns。
 """
 from PIL import Image, ImageDraw
 
-SIZE = 256  # 主图尺寸（绘制后再多档缩放入 ICO）
-SS = 4      # 超采样倍数，抗锯齿
+SIZE = 1024  # 主图尺寸（ICO 多档与 .icns 都从这里缩放）
+SS = 2       # 超采样倍数，抗锯齿
 
 GRAD_FROM = (102, 126, 234)  # #667eea
 GRAD_TO = (118, 75, 162)     # #764ba2
@@ -21,15 +28,19 @@ def lerp(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(len(a)))
 
 
-def gradient(draw_rect):
-    """对角渐变（135°，左上→右下）。"""
-    img = Image.new("RGBA", (draw_rect, draw_rect), (0, 0, 0, 0))
+def gradient(draw_rect, samples=256):
+    """对角渐变（135°，左上→右下）。
+
+    纯 Python 逐像素，按超采样尺寸（2048²）算要 4M 次迭代；渐变是线性的，先按 samples²
+    算一遍再放大，肉眼与逐像素结果一致。
+    """
+    img = Image.new("RGBA", (samples, samples), (0, 0, 0, 0))
     px = img.load()
-    for y in range(draw_rect):
-        for x in range(draw_rect):
-            t = (x + y) / (2 * draw_rect - 2)
+    for y in range(samples):
+        for x in range(samples):
+            t = (x + y) / (2 * samples - 2)
             px[x, y] = lerp(GRAD_FROM, GRAD_TO, t) + (255,)
-    return img
+    return img if samples == draw_rect else img.resize((draw_rect, draw_rect), Image.BICUBIC)
 
 
 def main():
@@ -68,14 +79,27 @@ def main():
 
     canvas.alpha_composite(white)
 
-    # 圆角裁切 + 缩回 256
+    # 圆角裁切 + 缩回主图尺寸
     canvas.putalpha(mask)
     master = canvas.resize((SIZE, SIZE), Image.LANCZOS)
 
-    out = "assets/app.ico"
-    master.save(out, format="ICO",
+    ico = "assets/app.ico"
+    master.save(ico, format="ICO",
                 sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-    print(f"wrote {out}")
+    print(f"wrote {ico}")
+
+    png = "assets/app-icon.png"
+    master.save(png, format="PNG")
+    print(f"wrote {png}")
+
+    # Apple 图标网格：内容 830 居中于 1024 画布，四周 97 透明边距
+    mac = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    inner = 830
+    pad = (SIZE - inner) // 2
+    mac.alpha_composite(master.resize((inner, inner), Image.LANCZOS), (pad, pad))
+    mac_png = "assets/app-icon-macos.png"
+    mac.save(mac_png, format="PNG")
+    print(f"wrote {mac_png}")
 
 
 if __name__ == "__main__":
