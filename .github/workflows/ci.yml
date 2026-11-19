@@ -1,7 +1,7 @@
 # Prtsc CI（R-1）。
 #
 # 测试矩阵 = 三个 runner 各跑自己平台能跑的腿（划分对齐本地基线口径
-# Core 502 / App 105×2TFM / Mac 80 / Linux 45）：
+# Core 785 / App 209×2TFM / Mac 91 / Linux 46）：
 #   windows-latest → Core + App 的 windows TFM 腿（App 的 net10.0 腿带 mac 平台 P/Invoke，Windows 上不跑）
 #   ubuntu-latest  → Core + Linux.Tests + App 的 net10.0 腿
 #   macos-latest   → Mac.Tests + App 的 net10.0 腿
@@ -16,7 +16,29 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    # 纯文档改动不跑测试（README / 用户手册 / 看板 / 发布说明）。
+    # GitHub 不对 tag push 评估 path filter（文档保证），所以这片过滤与 tags 共存是安全的。
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'docs/**'
+      - 'kanban/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'docs/**'
+      - 'kanban/**'
+  # 手动触发：release job 的**打包 dry-run**（实弹跑 pack/冒烟，不上传 Release）。
+  # 首跑风险的处置办法——不用先打 tag 就能把 pack-windows.sh 与安装器冒烟验一遍。
+  workflow_dispatch:
+
+# 同一 ref 的旧跑批让位：连续 push 只留最新一条（tag 各自成组，互不取消）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # 顶层最小权限（review M9）：test job 只读；release job 用 job 级 permissions: contents: write 覆盖
 permissions:
@@ -25,6 +47,7 @@ permissions:
 jobs:
   test-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -37,11 +60,17 @@ jobs:
 
   test-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      # libfontconfig1 是 libSkiaSharp.so 的动态依赖：ubuntu-24.04 runner 上没有它，
+      # 加载 Skia 的用例会集体抛 DllNotFoundException（报错只提 libSkiaSharp，不提 fontconfig，
+      # 首跑时看着像本机漏了原生库）。fonts-noto-cjk 保证 headless 文本渲染不走逐字形回退扫描。
+      - name: Install Skia native deps + CJK font
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1 fonts-noto-cjk
       - name: Core + Linux + App (net10.0 leg)
         run: |
           dotnet test tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj
@@ -50,6 +79,7 @@ jobs:
 
   test-macos:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -65,6 +95,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [test-windows, test-linux, test-macos]
     runs-on: windows-latest
+    # 打包 + 冒烟 + 上传串行在一条腿里，比三个测试 job 长；30 分钟紧，给 45。
+    timeout-minutes: 45
     permissions:
       contents: write # gh release 上传产物
     env:
@@ -111,7 +143,7 @@ jobs:
         run: |
           # 重复 push 同一 tag 时幂等：release 已存在就 --clobber 覆盖上传
           gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --title "Prtsc $TAG" --generate-notes
+            gh release create "$TAG" --verify-tag --title "Prtsc $TAG" --generate-notes
           (cd artifacts/pack && gh release upload "$TAG" \
             Prtsc-win-Setup.exe Prtsc-win-Portable.zip Prtsc-*.full.nupkg \
             releases.win.json RELEASES SHA256SUMS.txt --clobber)

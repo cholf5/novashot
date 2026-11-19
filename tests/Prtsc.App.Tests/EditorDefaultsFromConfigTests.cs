@@ -177,6 +177,23 @@ public class EditorDefaultsFromConfigTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, recursive: true);
+        // 500ms 防抖写盘（MainWindowViewModel.ConfigSaveDebounce）可能在用例已经断言完之后
+        // 才落盘，与本处的递归删除撞文件锁——Windows 上表现为 IOException（目录非空 / 文件被占用），
+        // 把一个本来通过的用例记成失败（CI test-windows 首跑就这么红的）。
+        // 策略：退避重试 3 次、不碰被测语义；真锁死就留一个 UUID 临时目录给 OS 清理，
+        // 让它退化成一次磁盘残留，而不是一次假红。
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, recursive: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt == 2) return;
+                Thread.Sleep(200);
+            }
+        }
     }
 }
