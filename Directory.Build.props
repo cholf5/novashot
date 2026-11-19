@@ -3,7 +3,9 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- 警告即错误：新增警告要么修掉，要么在下面写明理由后 NoWarn（当噪声压掉会重新长回来）。
+         注意 XAML 编译器诊断（AVLN*）不受此属性管辖，唯一生效通道是仓库根的 .editorconfig。 -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsNotAsErrors>NU1701</WarningsNotAsErrors>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
 
@@ -13,6 +15,11 @@
     <Company>cholf5</Company>
     <Product>Prtsc</Product>
     <Copyright>Copyright (c) $([System.DateTime]::Now.Year) cholf5</Copyright>
+
+    <!-- 许可证元数据唯一出处：全解决方案（src + tests）统一继承，勿在各 csproj 重复声明。
+         LICENSE 全文在仓库根目录；README「许可」一节有条款摘要与字体例外说明。 -->
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <Authors>cholf5</Authors>
 
     <!-- Repository layout -->
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
