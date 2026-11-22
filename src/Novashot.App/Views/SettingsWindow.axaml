@@ -99,19 +99,9 @@
           <StackPanel Margin="20,16" Spacing="14">
             <TextBlock Classes="hint" TextWrapping="Wrap" Text="{DynamicResource L.Settings.Hotkeys.Lede}" />
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Hotkeys.Fullscreen}" />
-              <Button Name="RecordFullscreen" Grid.Column="1" MinWidth="220" Classes="cmd"
-                      Content="{Binding HotkeyFullscreen}" Click="OnRecordClick" />
-            </Grid>
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Hotkeys.Region}" />
-              <Button Name="RecordRegion" Grid.Column="1" MinWidth="220" Classes="cmd"
-                      Content="{Binding HotkeyRegion}" Click="OnRecordClick" />
-            </Grid>
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Hotkeys.Window}" />
-              <Button Name="RecordWindow" Grid.Column="1" MinWidth="220" Classes="cmd"
-                      Content="{Binding HotkeyWindow}" Click="OnRecordClick" />
+              <TextBlock Classes="flabel" VerticalAlignment="Center" Text="{DynamicResource L.Settings.Hotkeys.Capture}" />
+              <Button Name="RecordCapture" Grid.Column="1" MinWidth="220" Classes="cmd"
+                      Content="{Binding HotkeyCapture}" Click="OnRecordClick" />
             </Grid>
           </StackPanel>
         </ScrollViewer>

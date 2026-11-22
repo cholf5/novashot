@@ -69,7 +69,7 @@ public class OverlaySnapTests
     }
 
     [Fact]
-    public async Task HoverOverEmptyArea_NoPreview()
+    public async Task HoverOverEmptyArea_ShowsWholeDisplaySnapPreview()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(TestAppHeadlessBootstrap));
         await session.Dispatch(() =>
@@ -80,8 +80,31 @@ public class OverlaySnapTests
 
             overlay.MouseMove(new Point(50, 50));
 
-            Assert.Null(adorner!.SnapPreviewRect);
+            var preview = adorner!.SnapPreviewRect;
+            Assert.NotNull(preview);
+            Assert.Equal(new Rect(0, 0, 1000, 800), preview.FrameRect); // 该屏全屏吸附预览
+            Assert.Equal("1000 × 800", preview.SizeLabel);
+
             overlay.Close();
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ClickOnEmptyArea_ConfirmsWholeDisplay()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(TestAppHeadlessBootstrap));
+        await session.Dispatch(() =>
+        {
+            var overlay = NewSnapOverlay(out _);
+            OverlayCaptureResult? confirmed = null;
+            overlay.Confirmed += (_, result) => confirmed = result;
+
+            overlay.MouseMove(new Point(50, 50));
+            overlay.MouseDown(new Point(50, 50), MouseButton.Left);
+            overlay.MouseUp(new Point(50, 50), MouseButton.Left, RawInputModifiers.LeftMouseButton);
+
+            var region = Assert.IsType<OverlayCaptureResult.Region>(confirmed);
+            Assert.Equal(new PixelRect(0, 0, 1000, 800), region.Rect); // 空白点击 = 该屏全屏
         }, CancellationToken.None);
     }
 

@@ -7,7 +7,7 @@ namespace Novashot.Platform.Mac.Hotkeys;
 
 /// <summary>
 /// Carbon RegisterEventHotKey 实现（无需辅助功能权限）。
-/// InstallEventHandler 常驻全局回调 → 按 hotKeyID.id 分发 HotkeyAction。
+/// InstallEventHandler 常驻全局回调 → 统一截图热键（意图唯一）触发 HotkeyPressed。
 /// 事件回调在 Carbon 主事件循环线程；Mac 无独立消息泵需求（Avalonia 主线程 runloop 即是），
 /// 注册直接在调用线程同步执行。
 /// </summary>
@@ -15,13 +15,16 @@ public sealed unsafe class MacHotkeyService : IHotkeyService
 {
     internal const uint SignatureNovashot = 0x50525453; // 'PRTS'
 
+    /// <summary>统一截图热键的 hotKeyID.id（Register 与回调 trampoline 共用，防两处漂移）。</summary>
+    private const uint CaptureHotkeyId = 1;
+
     private readonly ILogger<MacHotkeyService> _logger;
     private readonly Dictionary<uint, nint> _hotkeyRefs = []; // id → EventHotKeyRef
     private nint _handlerRef;
     private bool _started;
     private GCHandle _selfHandle; // 回调 userData 保活
 
-    public event EventHandler<HotkeyAction>? HotkeyPressed;
+    public event EventHandler? HotkeyPressed;
 
     public MacHotkeyService(ILogger<MacHotkeyService> logger)
     {
@@ -75,42 +78,35 @@ public sealed unsafe class MacHotkeyService : IHotkeyService
         }
     }
 
-    public void RegisterAll(string fullscreen, string region, string window)
+    public void Register(string spec)
     {
         if (!_started) throw new InvalidOperationException("Service not started");
 
         UnregisterAll();
 
-        RegisterOne(HotkeyAction.Fullscreen, fullscreen, 1);
-        RegisterOne(HotkeyAction.Region, region, 2);
-        RegisterOne(HotkeyAction.Window, window, 3);
-    }
-
-    private void RegisterOne(HotkeyAction action, string spec, uint id)
-    {
         if (!HotkeyParser.TryParse(spec, out var mods, out var vk))
         {
-            _logger.LogWarning("Invalid hotkey spec {Spec} for {Action}", spec, action);
+            _logger.LogWarning("Invalid hotkey spec {Spec}", spec);
             return;
         }
 
         var keycode = MacKeycodeMapper.VkToKeycode(vk);
         if (keycode is null)
         {
-            _logger.LogWarning("VK {Vk:X2} has no macOS keycode equivalent; skip {Action} hotkey '{Spec}'", vk, action, spec);
+            _logger.LogWarning("VK {Vk:X2} has no macOS keycode equivalent; skip hotkey '{Spec}'", vk, spec);
             return;
         }
 
-        var hotkeyId = new MacNative.EventHotKeyID { signature = SignatureNovashot, id = id };
+        var hotkeyId = new MacNative.EventHotKeyID { signature = SignatureNovashot, id = CaptureHotkeyId };
         var err = MacNative.RegisterEventHotKey(keycode.Value, MacKeycodeMapper.ModsToCarbon(mods), hotkeyId,
             MacNative.GetApplicationEventTarget(), 0, out var hkRef);
         if (err != 0)
         {
-            _logger.LogError("RegisterEventHotKey {Action} '{Spec}' failed: {Err}", action, spec, err);
+            _logger.LogError("RegisterEventHotKey '{Spec}' failed: {Err}", spec, err);
             return;
         }
-        _hotkeyRefs[id] = hkRef;
-        _logger.LogInformation("Hotkey {Action} registered: '{Spec}' (keycode 0x{Key:X2})", action, spec, keycode.Value);
+        _hotkeyRefs[CaptureHotkeyId] = hkRef;
+        _logger.LogInformation("Capture hotkey registered: '{Spec}' (keycode 0x{Key:X2})", spec, keycode.Value);
     }
 
     private void UnregisterAll()
@@ -140,16 +136,9 @@ public sealed unsafe class MacHotkeyService : IHotkeyService
 
         if (err != 0 || hotKeyId.signature != SignatureNovashot) return EventNotHandledErr;
 
-        HotkeyAction? action = hotKeyId.id switch
+        if (hotKeyId.id == CaptureHotkeyId) // 统一截图热键
         {
-            1 => HotkeyAction.Fullscreen,
-            2 => HotkeyAction.Region,
-            3 => HotkeyAction.Window,
-            _ => null,
-        };
-        if (action is { } a)
-        {
-            svc.HotkeyPressed?.Invoke(svc, a);
+            svc.HotkeyPressed?.Invoke(svc, EventArgs.Empty);
         }
         return EventNotHandledErr; // 让系统默认处理继续（语义：事件已消费但返回 notHandled 以免吞键）
     }

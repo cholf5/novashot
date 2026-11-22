@@ -24,9 +24,7 @@ public class SettingsViewModelTests
     public void Save_PersistsAllSections()
     {
         var (vm, store, _) = Create();
-        vm.HotkeyFullscreen = "Ctrl+Shift+F9";
-        vm.HotkeyRegion = "Ctrl+Alt+R";
-        vm.HotkeyWindow = "Ctrl+Shift+F10";
+        vm.HotkeyCapture = "Ctrl+Shift+F9";
         vm.LaunchOnStartup = true;
         vm.MinimizeToTray = true;
         vm.CloseToTray = false;
@@ -61,9 +59,7 @@ public class SettingsViewModelTests
         Assert.True(vm.Save());
 
         var c = store.Current;
-        Assert.Equal("Ctrl+Shift+F9", c.Hotkeys.Fullscreen);
-        Assert.Equal("Ctrl+Alt+R", c.Hotkeys.Region);
-        Assert.Equal("Ctrl+Shift+F10", c.Hotkeys.Window);
+        Assert.Equal("Ctrl+Shift+F9", c.Hotkeys.Capture);
         Assert.True(c.Startup.LaunchOnStartup);
         Assert.True(c.Startup.MinimizeToTray);
         Assert.False(c.Startup.CloseToTray);
@@ -100,24 +96,12 @@ public class SettingsViewModelTests
     public void Save_RejectsInvalidHotkey()
     {
         var (vm, store, fake) = Create();
-        vm.HotkeyFullscreen = "Ctrl+";
+        vm.HotkeyCapture = "Ctrl+";
 
         Assert.False(vm.Save());
         Assert.Equal(Loc.T("Settings.Hint.HotkeyInvalid"), vm.SaveHint);
-        Assert.Equal("PrintScreen", store.Current.Hotkeys.Fullscreen);
+        Assert.Equal("PrintScreen", store.Current.Hotkeys.Capture); // 未过校验不落盘
         Assert.Equal(0, fake.EnableCalls);
-    }
-
-    [Fact]
-    public void Save_RejectsDuplicateHotkeys()
-    {
-        var (vm, store, _) = Create();
-        vm.HotkeyFullscreen = "Ctrl+P";
-        vm.HotkeyRegion = "Ctrl+P";
-
-        Assert.False(vm.Save());
-        Assert.Equal(Loc.T("Settings.Hint.HotkeyDuplicate"), vm.SaveHint); // 专属提示，不能报成“热键无效”（review I1）
-        Assert.Equal("Ctrl+PrintScreen", store.Current.Hotkeys.Region);
     }
 
     [Fact]
@@ -148,7 +132,7 @@ public class SettingsViewModelTests
         Assert.False(vm.Save());
         Assert.False(string.IsNullOrEmpty(vm.SaveHint));
         Assert.False(store.Current.Startup.LaunchOnStartup); // config 不落盘
-        Assert.Equal("PrintScreen", store.Current.Hotkeys.Fullscreen);
+        Assert.Equal("PrintScreen", store.Current.Hotkeys.Capture);
     }
 
     [Theory]
@@ -193,7 +177,7 @@ public class SettingsViewModelTests
         var store = new JsonConfigStore(NullLogger<JsonConfigStore>.Instance, overrideDirectory: dir);
         store.Update(c =>
         {
-            c.Hotkeys.Region = "Ctrl+Alt+R";
+            c.Hotkeys.Capture = "Ctrl+Alt+R";
             c.Export.JpegQuality = 88;
             c.Export.DefaultFormat = "jpeg";
             c.Language = "zh-CN";
@@ -205,7 +189,7 @@ public class SettingsViewModelTests
         });
 
         var vm = new SettingsViewModel(store, new StubAutostartService());
-        Assert.Equal("Ctrl+Alt+R", vm.HotkeyRegion);
+        Assert.Equal("Ctrl+Alt+R", vm.HotkeyCapture);
         Assert.Equal(88, vm.JpegQuality);
         Assert.Equal(1, vm.ExportFormatIndex);
         Assert.Equal(2, vm.LanguageIndex);

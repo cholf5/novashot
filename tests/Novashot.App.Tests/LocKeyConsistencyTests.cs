@@ -145,7 +145,6 @@ public class LocKeyConsistencyTests
     public static readonly string[] DynamicallyReferencedKeys =
     [
         "Settings.Hint.HotkeyInvalid",
-        "Settings.Hint.HotkeyDuplicate",
     ];
 
     [Fact]

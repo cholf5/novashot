@@ -118,28 +118,8 @@
           <TextBlock Classes="label dim" Margin="0,5,0,26" TextWrapping="Wrap"
                      Text="{DynamicResource L.Capture.Lede}" />
 
-          <Button Classes="cmd" Click="OnCaptureFullscreenClick">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-              <Border Width="28" Height="28" CornerRadius="7" Background="#12FFFFFF">
-                <Path Classes="glyph" Width="16" Height="16" Stroke="{DynamicResource Ink}"
-                      Data="{DynamicResource Icon.Fullscreen}"
-                      HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Border>
-              <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
-                <TextBlock Text="{DynamicResource L.Capture.Fullscreen}" />
-                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.FullscreenHint}" />
-              </StackPanel>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Ctrl" />
-                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Shift" />
-                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="PrtSc" />
-              </StackPanel>
-            </Grid>
-          </Button>
-
-          <Border Height="1" Background="{DynamicResource Line}" Margin="10,0" />
-
-          <Button Classes="cmd" Click="OnCaptureRegionClick">
+          <!-- 统一交互（2026-11-23 第二轮）：唯一「截图」卡——overlay 内拖拽=区域、悬停点击=窗口、空白点击=全屏 -->
+          <Button Classes="cmd" Click="OnCaptureClick">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <Border Width="28" Height="28" CornerRadius="7" Background="#12FFFFFF">
                 <Path Classes="glyph" Width="16" Height="16" Stroke="{DynamicResource Ink}"
@@ -147,30 +127,10 @@
                       HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Border>
               <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
-                <TextBlock Text="{DynamicResource L.Capture.Region}" />
-                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.RegionHint}" />
+                <TextBlock Text="{DynamicResource L.Capture.Capture}" />
+                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.CaptureHint}" />
               </StackPanel>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="PrtSc" />
-              </StackPanel>
-            </Grid>
-          </Button>
-
-          <Border Height="1" Background="{DynamicResource Line}" Margin="10,0" />
-
-          <Button Classes="cmd" Click="OnCaptureWindowClick">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-              <Border Width="28" Height="28" CornerRadius="7" Background="#12FFFFFF">
-                <Path Classes="glyph" Width="16" Height="16" Stroke="{DynamicResource Ink}"
-                      Data="{DynamicResource Icon.Window}"
-                      HorizontalAlignment="Center" VerticalAlignment="Center" />
-              </Border>
-              <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
-                <TextBlock Text="{DynamicResource L.Capture.Window}" />
-                <TextBlock Classes="hint" FontSize="11" Text="{DynamicResource L.Capture.WindowHint}" />
-              </StackPanel>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="Ctrl" />
                 <controls:Keycap Theme="{StaticResource KeycapTheme}" Content="PrtSc" />
               </StackPanel>
             </Grid>

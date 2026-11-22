@@ -29,22 +29,22 @@ public class CliRequestRouterTests
     }
 
     [Fact]
-    public async Task RegionWithoutGeometry_TriggersInteractiveRegionWithDelay()
+    public async Task RegionWithoutGeometry_TriggersInteractiveCaptureWithDelay()
     {
-        HotkeyAction? action = null;
         int? delay = null;
+        var triggered = 0;
         var headlessCalled = 0;
         var router = NewRouter(
-            trigger: (a, d) => { action = a; delay = d; },
+            trigger: d => { triggered++; delay = d; },
             headless: (_, _) => { headlessCalled++; return Task.FromResult(CliPipeResponse.Success("unused")); });
 
         var response = await router.HandleAsync(new CliCommand { Mode = CliCaptureMode.Region, DelaySeconds = 3 });
 
-        Assert.Equal(HotkeyAction.Region, action);
+        Assert.Equal(1, triggered);
         Assert.Equal(3, delay);
         Assert.Equal(0, headlessCalled);
         Assert.True(response.Ok);
-        Assert.Contains("Region", response.Message);
+        Assert.Contains("Interactive capture", response.Message);
     }
 
     [Fact]
@@ -52,13 +52,11 @@ public class CliRequestRouterTests
     {
         // 终审 I-1：转发 ≡ 本地触发——省略 --delay（null）必须透传给咽喉点走 config 默认，
         // 不能被合并成显式 0（那会压过 config 默认延时，与本地热键不一致）
-        HotkeyAction? action = null;
         int? delay = 99; // 预置非 null，断言确实被写成了 null
-        var router = NewRouter(trigger: (a, d) => { action = a; delay = d; });
+        var router = NewRouter(trigger: d => delay = d);
 
         await router.HandleAsync(new CliCommand { Mode = CliCaptureMode.Region });
 
-        Assert.Equal(HotkeyAction.Region, action);
         Assert.Null(delay);
     }
 
@@ -81,16 +79,17 @@ public class CliRequestRouterTests
     }
 
     [Fact]
-    public async Task WindowCommand_TriggersInteractiveWindow()
+    public async Task WindowCommand_IsAliasOfInteractiveRegion()
     {
-        HotkeyAction? action = null;
-        var router = NewRouter(trigger: (a, _) => action = a);
+        // 统一交互：window ≡ region（无 geometry）——同一 overlay 的同义入口
+        var triggered = 0;
+        var router = NewRouter(trigger: _ => triggered++);
 
         var response = await router.HandleAsync(new CliCommand { Mode = CliCaptureMode.Window, DelaySeconds = 0 });
 
-        Assert.Equal(HotkeyAction.Window, action);
+        Assert.Equal(1, triggered);
         Assert.True(response.Ok);
-        Assert.Contains("Window", response.Message);
+        Assert.Contains("Interactive capture", response.Message);
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public class CliRequestRouterTests
         CliRequestRouter.InteractiveTriggerHandler? trigger = null,
         CliRequestRouter.HeadlessExecutorHandler? headless = null) => new(
         activate ?? (() => { }),
-        trigger ?? ((_, _) => { }),
+        trigger ?? (_ => { }),
         headless ?? ((_, _) => Task.FromResult(CliPipeResponse.Success("stub"))));
 }
 
@@ -188,10 +187,10 @@ public class CliPipeHostAssemblyTests
     public async Task HostWithRouter_ForwardedWindowCommand_TriggersInteractiveAndRespondsOk()
     {
         var pipeName = UniquePipeName();
-        var interactive = new List<HotkeyAction>();
+        var interactive = 0;
         var router = new CliRequestRouter(
             activate: () => { },
-            triggerInteractive: (action, _) => interactive.Add(action),
+            triggerInteractive: _ => interactive++,
             executeHeadless: (_, _) => Task.FromResult(CliPipeResponse.Success("unused")));
 
         using var host = new CliPipeServerHost(pipeName, (cmd, ct) => router.HandleAsync(cmd, ct));
@@ -203,7 +202,7 @@ public class CliPipeHostAssemblyTests
 
         Assert.True(result.Connected);
         Assert.Equal(0, result.ExitCode);
-        Assert.Equal([HotkeyAction.Window], interactive);
+        Assert.Equal(1, interactive);
     }
 
     [Fact]
@@ -211,10 +210,10 @@ public class CliPipeHostAssemblyTests
     {
         var pipeName = UniquePipeName();
         var activated = false;
-        var interactive = new List<HotkeyAction>();
+        var interactive = 0;
         var router = new CliRequestRouter(
             activate: () => activated = true,
-            triggerInteractive: (action, _) => interactive.Add(action),
+            triggerInteractive: _ => interactive++,
             executeHeadless: (_, _) => Task.FromResult(CliPipeResponse.Success("unused")));
 
         using var host = new CliPipeServerHost(pipeName, (cmd, ct) => router.HandleAsync(cmd, ct));
@@ -226,6 +225,6 @@ public class CliPipeHostAssemblyTests
         Assert.True(result.Connected);
         Assert.Equal(0, result.ExitCode);
         Assert.True(activated);
-        Assert.Empty(interactive);
+        Assert.Equal(0, interactive);
     }
 }

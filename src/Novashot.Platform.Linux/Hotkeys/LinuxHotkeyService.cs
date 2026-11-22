@@ -13,13 +13,12 @@ public sealed class LinuxHotkeyService : IHotkeyService
 {
     private readonly IXLibApi _api;
     private readonly ILogger<LinuxHotkeyService> _logger;
-    private readonly Dictionary<uint, HotkeyAction> _byKey = new(); // (keycode<<8|mods) → action 太粗，用 keycode+mods 精确键
-    private readonly Dictionary<(uint Keycode, uint Mods), HotkeyAction> _bindings = [];
+    private readonly Dictionary<(uint Keycode, uint Mods), byte> _bindings = [];
     private Thread? _pump;
     private CancellationTokenSource? _cts;
     private bool _started;
 
-    public event EventHandler<HotkeyAction>? HotkeyPressed;
+    public event EventHandler? HotkeyPressed;
 
     public LinuxHotkeyService(IXLibApi api, ILogger<LinuxHotkeyService> logger)
     {
@@ -48,55 +47,42 @@ public sealed class LinuxHotkeyService : IHotkeyService
         _logger.LogDebug("X11 hotkey pump started (event window 0x{Window:X})", window);
     }
 
-    public void RegisterAll(string fullscreen, string region, string window)
+    public void Register(string spec)
     {
         if (!_started)
-            throw new InvalidOperationException("Start() must be called before RegisterAll");
+            throw new InvalidOperationException("Start() must be called before Register");
 
-        // S-1（review I3）：会有多次 RegisterAll——先解上一轮的抓键，否则旧组合继续触发
+        // S-1（review I3）：会有多次 Register——先解上一轮的抓键，否则旧组合继续触发
         var eventWindow = _api.EventWindowHandle;
-        foreach (var (keycode, mods) in _bindings.Keys)
-            _api.UngrabKey(eventWindow, mods, keycode);
+        foreach (var (kc, m) in _bindings.Keys)
+            _api.UngrabKey(eventWindow, m, kc);
         _bindings.Clear();
 
-        var specs = new (string Spec, HotkeyAction Action)[]
+        // 失败记日志不抛（与 Win/Mac 同契约：热键注册失败不阻断启动，用户可在设置里改绑）
+        if (!HotkeyParser.TryParse(spec, out var mods, out var vk))
         {
-            (fullscreen, HotkeyAction.Fullscreen),
-            (region, HotkeyAction.Region),
-            (window, HotkeyAction.Window),
-        };
-
-        var failures = new List<string>();
-        foreach (var (spec, action) in specs)
-        {
-            if (!HotkeyParser.TryParse(spec, out var mods, out var vk))
-            {
-                failures.Add($"{spec} (parse failed)");
-                continue;
-            }
-            var keysym = XKeysymMapper.VkToKeysym(vk);
-            if (keysym is null)
-            {
-                failures.Add($"{spec} (no keysym for VK 0x{vk:X})");
-                continue;
-            }
-            var keycode = _api.KeycodeToKeysym(keysym.Value);
-            if (keycode == 0)
-            {
-                failures.Add($"{spec} (keysym 0x{keysym.Value:X} not on current keymap)");
-                continue;
-            }
-            if (!_api.GrabKey(_api.EventWindowHandle, mods, keycode))
-            {
-                failures.Add($"{spec} (XGrabKey failed — already grabbed by another app?)");
-                continue;
-            }
-            _bindings[(keycode, mods)] = action;
-            _logger.LogInformation("Hotkey registered: {Spec} → keycode {Keycode} mods {Mods:X}", spec, keycode, mods);
+            _logger.LogWarning("Invalid hotkey spec {Spec}", spec);
+            return;
         }
-
-        if (failures.Count > 0)
-            throw new InvalidOperationException("Some hotkeys failed to register: " + string.Join("; ", failures));
+        var keysym = XKeysymMapper.VkToKeysym(vk);
+        if (keysym is null)
+        {
+            _logger.LogWarning("No keysym for VK 0x{Vk:X}; skip hotkey '{Spec}'", vk, spec);
+            return;
+        }
+        var keycode = _api.KeycodeToKeysym(keysym.Value);
+        if (keycode == 0)
+        {
+            _logger.LogWarning("Keysym 0x{Keysym:X} not on current keymap; skip hotkey '{Spec}'", keysym.Value, spec);
+            return;
+        }
+        if (!_api.GrabKey(_api.EventWindowHandle, mods, keycode))
+        {
+            _logger.LogWarning("XGrabKey failed for '{Spec}' (already grabbed by another app?)", spec);
+            return;
+        }
+        _bindings[(keycode, mods)] = 0;
+        _logger.LogInformation("Capture hotkey registered: {Spec} → keycode {Keycode} mods {Mods:X}", spec, keycode, mods);
     }
 
     public void Stop()
@@ -134,12 +120,12 @@ public sealed class LinuxHotkeyService : IHotkeyService
 
             // NumLock(0x10)/CapsLock(0x2)/ScrollLock(0x80 在 mod3/mod5 外的 state 位) 掩掉再匹配
             var state = key.Modifiers & 0xFFu & ~(uint)(XLibNative.Mod2Mask | XLibNative.LockMask);
-            if (_bindings.TryGetValue((key.Keycode, state), out var action))
+            if (_bindings.ContainsKey((key.Keycode, state)))
             {
-                _logger.LogDebug("Hotkey fired: {Action}", action);
+                _logger.LogDebug("Capture hotkey fired");
                 try
                 {
-                    HotkeyPressed?.Invoke(this, action);
+                    HotkeyPressed?.Invoke(this, EventArgs.Empty);
                 }
                 catch (Exception ex)
                 {

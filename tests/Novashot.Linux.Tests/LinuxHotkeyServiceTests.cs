@@ -26,8 +26,8 @@ public class XKeysymMapperTests
 }
 
 /// <summary>
-/// XGrabKey 注册/分发：合法 spec 注册成功并记 bindings；解析失败聚合抛错；
-/// 事件泵 keycode+mods（NumLock/CapsLock 掩除）命中 → HotkeyPressed。
+/// XGrabKey 注册/分发：合法 spec 注册成功并记 bindings；非法 spec 记日志不抛（与 Win/Mac 同契约）；
+/// 事件泵 keycode+mods（NumLock/CapsLock 掩除）命中 → HotkeyPressed（统一截图热键，无动作负载）。
 /// </summary>
 public class LinuxHotkeyServiceTests
 {
@@ -40,80 +40,78 @@ public class LinuxHotkeyServiceTests
     }
 
     [Fact]
-    public void RegisterAll_GrabsKeysAndStoresBindings()
+    public void Register_GrabsKeyAndStoresBinding()
     {
         var (svc, api) = Make();
         svc.Start();
         // PrintScreen=0x2C → keysym 0xFF61；测试 keymap: 0xFF61 → keycode 107
         api.KeysymToKeycode[0xFF61] = 107;
 
-        svc.RegisterAll("PrintScreen", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+        svc.Register("PrintScreen");
 
-        Assert.Equal(3, api.GrabbedKeys.Count);
-        Assert.All(api.GrabbedKeys, g => Assert.Equal(107u, g.Keycode));
-        Assert.Equal((uint)0, api.GrabbedKeys[0].Modifiers);
-        Assert.Equal((uint)0x2, api.GrabbedKeys[1].Modifiers);  // ControlMask
-        Assert.Equal((uint)0x6, api.GrabbedKeys[2].Modifiers);  // Ctrl+Shift
+        var grab = Assert.Single(api.GrabbedKeys);
+        Assert.Equal(107u, grab.Keycode);
+        Assert.Equal((uint)0, grab.Modifiers);
         svc.Dispose();
     }
 
     [Fact]
-    public void RegisterAll_UnparseableSpec_AggregatesFailure()
+    public void Register_UnparseableSpec_LogsAndSkips_NoThrow()
     {
         var (svc, api) = Make();
         svc.Start();
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            svc.RegisterAll("F13", "Ctrl+PrintScreen", "Bad+Spec+Here"));
-        Assert.Contains("parse failed", ex.Message);
+
+        svc.Register("Bad+Spec+Here"); // 契约：记日志不抛，不抓键
+
+        Assert.Empty(api.GrabbedKeys);
         svc.Dispose();
     }
 
     [Fact]
-    public void RegisterAll_BeforeStart_Throws()
+    public void Register_BeforeStart_Throws()
     {
         var (svc, _) = Make();
-        Assert.Throws<InvalidOperationException>(() => svc.RegisterAll("PrintScreen", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen"));
+        Assert.Throws<InvalidOperationException>(() => svc.Register("PrintScreen"));
         svc.Dispose();
     }
 
     [Fact]
-    public async Task Pump_DispatchesHotkeyAction_IgnoringNumLockCapsLock()
+    public async Task Pump_DispatchesHotkey_IgnoringNumLockCapsLock()
     {
         var (svc, api) = Make();
         svc.Start();
         api.KeysymToKeycode[0xFF61] = 107;
-        svc.RegisterAll("PrintScreen", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+        svc.Register("PrintScreen");
 
-        var received = new TaskCompletionSource<HotkeyAction>(TaskCreationOptions.None);
-        svc.HotkeyPressed += (_, a) => received.TrySetResult(a);
+        var received = new TaskCompletionSource<bool>(TaskCreationOptions.None);
+        svc.HotkeyPressed += (_, _) => received.TrySetResult(true);
 
         // XEvent state 带 NumLock(0x10) 位——应被掩掉仍命中
         api.EmitKeyEvent(107, 0x10);
 
-        var action = await received.Task.WaitAsync(TimeSpan.FromSeconds(3));
-        Assert.Equal(HotkeyAction.Fullscreen, action);
+        await received.Task.WaitAsync(TimeSpan.FromSeconds(3));
         svc.Dispose();
     }
 
 /// <summary>
-/// S-1（review I3）：设置保存会二次 RegisterAll——必须先解上一轮 XGrabKey，
+/// S-1（review I3）：设置保存会二次 Register——必须先解上一轮 XGrabKey，
 /// 否则旧组合继续触发（重复截图 + 全局吞键到进程退出）。
 /// </summary>
 [Fact]
-public void RegisterAll_Twice_UngrabsPreviousBindings()
+public void Register_Twice_UngrabsPreviousBindings()
 {
     var (svc, api) = Make();
     svc.Start();
     api.KeysymToKeycode[0xFF61] = 107;
 
-    svc.RegisterAll("PrintScreen", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+    svc.Register("PrintScreen");
     var grabsAfterFirst = api.GrabbedKeys.Count;
 
     api.KeysymToKeycode[0xFFC6] = 115; // XK_F9 也要在 fake keymap 里
-    svc.RegisterAll("F9", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+    svc.Register("F9");
 
     Assert.True(api.UngrabbedKeys.Count >= grabsAfterFirst,
-        $"第二次 RegisterAll 必须先解上一轮 {grabsAfterFirst} 个抓键，实际解了 {api.UngrabbedKeys.Count}");
+        $"第二次 Register 必须先解上一轮 {grabsAfterFirst} 个抓键，实际解了 {api.UngrabbedKeys.Count}");
     Assert.All(api.UngrabbedKeys, u => Assert.Equal(107u, u.Keycode));
     svc.Dispose();
 }

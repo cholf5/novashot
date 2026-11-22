@@ -25,9 +25,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly IAutostartService _autostart;
 
     // —— 热键 ——
-    [ObservableProperty] private string _hotkeyFullscreen = "";
-    [ObservableProperty] private string _hotkeyRegion = "";
-    [ObservableProperty] private string _hotkeyWindow = "";
+    [ObservableProperty] private string _hotkeyCapture = "";
 
     // —— 常规 ——
     [ObservableProperty] private bool _launchOnStartup;
@@ -94,9 +92,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private void LoadFromConfig()
     {
         var c = _store.Current;
-        HotkeyFullscreen = c.Hotkeys.Fullscreen;
-        HotkeyRegion = c.Hotkeys.Region;
-        HotkeyWindow = c.Hotkeys.Window;
+        HotkeyCapture = c.Hotkeys.Capture;
         LaunchOnStartup = c.Startup.LaunchOnStartup;
         MinimizeToTray = c.Startup.MinimizeToTray;
         CloseToTray = c.Startup.CloseToTray;
@@ -168,9 +164,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         _store.Update(c =>
         {
-            c.Hotkeys.Fullscreen = HotkeyFullscreen.Trim();
-            c.Hotkeys.Region = HotkeyRegion.Trim();
-            c.Hotkeys.Window = HotkeyWindow.Trim();
+            c.Hotkeys.Capture = HotkeyCapture.Trim();
             c.Startup.LaunchOnStartup = LaunchOnStartup;
             c.Startup.MinimizeToTray = MinimizeToTray;
             c.Startup.CloseToTray = CloseToTray;
@@ -211,19 +205,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         return true;
     }
 
-    /// <summary>三条热键各自可解析且 (modifiers, vk) 互异；失败返回对应的提示 key。</summary>
+    /// <summary>截图热键可解析即可（意图唯一，无互异问题）；失败返回提示 key。</summary>
     private string? ValidateHotkeys()
     {
-        var parsed = new List<(uint mods, uint vk)>(3);
-        foreach (var spec in new[] { HotkeyFullscreen, HotkeyRegion, HotkeyWindow })
-        {
-            if (string.IsNullOrWhiteSpace(spec) || !HotkeyParser.TryParse(spec, out var mods, out var vk))
-                return "Settings.Hint.HotkeyInvalid";
-            if (parsed.Contains((mods, vk)))
-                return "Settings.Hint.HotkeyDuplicate";
-            parsed.Add((mods, vk));
-        }
-
+        if (string.IsNullOrWhiteSpace(HotkeyCapture) || !HotkeyParser.TryParse(HotkeyCapture, out _, out _))
+            return "Settings.Hint.HotkeyInvalid";
         return null;
     }
 

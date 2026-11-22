@@ -43,7 +43,7 @@ public partial class App : Application
     private const int CountdownToCaptureGapMs = 250;
 
     /// <summary>D-1 触发来源：热键在倒计时期间 = 取消本轮（验收「可取消」）；托盘/启动器 = 取消旧轮按新意图处理。</summary>
-    private enum CaptureTriggerSource { Hotkey, Tray, Launcher }
+    private enum CaptureTriggerSource { Hotkey, Tray } // Launcher 已随统一交互退役
 
     public override void Initialize()
     {
@@ -154,34 +154,23 @@ public partial class App : Application
 
         menu.Add(new NativeMenuItemSeparator());
 
-        var fullscreenItem = new NativeMenuItem(L("Tray.CaptureFullscreen"));
-        fullscreenItem.Click += async (_, _) => await TriggerCaptureAsync(HotkeyAction.Fullscreen, CaptureTriggerSource.Tray);
-        menu.Add(fullscreenItem);
+        // 统一交互（2026-11-23 第二轮）：唯一「截图」入口——打开 overlay，拖拽=区域、
+        // 悬停点击=窗口、空白点击=该屏全屏
+        var captureItem = new NativeMenuItem(L("Tray.Capture"));
+        captureItem.Click += async (_, _) => await TriggerCaptureAsync(CaptureTriggerSource.Tray);
+        menu.Add(captureItem);
 
-        var regionItem = new NativeMenuItem(L("Tray.CaptureRegion"));
-        regionItem.Click += async (_, _) => await TriggerCaptureAsync(HotkeyAction.Region, CaptureTriggerSource.Tray);
-        menu.Add(regionItem);
-
-        var windowItem = new NativeMenuItem(L("Tray.CaptureWindow"));
-        windowItem.Click += async (_, _) => await TriggerCaptureAsync(HotkeyAction.Window, CaptureTriggerSource.Tray);
-        menu.Add(windowItem);
-
-        // D-1：延时截图子菜单（走全屏模式；倒计时期间再点 = 取消旧轮重启新倒计时）
+        // D-1：延时截图子菜单（倒计时期间再点 = 取消旧轮重启新倒计时）
         var delayedMenu = new NativeMenu();
         foreach (var seconds in new[] { 3, 5 })
         {
             var delayedItem = new NativeMenuItem(L(seconds == 3 ? "Tray.DelayedCapture.3s" : "Tray.DelayedCapture.5s"));
             var delay = seconds;
             delayedItem.Click += async (_, _) =>
-                await TriggerCaptureAsync(HotkeyAction.Fullscreen, CaptureTriggerSource.Tray, delay);
+                await TriggerCaptureAsync(CaptureTriggerSource.Tray, delay);
             delayedMenu.Add(delayedItem);
         }
         menu.Add(new NativeMenuItem(L("Tray.DelayedCapture")) { Menu = delayedMenu });
-
-        // G-26：Capture Launcher（flameshot 式独立启动器窗口）
-        var launcherItem = new NativeMenuItem(L("Tray.CaptureLauncher"));
-        launcherItem.Click += (_, _) => Dispatcher.UIThread.Post(ShowCaptureLauncher);
-        menu.Add(launcherItem);
 
         menu.Add(new NativeMenuItemSeparator());
 
@@ -236,7 +225,7 @@ public partial class App : Application
     private void SetupHotkeys(HotkeyConfig cfg)
     {
         _hotkeys = AppServices.GetRequiredService<IHotkeyService>();
-        _hotkeys.HotkeyPressed += async (_, action) => await TriggerCaptureAsync(action);
+        _hotkeys.HotkeyPressed += async (_, _) => await TriggerCaptureAsync();
         try
         {
             _hotkeys.Start();
@@ -256,8 +245,8 @@ public partial class App : Application
         if (cfg.SameSpecsAs(_lastHotkeys)) return; // 未变不重注册：Windows 泵侧重注册有真实成本，只在真变更时走
         try
         {
-            _hotkeys.RegisterAll(cfg.Fullscreen, cfg.Region, cfg.Window);
-            _lastHotkeys = new HotkeyConfig { Fullscreen = cfg.Fullscreen, Region = cfg.Region, Window = cfg.Window };
+            _hotkeys.Register(cfg.Capture);
+            _lastHotkeys = new HotkeyConfig { Capture = cfg.Capture };
         }
         catch (Exception ex)
         {
@@ -278,15 +267,14 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// D-1 咽喉点：全部捕获触发（热键 / 托盘 / Capture Launcher）都汇到这里。
-    /// 延时解析：显式 delaySeconds（托盘延时子项、Launcher）优先，否则取 config 默认（钳制后）。
+    /// D-1 咽喉点：全部捕获触发（热键 / 托盘）都汇到这里——意图唯一（打开统一 overlay）。
+    /// 延时解析：显式 delaySeconds（托盘延时子项）优先，否则取 config 默认（钳制后）。
     /// 倒计时语义：进行中再触发——热键 = 取消本轮不启动新一轮（验收「可取消」）；
-    /// 托盘/启动器 = 取消旧轮 + 按新意图处理（延时刻意选 0 的 Launcher 会直接抓帧）。
+    /// 托盘 = 取消旧轮 + 按新延时处理。
     /// </summary>
-    private async Task TriggerCaptureAsync(HotkeyAction action,
+    private async Task TriggerCaptureAsync(
         CaptureTriggerSource source = CaptureTriggerSource.Hotkey,
-        int? delaySeconds = null,
-        PixelRect? region = null)
+        int? delaySeconds = null)
     {
         if (_mainWindow == null) return;
         await Dispatcher.UIThread.InvokeAsync(async () =>
@@ -312,40 +300,12 @@ public partial class App : Application
 
             if (delay > 0)
             {
-                EnsureCountdown().Start(new CaptureIntent(action, region), delay);
+                EnsureCountdown().Start(new CaptureIntent(), delay);
                 return;
             }
 
-            await DispatchCaptureAsync(action, region);
+            await _mainWindow.CaptureRegionAsync();
         });
-    }
-
-    /// <summary>G-26：Capture Launcher「开始截图」入口（窗口已自关，含关窗 200ms 防残影）。</summary>
-    public Task LaunchCaptureAsync(bool fullscreen, PixelRect? region, int delaySeconds)
-        => TriggerCaptureAsync(
-            fullscreen ? HotkeyAction.Fullscreen : HotkeyAction.Region,
-            CaptureTriggerSource.Launcher,
-            delaySeconds,
-            region);
-
-    /// <summary>按模式分发到 MainWindow 的既有捕获流程（region 仅在 Region 模式下由 Launcher 预置）。</summary>
-    private async Task DispatchCaptureAsync(HotkeyAction action, PixelRect? region)
-    {
-        if (_mainWindow == null) return;
-        switch (action)
-        {
-            case HotkeyAction.Fullscreen:
-                await _mainWindow.CaptureFullscreenAsync();
-                break;
-            case HotkeyAction.Region:
-                await (region is { } r
-                    ? _mainWindow.CapturePresetRegionAsync(r)
-                    : _mainWindow.CaptureRegionAsync());
-                break;
-            case HotkeyAction.Window:
-                await _mainWindow.CaptureWindowAsync();
-                break;
-        }
     }
 
     // ---- D-1：倒计时编排 + 角标窗（App 只做线程 marshal 与 UI；pending/轮次/settle 裁决都在 Core Orchestrator） ----
@@ -361,7 +321,7 @@ public partial class App : Application
         var countdown = new DelayedCaptureCountdown(CountdownScheduler.Instance);
         var orchestrator = new CountdownOrchestrator<CaptureIntent>(
             countdown,
-            intent => _ = DispatchCaptureAsync(intent.Action, intent.Region),
+            intent => { _ = _mainWindow!.CaptureRegionAsync(); }, // _mainWindow 在 TriggerCaptureAsync 入口已判空才会建轮次
             settleDelay: TimeSpan.FromMilliseconds(CountdownToCaptureGapMs),
             onStarted: ShowCountdownBadge,
             onTick: remainingSeconds =>
@@ -390,21 +350,7 @@ public partial class App : Application
         _countdownBadge = null;
     }
 
-    // ---- G-26：Capture Launcher 窗口（单实例） ----
-
-    private CaptureLauncherWindow? _launcherWindow;
-
-    private void ShowCaptureLauncher()
-    {
-        if (_launcherWindow is { } existing)
-        {
-            existing.Activate();
-            return;
-        }
-        _launcherWindow = new CaptureLauncherWindow();
-        _launcherWindow.Closed += (_, _) => _launcherWindow = null;
-        _launcherWindow.Show();
-    }
+    // ---- G-26：Capture Launcher 已随统一交互退役（2026-11-23 第二轮），窗口与托盘入口一并删除 ----
 
     private void Shutdown()
     {
@@ -437,8 +383,8 @@ public partial class App : Application
     /// </summary>
     private CliRequestRouter BuildCliPipeRouter() => new(
         activate: ShowMainWindow,
-        triggerInteractive: (action, delaySeconds) =>
-            _ = TriggerCaptureAsync(action, CaptureTriggerSource.Tray, delaySeconds),
+        triggerInteractive: delaySeconds =>
+            _ = TriggerCaptureAsync(CaptureTriggerSource.Tray, delaySeconds),
         executeHeadless: async (command, ct) =>
         {
             try
@@ -470,5 +416,6 @@ public partial class App : Application
     }
 }
 
-/// <summary>D-1：一轮延时捕获的意图（绑定轮次号挂在 Core CountdownOrchestrator 上，C-1 裁决用）。</summary>
-internal readonly record struct CaptureIntent(HotkeyAction Action, PixelRect? Region);
+/// <summary>D-1：一轮延时捕获的意图（绑定轮次号挂在 Core CountdownOrchestrator 上，C-1 裁决用）。
+/// 统一交互后意图唯一（打开 overlay），仅作轮次标记载体。</summary>
+internal readonly record struct CaptureIntent;

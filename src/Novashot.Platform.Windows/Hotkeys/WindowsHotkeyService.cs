@@ -18,9 +18,9 @@ public sealed class WindowsHotkeyService : IHotkeyService
     private const uint WM_APP_QUIT = 0x8003;
 
     private readonly ILogger<WindowsHotkeyService> _logger;
-    private readonly ConcurrentDictionary<int, HotkeyAction> _idToAction = new();
+    private readonly ConcurrentDictionary<int, byte> _pendingIds = new();
     // 仅泵线程（WndProc）读写：真正拿到 OS 注册成功的 id 集合。
-    // C1（review 2026-11-02）：解绑必须以此为准——_idToAction 在调用线程被 Clear/重建，
+    // C1（review 2026-11-02）：解绑必须以此为准——_pendingIds 在调用线程被 Clear/重建，
     // 泵侧若按它解绑会把旧注册永久留在 OS 里，新 RegisterHotKey 全部撞 "already registered"。
     private readonly HashSet<int> _registeredIds = new();
     private readonly SynchronizationContext? _syncContext;
@@ -30,7 +30,7 @@ public sealed class WindowsHotkeyService : IHotkeyService
     private int _nextId = 1;
     private volatile bool _running;
 
-    public event EventHandler<HotkeyAction>? HotkeyPressed;
+    public event EventHandler? HotkeyPressed;
 
     public WindowsHotkeyService(ILogger<WindowsHotkeyService> logger)
     {
@@ -65,28 +65,21 @@ public sealed class WindowsHotkeyService : IHotkeyService
         _hwnd = nint.Zero;
     }
 
-    public void RegisterAll(string fullscreen, string region, string window)
+    public void Register(string spec)
     {
         if (!_running) throw new InvalidOperationException("Service not started");
 
-        // 先解绑全部
+        // 先解绑全部（统一交互单热键：重注册即整体换绑）
         User32.PostMessageW(_hwnd, WM_APP_UNREGISTER_ALL, 0, 0);
-        _idToAction.Clear();
+        _pendingIds.Clear();
 
-        RegisterOne(HotkeyAction.Fullscreen, fullscreen);
-        RegisterOne(HotkeyAction.Region, region);
-        RegisterOne(HotkeyAction.Window, window);
-    }
-
-    private void RegisterOne(HotkeyAction action, string spec)
-    {
         if (!HotkeyParser.TryParse(spec, out var mods, out var vk))
         {
-            _logger.LogWarning("Invalid hotkey spec {Spec} for {Action}", spec, action);
+            _logger.LogWarning("Invalid hotkey spec {Spec}", spec);
             return;
         }
         var id = Interlocked.Increment(ref _nextId);
-        _idToAction[id] = action;
+        _pendingIds[id] = 0;
         // 消息线程中调用 RegisterHotKey，避免 hwnd 所有权跨线程
         User32.PostMessageW(_hwnd, WM_APP_REGISTER, id, (nint)((long)vk << 32 | mods));
     }
@@ -156,8 +149,7 @@ public sealed class WindowsHotkeyService : IHotkeyService
         switch (msg)
         {
             case User32.WM_HOTKEY:
-                if (_idToAction.TryGetValue((int)wParam, out var action))
-                    RaiseHotkey(action);
+                RaiseHotkey();
                 return 0;
 
             case WM_APP_REGISTER:
@@ -170,7 +162,7 @@ public sealed class WindowsHotkeyService : IHotkeyService
                     {
                         _logger.LogWarning("RegisterHotKey failed id={Id} mods={Mods:X} vk={Vk:X} err={Err}",
                             id, mods, vk, Marshal.GetLastWin32Error());
-                        _idToAction.TryRemove(id, out _);
+                        _pendingIds.TryRemove(id, out _);
                     }
                     else
                     {
@@ -197,16 +189,16 @@ public sealed class WindowsHotkeyService : IHotkeyService
         return User32.DefWindowProcW(hWnd, msg, wParam, lParam);
     }
 
-    private void RaiseHotkey(HotkeyAction action)
+    private void RaiseHotkey()
     {
-        _logger.LogInformation("Hotkey pressed: {Action}", action);
+        _logger.LogInformation("Capture hotkey pressed");
         if (_syncContext != null)
         {
-            _syncContext.Post(_ => HotkeyPressed?.Invoke(this, action), null);
+            _syncContext.Post(_ => HotkeyPressed?.Invoke(this, EventArgs.Empty), null);
         }
         else
         {
-            HotkeyPressed?.Invoke(this, action);
+            HotkeyPressed?.Invoke(this, EventArgs.Empty);
         }
     }
 

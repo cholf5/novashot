@@ -1,6 +1,5 @@
 using Novashot.Core.Capture;
 using Novashot.Core.Cli;
-using Novashot.Core.Hotkeys;
 
 namespace Novashot.App.Cli;
 
@@ -10,8 +9,8 @@ namespace Novashot.App.Cli;
 /// headless 分支在管道连接的后台线程直接跑 <see cref="CliCaptureExecutor"/>（无 GUI 闪现）。
 /// 分发语义（PM 裁决）：
 /// - gui → activate（主窗口 Show+Activate，单实例对齐 winshot）；
-/// - region 缺 geometry / window → 触发 GUI 统一交互捕获流程（拖拽=区域、悬停点击=吸附窗口，
-///   含 --delay 倒计时），立即回「已启动」；
+/// - region 缺 geometry / window（≡ region 同义别名）→ 触发 GUI 统一交互捕获流程
+///   （拖拽=区域、悬停点击=窗口、空白点击=全屏，含 --delay 倒计时），立即回「已启动」；
 /// - full / region+geometry → 同一个 headless 导出执行器，等结果回传（CLI 退出码 = 执行结果）。
 /// </summary>
 public sealed class CliRequestRouter
@@ -19,8 +18,8 @@ public sealed class CliRequestRouter
     /// <summary>激活主窗口（App 注入 ShowMainWindow；其内部自行 Post UI 线程）。</summary>
     public delegate void ActivateHandler();
 
-    /// <summary>交互捕获触发（App 注入 TriggerCaptureAsync；action 仅 Region/Window，delaySeconds=null = CLI 省略 --delay → 走 config 默认，终审 I-1 转发 ≡ 本地触发）。</summary>
-    public delegate void InteractiveTriggerHandler(HotkeyAction action, int? delaySeconds);
+    /// <summary>交互捕获触发（App 注入 TriggerCaptureAsync；意图唯一，delaySeconds=null = CLI 省略 --delay → 走 config 默认，终审 I-1 转发 ≡ 本地触发）。</summary>
+    public delegate void InteractiveTriggerHandler(int? delaySeconds);
 
     /// <summary>headless 导出（App 注入 DI 构造的 CliCaptureExecutor 执行）。</summary>
     public delegate Task<CliPipeResponse> HeadlessExecutorHandler(CliCommand command, CancellationToken ct);
@@ -48,12 +47,10 @@ public sealed class CliRequestRouter
                 return CliPipeResponse.Success("Novashot window activated.");
 
             case CliCaptureMode.Region when command.Geometry is null:
-                _triggerInteractive(HotkeyAction.Region, command.DelaySeconds);
-                return CliPipeResponse.Success("Region selection started in the running Novashot instance.");
-
             case CliCaptureMode.Window:
-                _triggerInteractive(HotkeyAction.Window, command.DelaySeconds);
-                return CliPipeResponse.Success("Window capture started in the running Novashot instance.");
+                // 统一交互：region（无 geometry）与 window 是同一 overlay 的同义入口（flameshot 兼容保留双 token）
+                _triggerInteractive(command.DelaySeconds);
+                return CliPipeResponse.Success("Interactive capture started in the running Novashot instance.");
 
             default:
                 // 防御：handler 故障也以响应形式回传（App 注入的执行 lambda 自带 catch，这里兜底保证「分发不抛」）

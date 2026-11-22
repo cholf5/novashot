@@ -27,16 +27,12 @@ public sealed class NovashotConfig
 
 public sealed class HotkeyConfig
 {
-    public string Fullscreen { get; set; } = "PrintScreen";
-    public string Region { get; set; } = "Ctrl+PrintScreen";
-    public string Window { get; set; } = "Ctrl+Shift+PrintScreen";
+    /// <summary>截图热键（统一交互唯一热键：打开 overlay，拖拽=区域、悬停点击=窗口、空白点击=全屏）。</summary>
+    public string Capture { get; set; } = "PrintScreen";
 
-    /// <summary>三条规格（逐字）是否相同。App 层用它跳过无变化的重注册（任何 store.Update 都会触发 Changed）。</summary>
+    /// <summary>规格（逐字）是否相同。App 层用它跳过无变化的重注册（任何 store.Update 都会触发 Changed）。</summary>
     public bool SameSpecsAs(HotkeyConfig? other)
-        => other is not null
-           && Fullscreen == other.Fullscreen
-           && Region == other.Region
-           && Window == other.Window;
+        => other is not null && Capture == other.Capture;
 }
 
 public sealed class StartupConfig

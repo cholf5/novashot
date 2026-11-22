@@ -64,8 +64,7 @@ public class SettingsWindowXamlTests
         await session.Dispatch(() =>
         {
             var w = CreateWindow();
-            foreach (var n in new[] { "RecordFullscreen", "RecordRegion", "RecordWindow" })
-                Assert.NotNull(w.FindControl<Button>(n));
+            Assert.NotNull(w.FindControl<Button>("RecordCapture")); // 统一交互：单热键单录制行
             foreach (var n in new[] { "LangSystem", "LangEn", "LangZh" })
                 Assert.NotNull(w.FindControl<RadioButton>(n));
             w.Close();
@@ -83,7 +82,7 @@ public class SettingsWindowXamlTests
             Assert.True(w.FindControl<ScrollViewer>("GeneralHost")!.IsVisible);
             Assert.False(w.FindControl<ScrollViewer>("HotkeysHost")!.IsVisible);
             // 录制按钮显示当前草稿热键串
-            var record = w.FindControl<Button>("RecordFullscreen")!;
+            var record = w.FindControl<Button>("RecordCapture")!;
             Assert.Equal("PrintScreen", (record.Content as string) ?? string.Empty);
             w.Close();
         }, CancellationToken.None);

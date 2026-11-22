@@ -32,12 +32,11 @@ public static class CliArgs
           gui       Launch the GUI tray app (default with no arguments).
                     If an instance is already running, bring its window to front and exit.
           full      Capture the entire virtual desktop and export headlessly (no GUI).
-          region    Capture a rectangle. Headless use requires --geometry X,Y,W/H (physical pixels,
-                    virtual-desktop coordinates); without it, a running GUI instance opens the
-                    region selection overlay, otherwise the command fails.
-          window    Capture a window. With a running GUI instance the interactive capture overlay
-                    is opened (hover a window and click to snap it, or drag for a region);
-                    without one the command fails (no GUI is started).
+          region    Interactive capture with a running GUI instance (drag for a region, hover and
+                    click for a window, click empty desktop for full screen); headless use
+                    requires --geometry X,Y,W/H (physical pixels, virtual-desktop coordinates).
+          window    Alias of region (kept for flameshot compatibility): opens the same
+                    interactive overlay. Without a running GUI instance the command fails.
 
         Options:
           -d, --delay <seconds>          Wait before capturing. 0-60, clamped. Default 0.

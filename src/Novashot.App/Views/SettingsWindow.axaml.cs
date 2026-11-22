@@ -83,9 +83,7 @@ public partial class SettingsWindow : Window
         if (sender is not Button { Name: var name }) return;
         var setter = name switch
         {
-            "RecordFullscreen" => (Action<string>)(v => _vm.HotkeyFullscreen = v),
-            "RecordRegion" => v => _vm.HotkeyRegion = v,
-            "RecordWindow" => v => _vm.HotkeyWindow = v,
+            "RecordCapture" => (Action<string>)(v => _vm.HotkeyCapture = v),
             _ => throw new InvalidOperationException($"Unknown hotkey record target: {name}"),
         };
 

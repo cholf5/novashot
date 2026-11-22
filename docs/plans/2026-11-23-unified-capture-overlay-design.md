@@ -1,6 +1,6 @@
 # 统一截图交互：拖拽 = 区域，悬停点击 = 窗口吸附
 
-日期：2026-11-23（brainstorming 定稿）
+日期：2026-11-23（brainstorming 定稿）；2026-11-23 第二轮：意图收敛（见文末）
 状态：设计已逐节确认
 
 ## 背景与目标
@@ -74,3 +74,49 @@
 - 不做 PrintWindow 黑图检测。
 - 不改 `SelectionSession` 权威选框语义；不改 CLI `full` headless 路径与 `region --geometry` headless 路径。
 - 不新增图层/模式切换 UI——交互只有一种。
+
+---
+
+# 第二轮（2026-11-23）：意图收敛——交互只剩一个，全屏变成吸附行为
+
+第一轮落地后 Region/Window 在 7 个层面仍是分身（枚举/配置/设置页/托盘/首页卡片/CLI token/
+倒计时意图）。第二轮把「意图」也统一，用户裁决：
+
+- **Fullscreen 意图删除**：悬停空白桌面 = 该屏全屏吸附预览，点击 = 截该屏全屏
+  （「全屏」单位 = 显示器，与旧 Enter 回退「本屏整屏」同口径；虚拟桌面 union 跨混合
+  缩放屏没有合理高亮形状）。
+- **CLI `full` headless 保留**：脚本化路径、无 GUI、非「交互」范畴。
+- **CaptureLauncherWindow 整个退役（选项 B）**：统一交互 + 托盘延时子项已覆盖其场景。
+
+## 交互层（overlay）
+
+- 指针未命中窗口时（无选框、手势 Idle）：该屏整屏亮吸附预览（整屏边框 + 物理 W×H 标签，
+  `SnapPreviewRect = 本屏 bounds`，暗化/边框/标签与窗口预览共用视觉，渲染零新分支）。
+- 点击确认（无冻结候选）= `Region(本屏物理 bounds)`；Enter 优先级：悬停窗口 → 窗口，
+  否则 → 指针所在屏全屏。拖拽 = 区域，Esc 链 / 取色互斥 / 冻结候选不变。
+- hint：「拖拽选区域 · 点击截取窗口 / 全屏」。
+
+## 意图收敛
+
+- `HotkeyAction` 枚举删除；`IHotkeyService` → `event EventHandler? HotkeyPressed`（无参）
+  + `Register(string spec)`；Windows/Mac/Linux 三个实现同步简化。
+- `HotkeyConfig` 收为单键 `Capture`（默认 PrintScreen）；旧 JSON 字段反序列化天然忽略
+  （0.1.0 未发布，无迁移负担）。
+- 设置页热键三行 → 一行；托盘「区域/窗口」合一（延时子项挂其下）、托盘「截图启动器」项删；
+  主窗口截图页四卡 → 两卡（截图 / 粘贴图片）；`CaptureFullscreenAsync` /
+  `CaptureWindowAsync` / `CapturePresetRegionAsync`（launcher 独占消费者）删除。
+- 倒计时 `CaptureIntent` 收为空结构（意图唯一）；`DispatchCaptureAsync` switch 消失。
+- `ICaptureService.CaptureFullscreen` Core API 保留（CLI `full` headless 消费者）。
+- CLI：`window` ≡ `region`（无 geometry）→ 统一 overlay，token 双保留（flameshot 兼容）；
+  `full` / `region --geometry` headless 不动。
+
+## 第二轮验证（2026-11-23）
+
+- 构建 0 error 0 warning；Core 802/802 ✓；App windows TFM 231/231 ✓、net10.0 225/225 ✓；
+  OverlaySnap 11/11 ✓。
+- Mac 27 败 / Linux 1 败：与干净 main 基线逐字一致（Windows 宿主预存平台语义）。
+- 已知预存 flake：HeadlessUnitTestSession.Dispose 偶发 NRE（受害测试随机轮换，断言本体
+  均通过），与第一轮基线结论相同。
+- 快照目检：主窗口两卡（截图 / 粘贴图片）+ 新 lede/hint 文案上屏；40-launcher.png 随
+  launcher 退役移除。
+- 审查：P0/P1 = 0；P2 一处（Mac 热键 ID 魔法数两处硬编码）当场修复为类级共用常量。

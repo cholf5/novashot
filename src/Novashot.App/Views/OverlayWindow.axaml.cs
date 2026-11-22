@@ -27,9 +27,11 @@ namespace Novashot.App.Views;
 /// M3-1：FloatingToolRing 悬浮工具环，跟随选框（跨屏时只显示在选框中心所在屏）
 /// E-1 M9：C 进/出取色模式（<see cref="ColorMagnifier"/>）；点击 = 复制 HEX + 记会话历史 +
 ///         抛 <see cref="StrokePicked"/>（外层经 StylePanel 路径写入描边色）+ 回选框
-/// 统一吸附交互（2026-11-23 设计）：未拖动时悬停顶层窗口自动高亮（SnapHitTester 命中，
-///         预览写回 adorner 渲染）；原地释放 = 确认该窗口（OverlayCaptureResult.WindowCapture），
-///         拖拽 = 既有区域路径。吸附只在无选框状态激活；多屏 N 实例共享同一份窗口缓存。
+/// 统一吸附交互（2026-11-23 设计，第二轮意图收敛）：未拖动时悬停顶层窗口自动高亮
+///         （SnapHitTester 命中，预览写回 adorner 渲染），空白桌面 = 该屏全屏吸附预览；
+///         原地释放 = 确认悬停窗口（OverlayCaptureResult.WindowCapture）或该屏全屏
+///         （Region(display bounds)），拖拽 = 既有区域路径。吸附只在无选框状态激活；
+///         多屏 N 实例共享同一份窗口缓存。
 /// </summary>
 public partial class OverlayWindow : Window
 {
@@ -164,7 +166,7 @@ public partial class OverlayWindow : Window
             _adorner.SelectionRect = _session.SelectionInFrame(_display.Index);
         // 统一吸附：出现权威选框即退出吸附预览（吸附只在无选框状态激活）
         if (_session.ConfirmRegion() is not null)
-            SetSnapPreview(null);
+            ClearSnapPreview();
         UpdateRingPosition();
     }
 
@@ -261,15 +263,17 @@ public partial class OverlayWindow : Window
         if (_snapGesture.MarkDragIfBeyond(phys.X, phys.Y))
         {
             _pressedWindow = null; // 实质拖拽：候选作废，交还区域路径（Session 正在建框）
-            SetSnapPreview(null);
+            ClearSnapPreview();
             return;
         }
 
-        // 悬停刷新：只在无选框、未按下时（按下期间的预览是冻结候选，不跟指针走）
+        // 悬停刷新：只在无选框、未按下时（按下期间的预览是冻结候选，不跟指针走）。
+        // 窗口命中 → 窗口预览；空白（未命中）→ 该屏全屏吸附预览（统一交互第二轮）
         if (_snapGesture.CurrentPhase == SnapGesture.Phase.Idle && _session.ConfirmRegion() is null)
         {
             _hoverWindow = SnapHitTester.Hit(_snapWindows, phys.X, phys.Y);
-            SetSnapPreview(_hoverWindow);
+            if (_hoverWindow is { } hit) SetSnapPreview(hit);
+            else SetDisplaySnapPreview();
         }
     }
 
@@ -280,10 +284,20 @@ public partial class OverlayWindow : Window
         var candidate = _pressedWindow;
         _pressedWindow = null;
 
-        // 点击（未越阈）且有冻结候选 → 确认窗口。有选框的按压没进手势（wasClick=false），
-        // 拖拽越阈候选已作废（candidate=null）——两类结局在此天然互斥。
-        if (wasClick && candidate is not null)
-            ConfirmWindow(candidate);
+        // 点击（未越阈）：有冻结候选 → 确认窗口；无（空白悬停）→ 该屏全屏。
+        // 有选框的按压没进手势（wasClick=false），拖拽越阈候选已作废——结局互斥不变。
+        if (!wasClick) return;
+        if (candidate is not null) ConfirmWindow(candidate);
+        else ConfirmDisplay();
+    }
+
+    /// <summary>空白悬停的确认产出：该屏整屏（与旧「Enter 无选框回退本屏整屏」同口径）。</summary>
+    private void ConfirmDisplay()
+    {
+        _snapGesture.Reset();
+        _hoverWindow = null;
+        ClearSnapPreview();
+        Confirm(new OverlayCaptureResult.Region(_display.Bounds));
     }
 
     private void OnSnapExited(object? sender, EventArgs e)
@@ -291,7 +305,7 @@ public partial class OverlayWindow : Window
         // 按下捕获期间离开本屏不算悬停离开（预览是冻结候选）；只清空闲态的悬停
         if (_snapGesture.CurrentPhase != SnapGesture.Phase.Idle) return;
         _hoverWindow = null;
-        SetSnapPreview(null);
+        ClearSnapPreview();
     }
 
     private void OnSnapCaptureLost(object? sender, EventArgs e)
@@ -301,19 +315,28 @@ public partial class OverlayWindow : Window
         _pressedWindow = null;
     }
 
-    /// <summary>悬停命中 → adorner 预览（本屏帧映射，可越界；标签用物理像素尺寸=实际截图尺寸）。</summary>
-    private void SetSnapPreview(WindowInfo? target)
+    private void ClearSnapPreview()
+    {
+        if (_adorner is not null) _adorner.SnapPreviewRect = null;
+    }
+
+    /// <summary>窗口悬停命中 → adorner 预览（本屏帧映射，可越界；标签用物理像素尺寸=实际截图尺寸）。</summary>
+    private void SetSnapPreview(WindowInfo target)
     {
         if (_adorner is null) return;
-        if (target is null)
-        {
-            _adorner.SnapPreviewRect = null;
-            return;
-        }
         // 帧映射走 SelectionGeometry 单源（与 SelectionSession 同一份公式，防两处漂移）
         var frame = SelectionGeometry.PhysicalToLocalDipRect(_display, target.Bounds);
         _adorner.SnapPreviewRect = new SelectionAdorner.SnapPreview(
             frame, $"{target.Bounds.Width} × {target.Bounds.Height}");
+    }
+
+    /// <summary>空白悬停 → 该屏全屏吸附预览（整屏边框 + 物理 W×H 标签，视觉语言与窗口预览一致）。</summary>
+    private void SetDisplaySnapPreview()
+    {
+        if (_adorner is null) return;
+        var full = SelectionGeometry.PhysicalToLocalDipRect(_display, _display.Bounds);
+        _adorner.SnapPreviewRect = new SelectionAdorner.SnapPreview(
+            full, $"{_display.Bounds.Width} × {_display.Bounds.Height}");
     }
 
     // ------------------------------------------------------------------------
@@ -334,7 +357,7 @@ public partial class OverlayWindow : Window
         _snapGesture.Reset();
         _pressedWindow = null;
         _hoverWindow = null;
-        SetSnapPreview(null);
+        ClearSnapPreview();
 
         _magnifier.IsVisible = true;
         if (_adorner != null) _adorner.IsHitTestVisible = false; // 放大镜层独占指针输入
@@ -413,7 +436,7 @@ public partial class OverlayWindow : Window
         _snapGesture.Reset();
         _pressedWindow = null;
         _hoverWindow = null;
-        SetSnapPreview(null);
+        ClearSnapPreview();
         Confirm(new OverlayCaptureResult.WindowCapture(target));
     }
 

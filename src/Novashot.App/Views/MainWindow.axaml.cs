@@ -229,19 +229,9 @@ public partial class MainWindow : Window
         editor.CommitTextEditCommand.Execute(null);
     }
 
-    private async void OnCaptureFullscreenClick(object? sender, RoutedEventArgs e)
-    {
-        await CaptureFullscreenAsync();
-    }
-
-    private async void OnCaptureRegionClick(object? sender, RoutedEventArgs e)
+    private async void OnCaptureClick(object? sender, RoutedEventArgs e)
     {
         await CaptureRegionAsync();
-    }
-
-    private void OnCaptureWindowClick(object? sender, RoutedEventArgs e)
-    {
-        _ = CaptureWindowAsync();
     }
 
     private void OnMinimizeToTrayClick(object? sender, RoutedEventArgs e) => Hide();
@@ -614,35 +604,8 @@ public partial class MainWindow : Window
     };
 
     /// <summary>
-    /// Public API：托盘/热键触发全屏抓取。主窗口先隐藏，等 200ms 让 shadow 消失，再抓帧。
-    /// </summary>
-    public async Task CaptureFullscreenAsync()
-    {
-        _logger.LogInformation("Capture Fullscreen requested");
-        var wasVisible = IsVisible;
-        if (wasVisible)
-        {
-            Hide();
-            await Task.Delay(200);
-        }
-        try
-        {
-            var img = _capture.CaptureFullscreen();
-            _vm.EnterEditor(img);
-            Show();
-            Activate();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fullscreen capture failed");
-            _vm.StatusText = Loc.T("Status.CaptureFailed", ex.Message);
-            if (wasVisible) Show();
-        }
-    }
-
-    /// <summary>
-    /// 统一交互捕获（拖拽=区域、悬停点击/Enter=吸附窗口）：每个物理显示器一个 <see cref="OverlayWindow"/>；
-    /// 先抓帧再显示 overlay，避免 overlay 自身被拍进画面。
+    /// 统一交互捕获（拖拽=区域、悬停点击=吸附窗口、空白点击=该屏全屏）：每个物理显示器一个
+    /// <see cref="OverlayWindow"/>；先抓帧再显示 overlay，避免 overlay 自身被拍进画面。
     /// 首个 Confirmed/Cancelled 决定整会话结果，其余 overlay 一并关闭。
     /// M2-3a：每屏一个 overlay；B-3（M2-3b）：共享 <see cref="SelectionSession"/> 权威选框，
     /// 选框可跨屏拖拽，确认的物理 region 由 CaptureRegion 跨屏拼接；
@@ -807,42 +770,6 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// D-1/G-26：截取指定矩形（Capture Launcher 预置区域的路径）。
-    /// 物理像素、虚拟桌面坐标；调用方（App）已做钳界。主窗口隐藏 → 等残影消失 → 抓帧 → 编辑器。
-    /// </summary>
-    public async Task CapturePresetRegionAsync(PixelRect region)
-    {
-        _logger.LogInformation("Capture preset region {Rect} requested", region);
-        if (region.IsEmpty) return;
-
-        var wasVisible = IsVisible;
-        if (wasVisible)
-        {
-            Hide();
-            await Task.Delay(200);
-        }
-        try
-        {
-            var img = _capture.CaptureRegion(region);
-            _vm.EnterEditor(img);
-            Show();
-            Activate();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Preset region capture failed for {Rect}", region);
-            _vm.StatusText = Loc.T("Status.RegionFailed", ex.Message);
-            if (wasVisible) Show();
-        }
-    }
-
     /// <summary>D-1：跨窗口状态提示（App 层在倒计时被取消时调用）。</summary>
     public void ShowStatus(string text) => _vm.StatusText = text;
-
-    /// <summary>
-    /// Window 捕获入口（统一交互，2026-11-23 设计）：不再走独立的窗口列表对话框，
-    /// 直接复用 overlay 交互——悬停吸附点击/Enter 确认窗口，拖拽则是区域。
-    /// </summary>
-    public Task CaptureWindowAsync() => CaptureRegionAsync();
 }

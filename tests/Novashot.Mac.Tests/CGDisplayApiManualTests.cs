@@ -51,7 +51,7 @@ public class MacHotkeyServiceManualTests
         using var svc = new Novashot.Platform.Mac.Hotkeys.MacHotkeyService(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<Novashot.Platform.Mac.Hotkeys.MacHotkeyService>.Instance);
         svc.Start();
-        svc.RegisterAll("F13", "Ctrl+PrintScreen", "Ctrl+Shift+PrintScreen");
+        svc.Register("F13");
         svc.Stop();
     }
 }

@@ -184,13 +184,6 @@ public class UiSnapshotTests
         Save(settings, "30-settings.png");
         settings.Close();
 
-        // Capture Launcher (G-26)：默认区域模式 + 主屏预填
-        var launcher = new CaptureLauncherWindow();
-        launcher.Show();
-        Pump(launcher);
-        Save(launcher, "40-launcher.png");
-        launcher.Close();
-
         // E-1 M9 取色器：放大镜 + HEX/RGB 浮签（C 键取色模式下的视觉态；直接驱动放大镜属性，
         // 模式接线由 ColorPickerOverlayTests 锁定，这里只出视觉图人工核对）
         var pickerBmp = MakeFakeShot();
