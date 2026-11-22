@@ -251,18 +251,6 @@ public partial class MainWindow : Window
     /// <summary>窗口标题跟随语言（Title 是普通 string，不跟 DynamicResource）。</summary>
     internal void ApplyLocalizedTitle() => Title = Loc.T("App.Title");
 
-    /// <summary>右侧面板切页 Style / Canvas（纯视图状态，不进 VM）。</summary>
-    private void OnPanelTabClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not ToggleButton { Tag: string tag }) return;
-        var showStyle = string.Equals(tag, "style", StringComparison.Ordinal);
-
-        if (this.FindControl<ToggleButton>("StyleTab") is { } styleTab) styleTab.IsChecked = showStyle;
-        if (this.FindControl<ToggleButton>("CanvasTab") is { } canvasTab) canvasTab.IsChecked = !showStyle;
-        if (this.FindControl<ScrollViewer>("StyleHost") is { } styleHost) styleHost.IsVisible = showStyle;
-        if (this.FindControl<ScrollViewer>("CanvasHost") is { } canvasHost) canvasHost.IsVisible = !showStyle;
-    }
-
     /// <summary>点主窗口「最近」里的缩略图 → 重新载入那张图。</summary>
     private void OnRecentShotTapped(object? sender, TappedEventArgs e)
     {

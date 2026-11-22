@@ -215,8 +215,6 @@ internal static class Strings
         ["Kind.Blur"] = "Blur",
         ["Kind.Invert"] = "Invert",
 
-        ["Panel.Style"] = "Style",
-        ["Panel.Canvas"] = "Canvas",
         ["Panel.Colour"] = "Colour",
         ["Panel.History"] = "History",
         ["Panel.Stroke"] = "Stroke",
@@ -575,8 +573,6 @@ internal static class Strings
         ["Kind.Blur"] = "模糊",
         ["Kind.Invert"] = "反色",
 
-        ["Panel.Style"] = "样式",
-        ["Panel.Canvas"] = "画布",
         ["Panel.Colour"] = "颜色",
         ["Panel.History"] = "取色历史",
         ["Panel.Stroke"] = "粗细",

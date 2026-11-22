@@ -35,7 +35,7 @@ public partial class SettingsWindow : Window
         ApplyLanguageRadio();
     }
 
-    // —— 分段导航（OnPanelTabClick 模式泛化到 6 节） ——
+    // —— 分段导航（Tag 承载节名 + Click 切换可见性的同款视图层套路） ——
 
     private void OnNavClick(object? sender, RoutedEventArgs e)
     {

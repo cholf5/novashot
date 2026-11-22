@@ -86,18 +86,6 @@ public class UiSnapshotTests
             Pump(window);
         }
 
-        var canvasTab = window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("CanvasTab");
-        if (canvasTab is not null)
-        {
-            canvasTab.IsChecked = true;
-            window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("StyleTab")!.IsChecked = false;
-            window.FindControl<ScrollViewer>("StyleHost")!.IsVisible = false;
-            window.FindControl<ScrollViewer>("CanvasHost")!.IsVisible = true;
-        }
-
-        Pump(window);
-        Save(window, "03-editor-canvas-tab-en.png");
-
         Novashot.App.Localization.Loc.SetPreference("zh-CN", Application.Current!);
         if (window.DataContext is MainWindowViewModel vm2) vm2.ReturnToCapture();
         Pump(window);

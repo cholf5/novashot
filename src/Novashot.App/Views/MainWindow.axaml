@@ -458,37 +458,19 @@
           </Border>
         </Grid>
 
-        <!-- 右侧面板 -->
+        <!-- 右侧面板：样式与画布单页直排（docs/design/2026-11-22-merge-style-canvas-panel.md） -->
         <Border Grid.Column="1" Background="{DynamicResource Bg.Panel}"
                 BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0">
-          <Grid RowDefinitions="Auto,*">
-
-            <Border Grid.Row="0" Padding="10" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
-              <Border Background="#26000000" CornerRadius="8" Padding="3">
-                <Grid ColumnDefinitions="*,*">
-                  <ToggleButton Name="StyleTab" Classes="seg" Tag="style" IsChecked="True"
-                                Content="{DynamicResource L.Panel.Style}" Click="OnPanelTabClick" />
-                  <ToggleButton Name="CanvasTab" Grid.Column="1" Classes="seg" Tag="canvas"
-                                Content="{DynamicResource L.Panel.Canvas}" Click="OnPanelTabClick" />
-                </Grid>
-              </Border>
-            </Border>
-
-            <Panel Grid.Row="1">
-              <ScrollViewer Name="StyleHost" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel>
-                  <controls:StylePanel DataContext="{Binding Editor.StylePanel}" />
-                  <Border Height="1" Background="{DynamicResource Line}" Margin="12,2" />
-                  <TextBlock Classes="hint" FontSize="11" TextWrapping="Wrap" Margin="12,0,12,16"
-                             Text="{DynamicResource L.Editor.CanvasHint}" />
-                </StackPanel>
-              </ScrollViewer>
-
-              <ScrollViewer Name="CanvasHost" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
-                <controls:CompositionPanel DataContext="{Binding Editor.CompositionPanelViewModel}" />
-              </ScrollViewer>
-            </Panel>
-          </Grid>
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+              <controls:StylePanel DataContext="{Binding Editor.StylePanel}" />
+              <Border Height="1" Background="{DynamicResource Line}" Margin="12,2" />
+              <controls:CompositionPanel DataContext="{Binding Editor.CompositionPanelViewModel}" />
+              <Border Height="1" Background="{DynamicResource Line}" Margin="12,2" />
+              <TextBlock Classes="hint" FontSize="11" TextWrapping="Wrap" Margin="12,0,12,16"
+                         Text="{DynamicResource L.Editor.CanvasHint}" />
+            </StackPanel>
+          </ScrollViewer>
         </Border>
       </Grid>
     </Panel>
