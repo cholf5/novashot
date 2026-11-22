@@ -112,7 +112,10 @@ public class OverlayWindowInputTests
             overlayB.Closed += (_, _) => bmpB.Dispose();
 
             PixelRect? confirmed = null;
-            overlayA.Confirmed += (_, region) => confirmed = region;
+            overlayA.Confirmed += (_, result) =>
+            {
+                if (result is OverlayCaptureResult.Region r) confirmed = r.Rect;
+            };
 
             overlayA.Show();
             overlayB.Show();

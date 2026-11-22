@@ -641,15 +641,17 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Region 捕获：每个物理显示器一个 <see cref="OverlayWindow"/>；
+    /// 统一交互捕获（拖拽=区域、悬停点击/Enter=吸附窗口）：每个物理显示器一个 <see cref="OverlayWindow"/>；
     /// 先抓帧再显示 overlay，避免 overlay 自身被拍进画面。
     /// 首个 Confirmed/Cancelled 决定整会话结果，其余 overlay 一并关闭。
     /// M2-3a：每屏一个 overlay；B-3（M2-3b）：共享 <see cref="SelectionSession"/> 权威选框，
-    /// 选框可跨屏拖拽，确认的物理 region 由 CaptureRegion 跨屏拼接。
+    /// 选框可跨屏拖拽，确认的物理 region 由 CaptureRegion 跨屏拼接；
+    /// 统一吸附（2026-11-23 设计）：窗口确认走 <see cref="CaptureWindowForSnapAsync"/> 的
+    /// 置前 → 250ms → CaptureWindow 时序（原 WindowPickerDialog 路径退役，交互只有一种）。
     /// </summary>
     public async Task CaptureRegionAsync()
     {
-        _logger.LogInformation("Capture Region requested");
+        _logger.LogInformation("Interactive capture requested");
         var wasVisible = IsVisible;
         if (wasVisible)
         {
@@ -673,11 +675,14 @@ public partial class MainWindow : Window
         try
         {
             var displays = _capture.EnumerateDisplays();
-            _logger.LogInformation("Opening region overlays across {N} display(s)", displays.Count);
+            _logger.LogInformation("Opening capture overlays across {N} display(s)", displays.Count);
 
             // 先抓全部显示器（overlay 尚未显示，不会被拍到）
             foreach (var d in displays)
                 displayShots.Add(_capture.CaptureDisplay(d.Index));
+
+            // 统一吸附：overlay 存续期间缓存一次窗口列表（多屏共享；不刷新，见设计稿错误处理节）
+            var snapWindows = _windowService.EnumerateWindows();
 
             var completed = false;
 
@@ -689,30 +694,11 @@ public partial class MainWindow : Window
                 }
             }
 
-            void OnAnyConfirmed(PixelRect region)
+            void OnAnyConfirmed(OverlayCaptureResult result)
             {
                 if (completed) return;
                 completed = true;
-                Dispatcher.UIThread.Post(() =>
-                {
-                    CloseAll();
-                    try
-                    {
-                        var img = _capture.CaptureRegion(region);
-                        _vm.EnterEditor(img);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Region crop failed");
-                        _vm.StatusText = Loc.T("Status.RegionFailed", ex.Message);
-                    }
-                    finally
-                    {
-                        DisposeShotsAfterRenderSettles(); // 显示器抓帧位图释放（延迟一跳）
-                    }
-                    Show();
-                    Activate();
-                });
+                Dispatcher.UIThread.Post(() => _ = CompleteConfirmedAsync(result, CloseAll, DisposeShotsAfterRenderSettles));
             }
 
             void OnAnyCancelled()
@@ -741,8 +727,9 @@ public partial class MainWindow : Window
             {
                 var display = displays[i];
                 var shot = displayShots[i];
-                var overlay = new OverlayWindow(shot.Bitmap, display, clipboard, colorHistory, selectionSession);
-                overlay.Confirmed += (_, region) => OnAnyConfirmed(region);
+                var overlay = new OverlayWindow(shot.Bitmap, display, clipboard, colorHistory, selectionSession,
+                    snapWindows);
+                overlay.Confirmed += (_, result) => OnAnyConfirmed(result);
                 overlay.Cancelled += (_, _) => OnAnyCancelled();
                 overlay.StrokePicked += (_, color) => _vm.PendingStrokeColor = color;
                 overlays.Add(overlay);
@@ -756,10 +743,67 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Region capture setup failed");
+            _logger.LogError(ex, "Interactive capture setup failed");
             foreach (var o in overlays) { try { o.Close(); } catch { } }
             DisposeShotsAfterRenderSettles(); // 同 I-2：部分 overlay 可能已显示，位图释放同样延一跳
             if (wasVisible) Show();
+        }
+    }
+
+    /// <summary>确认收口：region 走跨屏拼接；窗口走置前重捕获。位图释放/主窗复原两路共用。</summary>
+    private async Task CompleteConfirmedAsync(OverlayCaptureResult result, Action closeAll, Action disposeShots)
+    {
+        closeAll();
+        try
+        {
+            CapturedImage img;
+            switch (result)
+            {
+                case OverlayCaptureResult.Region region:
+                    img = _capture.CaptureRegion(region.Rect);
+                    break;
+                case OverlayCaptureResult.WindowCapture win:
+                    img = await CaptureWindowForSnapAsync(win.Target, _windowService, _capture, _logger);
+                    break;
+                default:
+                    return;
+            }
+            _vm.EnterEditor(img);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Capture confirm failed for {Kind}", result.GetType().Name);
+            _vm.StatusText = Loc.T(
+                result is OverlayCaptureResult.WindowCapture ? "Status.WindowFailed" : "Status.RegionFailed",
+                ex.Message);
+        }
+        finally
+        {
+            disposeShots(); // 显示器抓帧位图释放（延迟一跳）
+            Show();
+            Activate();
+        }
+    }
+
+    /// <summary>
+    /// 统一交互窗口确认的像素获取（设计稿裁决 B）：置前 → 等 250ms 重绘 → PrintWindow 重捕获。
+    /// internal static 便于 headless 用 stub 服务直接验证时序与回退分支。
+    /// </summary>
+    internal static async Task<CapturedImage> CaptureWindowForSnapAsync(
+        WindowInfo target, IWindowService windowService, ICaptureService capture, ILogger logger)
+    {
+        // 让目标窗口浮到前台并稍等其重绘（尤其 UWP/DirectComposition 需要 tick 一下 DWM）
+        windowService.TryBringToForeground(target.Handle);
+        await Task.Delay(250);
+        try
+        {
+            return capture.CaptureWindow(target.Handle);
+        }
+        catch (Exception ex)
+        {
+            // PrintWindow 失败回退裁屏（设计稿错误处理节）：窗口已在最前，重抓裁矩形是 WYSIWYG 兜底
+            logger.LogWarning(ex, "PrintWindow capture failed for {Title}; falling back to region crop", target.Title);
+            return capture.CaptureRegion(target.Bounds);
         }
     }
 
@@ -797,61 +841,8 @@ public partial class MainWindow : Window
     public void ShowStatus(string text) => _vm.StatusText = text;
 
     /// <summary>
-    /// Window 捕获：弹出 <see cref="WindowPickerDialog"/> 让用户挑一个顶层窗口，
-    /// 主窗口隐藏 → 等 250ms 让候选窗口浮到前台 → <see cref="ICaptureService.CaptureWindow"/> →
-    /// 进入编辑器。用户取消 picker 则复原。
+    /// Window 捕获入口（统一交互，2026-11-23 设计）：不再走独立的窗口列表对话框，
+    /// 直接复用 overlay 交互——悬停吸附点击/Enter 确认窗口，拖拽则是区域。
     /// </summary>
-    public async Task CaptureWindowAsync()
-    {
-        _logger.LogInformation("Capture Window requested");
-
-        var picker = new WindowPickerDialog(_windowService, _capture);
-        WindowInfo? target = null;
-        if (IsVisible)
-        {
-            await picker.ShowDialog(this);
-            target = picker.Selected;
-        }
-        else
-        {
-            // 从托盘/热键触发，无 owner，直接 Show + 等关闭
-            var tcs = new TaskCompletionSource();
-            picker.Closed += (_, _) => tcs.TrySetResult();
-            picker.Show();
-            picker.Activate();
-            await tcs.Task;
-            target = picker.Selected;
-        }
-
-        if (target is null)
-        {
-            _logger.LogDebug("Window picker cancelled");
-            return;
-        }
-
-        var wasVisible = IsVisible;
-        if (wasVisible)
-        {
-            Hide();
-        }
-
-        try
-        {
-            // 让目标窗口浮到前台并稍等其重绘（尤其 UWP/DirectComposition 需要 tick 一下 DWM）
-            _windowService.TryBringToForeground(target.Handle);
-            await Task.Delay(250);
-
-            var img = _capture.CaptureWindow(target.Handle);
-            _vm.EnterEditor(img);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Window capture failed");
-            _vm.StatusText = Loc.T("Status.WindowFailed", ex.Message);
-        }
-        finally
-        {
-            if (wasVisible) { Show(); Activate(); }
-        }
-    }
+    public Task CaptureWindowAsync() => CaptureRegionAsync();
 }

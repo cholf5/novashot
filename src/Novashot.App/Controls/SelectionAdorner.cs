@@ -49,6 +49,36 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     /// </summary>
     public event EventHandler? GeometrySettled;
 
+    // ---- 统一吸附交互（docs/plans/2026-11-23-unified-capture-overlay-design.md）----
+    // 本控件只转发原始指针流与渲染吸附预览；窗口命中判定/手势裁决都在 OverlayWindow。
+    /// <summary>左键按下（本屏本地 DIP）。OverlayWindow 据此冻结吸附候选。</summary>
+    public event EventHandler<Point>? SnapPointerPressed;
+    /// <summary>指针移动（本屏本地 DIP）。OverlayWindow 据此刷新悬停命中/作废拖拽候选。</summary>
+    public event EventHandler<Point>? SnapPointerMoved;
+    /// <summary>左键释放（本屏本地 DIP）。OverlayWindow 据此分类点击/拖拽并裁决确认。</summary>
+    public event EventHandler<Point>? SnapPointerReleased;
+    /// <summary>指针离开本屏：悬停预览应清掉（按下捕获期间调用方用相位门控）。</summary>
+    public event EventHandler? SnapPointerExited;
+    /// <summary>指针捕获丢失（Alt-tab 等）：吸附手势必须复位，不得当成点击。</summary>
+    public event EventHandler? SnapCaptureLost;
+
+    /// <summary>吸附预览：本屏帧矩形（可越界，窗口自然裁剪）+ 展示用尺寸标签文本。</summary>
+    public sealed record SnapPreview(Rect FrameRect, string SizeLabel);
+
+    private SnapPreview? _snapPreview;
+
+    /// <summary>吸附预览（渲染专用，非权威态；仅无选框时由 OverlayWindow 写入）。</summary>
+    public SnapPreview? SnapPreviewRect
+    {
+        get => _snapPreview;
+        set
+        {
+            if (Equals(_snapPreview, value)) return;
+            _snapPreview = value;
+            InvalidateVisual();
+        }
+    }
+
     private static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(400);
     private readonly DispatcherTimer _settleTimer;
 
@@ -114,6 +144,9 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
         if (_selection is not { } sel)
         {
             ctx.DrawRectangle(DimBrush, null, view);
+            // 统一吸附：无选框时的悬停窗口预览（OverlayWindow 命中后写入；拖拽/有选框时已被清空）
+            if (SnapPreviewRect is { } snap)
+                DrawSnapPreview(ctx, snap, view);
             return;
         }
 
@@ -143,17 +176,33 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
         }
 
         // 尺寸标签：数字用真实选框，锚点用可见切片（选框顶缘越出本屏时标签仍贴在屏内）
+        DrawSizeLabel(ctx, $"{(int)Math.Round(sel.Width)} × {(int)Math.Round(sel.Height)}", vis);
+    }
+
+    /// <summary>吸附预览：真实矩形描边（越界段由窗口裁剪）+ 本屏切片上的尺寸标签。</summary>
+    private void DrawSnapPreview(DrawingContext ctx, SnapPreview snap, Rect view)
+    {
+        ctx.DrawRectangle(null, SelectionPen, snap.FrameRect);
+
+        // 标签锚点用可见切片（预览框越出本屏时仍贴在屏内），与选框标签同规则
+        var vis = SelectionGeometry.ClampAndNormalizeTo(snap.FrameRect, view);
+        DrawSizeLabel(ctx, snap.SizeLabel, vis);
+    }
+
+    /// <summary>尺寸标签（选框与吸附预览共用视觉语言）：贴锚点矩形顶缘，顶出屏幕则贴内侧。</summary>
+    private static void DrawSizeLabel(DrawingContext ctx, string text, Rect anchor)
+    {
         var label = new FormattedText(
-            $"{(int)Math.Round(sel.Width)} × {(int)Math.Round(sel.Height)}",
+            text,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             new Typeface("Segoe UI"),
             12,
             LabelFgBrush);
         var labelSize = new Size(label.Width + 10, label.Height + 4);
-        var labelY = vis.Y - labelSize.Height - 4;
-        if (labelY < 0) labelY = vis.Y + 4; // 顶到上边就贴到切片内侧
-        var labelRect = new Rect(new Point(vis.X, labelY), labelSize);
+        var labelY = anchor.Y - labelSize.Height - 4;
+        if (labelY < 0) labelY = anchor.Y + 4; // 顶到上边就贴到切片内侧
+        var labelRect = new Rect(new Point(anchor.X, labelY), labelSize);
         ctx.DrawRectangle(LabelBgBrush, null, labelRect);
         ctx.DrawText(label, new Point(labelRect.X + 5, labelRect.Y + 2));
     }
@@ -176,6 +225,7 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         var p = e.GetPosition(this);
+        SnapPointerMoved?.Invoke(this, p); // 统一吸附：原始流转发（含拖拽期间，OverlayWindow 用相位门控）
 
         if (Session is { } s)
         {
@@ -208,8 +258,10 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
         {
             CommitRequested?.Invoke(this, EventArgs.Empty);
             e.Handled = true;
-            return;
+            return; // 双击提交不进吸附手势（有选框时 OverlayWindow 也会按选框状态门控）
         }
+
+        SnapPointerPressed?.Invoke(this, p); // 统一吸附：原始流转发，OverlayWindow 冻结吸附候选
 
         Session?.Press(DisplayIndex, p, e.KeyModifiers);
         Cursor = new Cursor(CursorFor(Session?.ActiveGrip ?? HitTestGrip(p)));
@@ -220,11 +272,18 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        SnapPointerReleased?.Invoke(this, e.GetPosition(this));
         Session?.Release(DisplayIndex);
         e.Pointer.Capture(null);
         Cursor = new Cursor(_selection is null
             ? StandardCursorType.Cross
             : CursorFor(HitTestGrip(e.GetPosition(this))));
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        SnapPointerExited?.Invoke(this, EventArgs.Empty);
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
@@ -233,6 +292,8 @@ public sealed class SelectionAdorner : Control, ICustomHitTest
         // 捕获丢失（如窗口被外部关闭）等价释放：会话态必须退出拖拽，否则后续 Press 被永久忽略。
         // 正常释放后 Capture(null) 也会触发本事件——Release 幂等（_mode==None 直接返回）。
         Session?.Release(DisplayIndex);
+        // 统一吸附：捕获丢失不是点击，手势必须复位（OverlayWindow 据此丢弃冻结候选）
+        SnapCaptureLost?.Invoke(this, EventArgs.Empty);
     }
 
     // ------------------------------------------------------------------------

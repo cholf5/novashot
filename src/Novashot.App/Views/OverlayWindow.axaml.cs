@@ -7,6 +7,7 @@ using Novashot.App.Localization;
 using Novashot.App.Utils;
 using Novashot.Core.Clipboard;
 using Novashot.Core.Editor;
+using Novashot.Core.Windows;
 using SkiaSharp;
 using PixelRect = Novashot.Core.Common.PixelRect;
 using DisplayInfo = Novashot.Core.Common.DisplayInfo;
@@ -26,6 +27,9 @@ namespace Novashot.App.Views;
 /// M3-1：FloatingToolRing 悬浮工具环，跟随选框（跨屏时只显示在选框中心所在屏）
 /// E-1 M9：C 进/出取色模式（<see cref="ColorMagnifier"/>）；点击 = 复制 HEX + 记会话历史 +
 ///         抛 <see cref="StrokePicked"/>（外层经 StylePanel 路径写入描边色）+ 回选框
+/// 统一吸附交互（2026-11-23 设计）：未拖动时悬停顶层窗口自动高亮（SnapHitTester 命中，
+///         预览写回 adorner 渲染）；原地释放 = 确认该窗口（OverlayCaptureResult.WindowCapture），
+///         拖拽 = 既有区域路径。吸附只在无选框状态激活；多屏 N 实例共享同一份窗口缓存。
 /// </summary>
 public partial class OverlayWindow : Window
 {
@@ -33,15 +37,19 @@ public partial class OverlayWindow : Window
     private readonly IClipboardService? _clipboard;
     private readonly ColorHistory? _colorHistory;
     private readonly SelectionSession _session;
+    private readonly IReadOnlyList<WindowInfo> _snapWindows;
+    private readonly SnapGesture _snapGesture;
     private SelectionAdorner? _adorner;
     private FloatingToolRing? _ring;
     private ColorMagnifier? _magnifier;
     private Border? _defaultHint;
     private Border? _pickerHint;
     private DispatcherTimer? _copiedTimer;
+    private WindowInfo? _hoverWindow;    // 当前悬停命中（Enter 确认用；拖拽/捕获期间冻结不刷新）
+    private WindowInfo? _pressedWindow;  // 按下瞬间冻结的吸附候选（点击确认用，避免手抖滑出边缘误判）
 
-    /// <summary>Confirmed 事件的第二参数是虚拟桌面物理像素坐标下的 region。</summary>
-    public event EventHandler<PixelRect>? Confirmed;
+    /// <summary>确认产出：拖拽选框 = Region（虚拟桌面物理像素）；吸附点击 = WindowCapture。</summary>
+    public event EventHandler<OverlayCaptureResult>? Confirmed;
     public event EventHandler? Cancelled;
 
     /// <summary>E-1 M9：取色点击（含复制/历史记账之后的收尾通知）。外层把该色挂到编辑器描边色。</summary>
@@ -54,13 +62,18 @@ public partial class OverlayWindow : Window
 
     public OverlayWindow(SKBitmap desktopBitmap, DisplayInfo display,
         IClipboardService? clipboard = null, ColorHistory? colorHistory = null,
-        SelectionSession? session = null)
+        SelectionSession? session = null, IReadOnlyList<WindowInfo>? snapWindows = null)
     {
         _display = display;
         _clipboard = clipboard;
         _colorHistory = colorHistory;
         // B-3：外部（MainWindow）注入跨屏会话；独立构造（测试/单窗）时退化为单屏会话，行为与旧本地数学等价
         _session = session ?? new SelectionSession(new[] { display });
+        // 统一吸附：窗口缓存由 MainWindow 一次枚举后多屏共享；缺省空表 = 不吸附（测试/单窗不受影响）。
+        // 手势阈值物理像素 = MinSize(DIP) × scale，与 Session「<MinSize 清框」门限严格分界：
+        // 拖出有效选框必已越阈（区域），没成框的释放仍是点击（窗口/无动作），两类结局互斥。
+        _snapWindows = snapWindows ?? Array.Empty<WindowInfo>();
+        _snapGesture = new SnapGesture(SelectionGeometry.MinSize * display.ScaleFactor);
 
         InitializeComponent();
 
@@ -88,6 +101,12 @@ public partial class OverlayWindow : Window
             _adorner.GeometrySettled += (_, _) => UpdateRingPosition();
             _adorner.Session = _session;
             _adorner.DisplayIndex = display.Index;
+            // 统一吸附接线：adorner 只转发原始指针流，命中/手势/裁决都在本窗口
+            _adorner.SnapPointerPressed += OnSnapPressed;
+            _adorner.SnapPointerMoved += OnSnapMoved;
+            _adorner.SnapPointerReleased += OnSnapReleased;
+            _adorner.SnapPointerExited += OnSnapExited;
+            _adorner.SnapCaptureLost += OnSnapCaptureLost;
         }
         if (_ring != null)
         {
@@ -143,6 +162,9 @@ public partial class OverlayWindow : Window
     {
         if (_adorner != null)
             _adorner.SelectionRect = _session.SelectionInFrame(_display.Index);
+        // 统一吸附：出现权威选框即退出吸附预览（吸附只在无选框状态激活）
+        if (_session.ConfirmRegion() is not null)
+            SetSnapPreview(null);
         UpdateRingPosition();
     }
 
@@ -213,6 +235,88 @@ public partial class OverlayWindow : Window
     }
 
     // ------------------------------------------------------------------------
+    //  统一吸附交互：悬停命中 → 预览；点击/Enter → 窗口确认；拖拽 → 既有区域路径
+    //  吸附只在无选框状态激活；手势阈值已与 Session MinSize 清框门限对齐（见构造函数）
+    // ------------------------------------------------------------------------
+    private void OnSnapPressed(object? sender, Point p)
+    {
+        if (_picking) return;
+        if (_session.ConfirmRegion() is not null)
+        {
+            _snapGesture.Reset(); // 有选框：按压归选框操作（移动/缩放/重建），不进吸附手势
+            return;
+        }
+
+        var phys = SelectionGeometry.LocalToPhysical(_display, p);
+        _snapGesture.Press(phys.X, phys.Y);
+        // 冻结按下瞬间的命中：释放时确认的是按下点所在窗口，不看释放点（手抖滑出边缘不误判）
+        _pressedWindow = SnapHitTester.Hit(_snapWindows, phys.X, phys.Y);
+    }
+
+    private void OnSnapMoved(object? sender, Point p)
+    {
+        if (_picking) return;
+        var phys = SelectionGeometry.LocalToPhysical(_display, p);
+
+        if (_snapGesture.MarkDragIfBeyond(phys.X, phys.Y))
+        {
+            _pressedWindow = null; // 实质拖拽：候选作废，交还区域路径（Session 正在建框）
+            SetSnapPreview(null);
+            return;
+        }
+
+        // 悬停刷新：只在无选框、未按下时（按下期间的预览是冻结候选，不跟指针走）
+        if (_snapGesture.CurrentPhase == SnapGesture.Phase.Idle && _session.ConfirmRegion() is null)
+        {
+            _hoverWindow = SnapHitTester.Hit(_snapWindows, phys.X, phys.Y);
+            SetSnapPreview(_hoverWindow);
+        }
+    }
+
+    private void OnSnapReleased(object? sender, Point p)
+    {
+        if (_picking) return;
+        var wasClick = _snapGesture.Release();
+        var candidate = _pressedWindow;
+        _pressedWindow = null;
+
+        // 点击（未越阈）且有冻结候选 → 确认窗口。有选框的按压没进手势（wasClick=false），
+        // 拖拽越阈候选已作废（candidate=null）——两类结局在此天然互斥。
+        if (wasClick && candidate is not null)
+            ConfirmWindow(candidate);
+    }
+
+    private void OnSnapExited(object? sender, EventArgs e)
+    {
+        // 按下捕获期间离开本屏不算悬停离开（预览是冻结候选）；只清空闲态的悬停
+        if (_snapGesture.CurrentPhase != SnapGesture.Phase.Idle) return;
+        _hoverWindow = null;
+        SetSnapPreview(null);
+    }
+
+    private void OnSnapCaptureLost(object? sender, EventArgs e)
+    {
+        // Alt-tab 等导致捕获丢失不是点击：复位手势、丢弃冻结候选，不触发任何确认
+        _snapGesture.Reset();
+        _pressedWindow = null;
+    }
+
+    /// <summary>悬停命中 → adorner 预览（本屏帧映射，可越界；标签用物理像素尺寸=实际截图尺寸）。</summary>
+    private void SetSnapPreview(WindowInfo? target)
+    {
+        if (_adorner is null) return;
+        if (target is null)
+        {
+            _adorner.SnapPreviewRect = null;
+            return;
+        }
+        // 帧映射走 SelectionGeometry 单源（与 SelectionSession 同一份公式，防两处漂移）
+        var frame = SelectionGeometry.PhysicalToLocalDipRect(_display, target.Bounds);
+        _adorner.SnapPreviewRect = new SelectionAdorner.SnapPreview(
+            frame, $"{target.Bounds.Width} × {target.Bounds.Height}");
+    }
+
+    // ------------------------------------------------------------------------
     //  E-1 M9 取色模式
     // ------------------------------------------------------------------------
     private void TogglePickMode()
@@ -225,6 +329,12 @@ public partial class OverlayWindow : Window
     {
         if (_picking || _magnifier is null) return;
         _picking = true;
+
+        // 统一吸附：取色模式独占指针，吸附预览与候选一并清掉，防残影误确认
+        _snapGesture.Reset();
+        _pressedWindow = null;
+        _hoverWindow = null;
+        SetSnapPreview(null);
 
         _magnifier.IsVisible = true;
         if (_adorner != null) _adorner.IsHitTestVisible = false; // 放大镜层独占指针输入
@@ -276,14 +386,35 @@ public partial class OverlayWindow : Window
 
     private void TryConfirmSelection()
     {
-        // B-3：权威选框在会话（物理像素）；无选框回退本屏整屏（既有语义）
-        Confirm(_session.ConfirmRegion() ?? _display.Bounds);
+        // B-3：权威选框在会话（物理像素）——有选框走区域，优先级最高
+        if (_session.ConfirmRegion() is { } region)
+        {
+            Confirm(new OverlayCaptureResult.Region(region));
+            return;
+        }
+        // 统一吸附：无选框时悬停命中优先（Enter 确认当前悬停窗口），其次整屏回退（既有语义）
+        if (_hoverWindow is { } w)
+        {
+            ConfirmWindow(w);
+            return;
+        }
+        Confirm(new OverlayCaptureResult.Region(_display.Bounds));
     }
 
-    private void Confirm(PixelRect region)
+    private void Confirm(OverlayCaptureResult result)
     {
-        Confirmed?.Invoke(this, region);
+        Confirmed?.Invoke(this, result);
         Close();
+    }
+
+    /// <summary>吸附确认窗口：清吸附态后抛 WindowCapture（像素获取/置前时序在 MainWindow）。</summary>
+    private void ConfirmWindow(WindowInfo target)
+    {
+        _snapGesture.Reset();
+        _pressedWindow = null;
+        _hoverWindow = null;
+        SetSnapPreview(null);
+        Confirm(new OverlayCaptureResult.WindowCapture(target));
     }
 
     private void Cancel()

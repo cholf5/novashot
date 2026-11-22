@@ -1,4 +1,8 @@
 using System;
+using Novashot.Core.Common;
+
+// Core 也有 PixelRect：本文件的物理像素矩形一律用 Core 口径（与 SelectionSession 同别名）
+using PixelRect = Novashot.Core.Common.PixelRect;
 
 namespace Novashot.App.Controls;
 
@@ -16,6 +20,29 @@ public static class SelectionGeometry
     public const double EdgeHitSlop = 6;
     /// <summary>选框最小边（DIP）；释放时小于此值清空。</summary>
     public const double MinSize = 4;
+
+    // ---- 物理↔DIP 帧映射（B-3 口径单源：SelectionSession 与 OverlayWindow 共用。
+    //      公式漂移 = 跨屏选框/吸附预览错位且单屏开发机测不出，故只有这一份实现） ----
+
+    /// <summary>指定屏的本地 DIP 点 → 虚拟桌面物理像素（Math.Round 舍入）。</summary>
+    public static Avalonia.PixelPoint LocalToPhysical(DisplayInfo d, Avalonia.Point dip)
+    {
+        var s = d.ScaleFactor;
+        return new Avalonia.PixelPoint(
+            (int)Math.Round(d.Bounds.X + dip.X * s),
+            (int)Math.Round(d.Bounds.Y + dip.Y * s));
+    }
+
+    /// <summary>虚拟桌面物理像素矩形 → 指定屏的本地 DIP 帧（可越界）。</summary>
+    public static Avalonia.Rect PhysicalToLocalDipRect(DisplayInfo d, PixelRect p)
+    {
+        var s = d.ScaleFactor;
+        return new Avalonia.Rect(
+            (p.X - d.Bounds.X) / s,
+            (p.Y - d.Bounds.Y) / s,
+            p.Width / s,
+            p.Height / s);
+    }
 
     /// <summary>Grip 类型 —— 4 角、4 边中点、内部、外部。</summary>
     public enum Grip { NW, N, NE, E, SE, S, SW, W, Inside, Outside }

@@ -157,7 +157,10 @@ public class ColorPickerOverlayTests
             var overlay = NewOverlay(out _, out var magnifier);
 
             PixelRect? confirmedRegion = null;
-            overlay!.Confirmed += (_, region) => confirmedRegion = region;
+            overlay!.Confirmed += (_, result) =>
+            {
+                if (result is OverlayCaptureResult.Region r) confirmedRegion = r.Rect;
+            };
 
             TapKey(overlay, Key.C, PhysicalKey.C);
             Assert.True(magnifier!.IsVisible);

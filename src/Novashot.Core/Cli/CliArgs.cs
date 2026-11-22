@@ -35,8 +35,9 @@ public static class CliArgs
           region    Capture a rectangle. Headless use requires --geometry X,Y,W/H (physical pixels,
                     virtual-desktop coordinates); without it, a running GUI instance opens the
                     region selection overlay, otherwise the command fails.
-          window    Capture a window (interactive pick). With a running GUI instance the window
-                    picker is opened; without one the command fails (no GUI is started).
+          window    Capture a window. With a running GUI instance the interactive capture overlay
+                    is opened (hover a window and click to snap it, or drag for a region);
+                    without one the command fails (no GUI is started).
 
         Options:
           -d, --delay <seconds>          Wait before capturing. 0-60, clamped. Default 0.

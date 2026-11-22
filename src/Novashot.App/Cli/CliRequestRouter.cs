@@ -10,7 +10,8 @@ namespace Novashot.App.Cli;
 /// headless 分支在管道连接的后台线程直接跑 <see cref="CliCaptureExecutor"/>（无 GUI 闪现）。
 /// 分发语义（PM 裁决）：
 /// - gui → activate（主窗口 Show+Activate，单实例对齐 winshot）；
-/// - region 缺 geometry / window → 触发对应 GUI 交互捕获流程（含 --delay 倒计时），立即回「已启动」；
+/// - region 缺 geometry / window → 触发 GUI 统一交互捕获流程（拖拽=区域、悬停点击=吸附窗口，
+///   含 --delay 倒计时），立即回「已启动」；
 /// - full / region+geometry → 同一个 headless 导出执行器，等结果回传（CLI 退出码 = 执行结果）。
 /// </summary>
 public sealed class CliRequestRouter

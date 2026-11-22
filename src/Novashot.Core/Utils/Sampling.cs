@@ -4,7 +4,7 @@ namespace Novashot.Core.Utils;
 
 /// <summary>
 /// 源图缩放重采样的统一口径（消费点：Composition.RenderScene 编辑器预览、
-/// ThumbnailWriter / PickerThumbnails 缩略图）。
+/// ThumbnailWriter 缩略图）。
 ///
 /// 为什么必须显式给采样：SKCanvas.DrawBitmap 无参重载走 struct 默认 SKSamplingOptions
 /// （= nearest、无 mipmap），任何非 1:1 缩放都会把高频细节嚼成摩尔纹/马赛克

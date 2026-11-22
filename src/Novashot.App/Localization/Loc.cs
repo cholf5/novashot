@@ -112,7 +112,7 @@ internal static class Strings
     {
         // ---- common ----
         ["App.Title"] = "Novashot",
-        ["Overlay.Hint"] = "Drag to select · drag handles to adjust · Enter to confirm · Esc to cancel",
+        ["Overlay.Hint"] = "Drag for region · Click to capture window · Enter to confirm · Esc to cancel",
         ["Overlay.PickerHint"] = "Pick mode: click to sample a colour · C to exit",
         ["Overlay.PickerCopied"] = "Copied {0}",
         ["Pin.Hint"] = "Drag to move · scroll to zoom · double-click or Esc to close",
@@ -139,7 +139,7 @@ internal static class Strings
         ["Capture.Region"] = "Region",
         ["Capture.RegionHint"] = "Drag a box, then annotate",
         ["Capture.Window"] = "Window",
-        ["Capture.WindowHint"] = "Pick a window from a live list",
+        ["Capture.WindowHint"] = "Hover a window and click to capture it",
         ["Capture.Paste"] = "Paste an image",
         ["Capture.PasteHint"] = "Open whatever is on the clipboard",
         ["Capture.Recent"] = "Recent",
@@ -457,20 +457,13 @@ internal static class Strings
         ["Update.Prompt.NoUpdateOnRetry"] = "No update found anymore — the feed changed?",
         ["Status.UpdateCheckFailed"] = "Update check failed: {0}",
 
-        // ---- window picker ----
-        ["Picker.Title"] = "Capture a window",
-        ["Picker.Lede"] = "Pick the window to capture. Double-click to grab it.",
-        ["Picker.Capture"] = "Capture",
-        ["Picker.Empty"] = "No capturable windows found.",
-        ["Picker.Untitled"] = "(untitled)",
-        ["Picker.Minimized"] = "[minimized]",
     };
 
     public static readonly Dictionary<string, string> Zh = new(StringComparer.Ordinal)
     {
         // ---- common ----
         ["App.Title"] = "Novashot",
-        ["Overlay.Hint"] = "拖动创建选框 · 拖角/边调整 · Enter 确认 · Esc 取消",
+        ["Overlay.Hint"] = "拖拽选区域 · 点击截窗口 · Enter 确认 · Esc 取消",
         ["Overlay.PickerHint"] = "取色模式：点击拾取颜色 · C 退出",
         ["Overlay.PickerCopied"] = "已复制 {0}",
         ["Pin.Hint"] = "拖动移动 · 滚轮缩放 · 双击或 Esc 关闭",
@@ -497,7 +490,7 @@ internal static class Strings
         ["Capture.Region"] = "区域",
         ["Capture.RegionHint"] = "拖一个框，然后标注",
         ["Capture.Window"] = "窗口",
-        ["Capture.WindowHint"] = "从实时列表里选一个窗口",
+        ["Capture.WindowHint"] = "悬停窗口点击截取（拖拽则是选区域）",
         ["Capture.Paste"] = "粘贴图片",
         ["Capture.PasteHint"] = "把剪贴板里的图直接打开",
         ["Capture.Recent"] = "最近",
@@ -815,12 +808,5 @@ internal static class Strings
         ["Update.Prompt.NoUpdateOnRetry"] = "feed 上没有找到更新——地址是不是变了？",
         ["Status.UpdateCheckFailed"] = "更新检查失败：{0}",
 
-        // ---- window picker ----
-        ["Picker.Title"] = "选择要截取的窗口",
-        ["Picker.Lede"] = "选一个窗口，双击直接截取。",
-        ["Picker.Capture"] = "截取",
-        ["Picker.Empty"] = "没找到可截取的窗口。",
-        ["Picker.Untitled"] = "（未命名）",
-        ["Picker.Minimized"] = "[已最小化]",
     };
 }

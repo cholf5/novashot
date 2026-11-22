@@ -92,7 +92,7 @@ public sealed class SelectionSession
         // 帧切换前先把旧帧权威选框换算进新帧（_selection 表达在旧 _framePos 里，
         // 顺序反了会把旧帧数值误当新帧读——B-3 测试实证过该陷阱）
         var selLocal = _selection is { } cur
-            ? PhysicalToLocalDipRect(_displays[pos], DipToPhysical(_displays[_framePos], cur))
+            ? SelectionGeometry.PhysicalToLocalDipRect(_displays[pos], DipToPhysical(_displays[_framePos], cur))
             : (Rect?)null;
 
         _framePos = pos;
@@ -132,7 +132,7 @@ public sealed class SelectionSession
         var rpos = PosOfIndex(displayIndex);
         if (rpos < 0) return;
 
-        var phys = LocalToPhysical(_displays[rpos], localDip);
+        var phys = SelectionGeometry.LocalToPhysical(_displays[rpos], localDip);
         var frame = _displays[_framePos];
         var p = PhysicalToLocalDip(frame, phys);
 
@@ -219,7 +219,7 @@ public sealed class SelectionSession
         var pos = PosOfIndex(displayIndex);
         if (pos < 0) return null;
         var phys = DipToPhysical(_displays[_framePos], sel);
-        return PhysicalToLocalDipRect(_displays[pos], phys);
+        return SelectionGeometry.PhysicalToLocalDipRect(_displays[pos], phys);
     }
 
     /// <summary>
@@ -246,14 +246,6 @@ public sealed class SelectionSession
         return -1;
     }
 
-    private static PixelPoint LocalToPhysical(DisplayInfo d, Point dip)
-    {
-        var s = d.ScaleFactor;
-        return new PixelPoint(
-            (int)Math.Round(d.Bounds.X + dip.X * s),
-            (int)Math.Round(d.Bounds.Y + dip.Y * s));
-    }
-
     private static Point PhysicalToLocalDip(DisplayInfo d, PixelPoint phys)
     {
         var s = d.ScaleFactor;
@@ -262,13 +254,7 @@ public sealed class SelectionSession
 
     /// <summary>本地 DIP 点量化到本屏物理网格再回 DIP（与 Drag 路径同口径，见 Press 内注释）。</summary>
     private static Point QuantizedLocalDip(DisplayInfo d, Point dip) =>
-        PhysicalToLocalDip(d, LocalToPhysical(d, dip));
-
-    private static Rect PhysicalToLocalDipRect(DisplayInfo d, PixelRect p)
-    {
-        var s = d.ScaleFactor;
-        return new Rect((p.X - d.Bounds.X) / s, (p.Y - d.Bounds.Y) / s, p.Width / s, p.Height / s);
-    }
+        PhysicalToLocalDip(d, SelectionGeometry.LocalToPhysical(d, dip));
 
     /// <summary>DIP 矩形 → 物理像素（Math.Round 舍入、宽高至少 1，与旧 OverlayWindow.DipToPhysical 同口径）。</summary>
     private static PixelRect DipToPhysical(DisplayInfo d, Rect dip)
