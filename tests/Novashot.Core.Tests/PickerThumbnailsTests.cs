@@ -52,6 +52,28 @@ public class PickerThumbnailsTests
         Assert.Equal(6, outBmp.Height);
     }
 
+    [Fact]
+    public void Resize_DownscaleUsesSmoothSampling_NotNearest()
+    {
+        // 与 CompositionTests 同口径：1px 黑白竖条纹深缩小，nearest 只输出纯黑白，
+        // 平滑采样必然混出中间灰度。锁住窗口缩略图缩放不回退到最近邻。
+        using var src = new SKBitmap(new SKImageInfo(960, 540, SKColorType.Bgra8888, SKAlphaType.Opaque));
+        using (var canvas = new SKCanvas(src))
+        {
+            canvas.Clear(SKColors.White);
+            using var paint = new SKPaint { Color = SKColors.Black };
+            for (var x = 0; x < 960; x += 2) canvas.DrawRect(x, 0, 1, 540, paint);
+        }
+        using var outBmp = PickerThumbnails.Resize(src, 96, 54);
+
+        var hasMidGray = false;
+        for (var x = 0; x < outBmp.Width && !hasMidGray; x++)
+            for (var y = 0; y < outBmp.Height && !hasMidGray; y++)
+                if (outBmp.GetPixel(x, y).Red is > 10 and < 245)
+                    hasMidGray = true;
+        Assert.True(hasMidGray, "缩略图缩小应平滑采样（出现中间灰度），而不是 nearest 的纯黑白");
+    }
+
     private static SKBitmap MakeBitmap(int w, int h, SKColor color)
     {
         var bmp = new SKBitmap(new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque));

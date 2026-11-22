@@ -82,4 +82,30 @@ public class ThumbnailWriterTests : IDisposable
     {
         Assert.Equal(320, ThumbnailWriter.MaxEdge);
     }
+
+    [Fact]
+    public void Write_DownscaleUsesSmoothSampling_NotNearest()
+    {
+        // 与 CompositionTests 同口径：1px 黑白竖条纹深缩小，nearest 只输出纯黑白，
+        // 平滑采样必然混出中间灰度。锁住缩略图缩放不回退到最近邻。
+        Directory.CreateDirectory(_tempDir);
+        using var bitmap = new SKBitmap(new SKImageInfo(1600, 100, SKColorType.Bgra8888, SKAlphaType.Opaque));
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.White);
+            using var paint = new SKPaint { Color = SKColors.Black };
+            for (var x = 0; x < 1600; x += 2) canvas.DrawRect(x, 0, 1, 100, paint);
+        }
+
+        ThumbnailWriter.Write(_tempDir, "thumb_sampling.png", bitmap);
+
+        using var decoded = SKBitmap.Decode(Path.Combine(_tempDir, "thumb_sampling.png"));
+        Assert.NotNull(decoded);
+        var hasMidGray = false;
+        for (var x = 0; x < decoded!.Width && !hasMidGray; x++)
+            for (var y = 0; y < decoded.Height && !hasMidGray; y++)
+                if (decoded.GetPixel(x, y).Red is > 10 and < 245)
+                    hasMidGray = true;
+        Assert.True(hasMidGray, "缩略图缩小应平滑采样（出现中间灰度），而不是 nearest 的纯黑白");
+    }
 }

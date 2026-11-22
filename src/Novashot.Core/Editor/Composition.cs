@@ -1,5 +1,6 @@
 using Novashot.Core.Annotation;
 using Novashot.Core.Annotation.Model;
+using Novashot.Core.Utils;
 using SkiaSharp;
 
 namespace Novashot.Core.Editor;
@@ -28,7 +29,9 @@ public static class Composition
         ArgumentNullException.ThrowIfNull(canvas);
         ArgumentNullException.ThrowIfNull(document);
 
-        canvas.DrawBitmap(document.Source, 0, 0);
+        // 源图平滑重采样（口径统一在 Utils.Sampling）：预览视口几乎总是非 1:1，
+        // DrawBitmap 默认 nearest 会嚼出摩尔纹/马赛克，见 Sampling.cs 备注。
+        canvas.DrawImage(document.RenderImage, 0, 0, Sampling.Smooth, null);
         foreach (var annotation in document.Annotations)
         {
             if (skipAnnotation is not null && ReferenceEquals(annotation, skipAnnotation)) continue;

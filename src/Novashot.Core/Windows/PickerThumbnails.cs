@@ -1,3 +1,4 @@
+using Novashot.Core.Utils;
 using SkiaSharp;
 
 namespace Novashot.Core.Windows;
@@ -32,7 +33,9 @@ public static class PickerThumbnails
         var canvas = surface.Canvas;
         canvas.Clear(SKColors.Transparent);
         canvas.SetMatrix(SKMatrix.CreateScale((float)width / source.Width, (float)height / source.Height));
-        canvas.DrawBitmap(source, 0, 0);
+        // 非拥有包装 + 平滑采样（见 Utils.Sampling）：nearest 深缩小会让缩略图摩尔纹
+        using var srcView = SKImage.FromPixels(source.Info, source.GetPixels(), source.RowBytes);
+        canvas.DrawImage(srcView, 0, 0, Sampling.Smooth, null);
         canvas.Flush();
 
         using var image = surface.Snapshot();

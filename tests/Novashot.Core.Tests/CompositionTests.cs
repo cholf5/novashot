@@ -42,6 +42,34 @@ public class CompositionTests
     }
 
     [Fact]
+    public void Scaled_render_uses_smooth_sampling_not_nearest()
+    {
+        // 预览视口几乎总是非 1:1 缩放：1px 黑白竖条纹缩到 0.45× 后，nearest 采样只会
+        // 输出纯黑/纯白（高频细节嚼成摩尔纹，4K@150% 预览马赛克的根因），平滑采样
+        // 必然混出中间灰度。锁住源图重采样口径不回退到最近邻。
+        var src = new SKBitmap(new SKImageInfo(200, 8, SKColorType.Bgra8888, SKAlphaType.Opaque));
+        for (var x = 0; x < 200; x++)
+            for (var y = 0; y < 8; y++)
+                src.SetPixel(x, y, x % 2 == 0 ? SKColors.Black : SKColors.White);
+        var doc = new AnnotationDocument(src);
+
+        using var surface = SKSurface.Create(new SKImageInfo(90, 4, SKColorType.Bgra8888, SKAlphaType.Opaque));
+        var canvas = surface.Canvas;
+        canvas.Scale(0.45f);
+        Composition.RenderScene(canvas, doc);
+        canvas.Flush();
+
+        using var snap = surface.Snapshot();
+        using var bmp = SKBitmap.FromImage(snap);
+        var hasMidGray = false;
+        for (var x = 0; x < bmp.Width && !hasMidGray; x++)
+            for (var y = 0; y < bmp.Height && !hasMidGray; y++)
+                if (bmp.GetPixel(x, y).Red is > 10 and < 245)
+                    hasMidGray = true;
+        Assert.True(hasMidGray, "非 1:1 缩放渲染应混出中间灰度（平滑采样），而不是 nearest 的纯黑白");
+    }
+
+    [Fact]
     public void Renders_annotation_on_top_of_source()
     {
         using var src = SolidSource(40, 40, SKColors.White);

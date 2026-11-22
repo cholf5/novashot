@@ -18,6 +18,22 @@ public sealed class AnnotationDocument
     /// <summary>源图（非拥有）。像素尺寸 = <see cref="Width"/> × <see cref="Height"/>。</summary>
     public SKBitmap Source { get; }
 
+    private SKImage? _renderImage;
+
+    /// <summary>
+    /// 源图的渲染视图（懒创建，<see cref="SKImage.FromBitmap"/> 会拷贝像素、自持有内存，
+    /// 与 Source 的释放顺序解耦）。必须整个会话复用同一实例：GPU 画布的纹理/mipmap
+    /// 缓存按 SKImage 实例生效，每帧新建包装会在 4K 源图上逐帧重传。
+    /// </summary>
+    public SKImage RenderImage => _renderImage ??= SKImage.FromBitmap(Source);
+
+    /// <summary>释放渲染视图缓存。拥有 Source 的一方在释放 Source 前调用；不调用则由 GC 兜底。</summary>
+    public void ReleaseRenderImage()
+    {
+        _renderImage?.Dispose();
+        _renderImage = null;
+    }
+
     public int Width => Source.Width;
     public int Height => Source.Height;
 

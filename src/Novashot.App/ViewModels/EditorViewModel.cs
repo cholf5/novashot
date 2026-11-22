@@ -333,6 +333,7 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         CompositionPanelViewModel.Dispose();
         History.StateChanged -= OnHistoryStateChanged;
         Document.Changed -= OnDocumentChanged;
+        Document.ReleaseRenderImage(); // 渲染视图缓存随会话释放（先于 Source 所有的 CapturedImage）
         _capturedImage.Dispose();
     }
 

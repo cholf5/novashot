@@ -1,3 +1,4 @@
+using Novashot.Core.Utils;
 using SkiaSharp;
 
 namespace Novashot.Core.Library;
@@ -27,7 +28,9 @@ public static class ThumbnailWriter
         var canvas = surface.Canvas;
         canvas.Clear(SKColors.Transparent);
         canvas.SetMatrix(SKMatrix.CreateScale((float)width / bitmap.Width, (float)height / bitmap.Height));
-        canvas.DrawBitmap(bitmap, 0, 0);
+        // 非拥有包装 + 平滑采样（见 Utils.Sampling）：nearest 深缩小会让缩略图摩尔纹
+        using var srcView = SKImage.FromPixels(bitmap.Info, bitmap.GetPixels(), bitmap.RowBytes);
+        canvas.DrawImage(srcView, 0, 0, Sampling.Smooth, null);
         canvas.Flush();
 
         using var image = surface.Snapshot();
