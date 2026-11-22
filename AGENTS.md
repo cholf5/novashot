@@ -13,7 +13,7 @@ dotnet test tests/Novashot.Core.Tests             # 纯逻辑：几何/合成/�
 dotnet test tests/Novashot.App.Tests -f net10.0   # headless UI 接线（windows TFM 腿用 -f net10.0-windows10.0.19041.0）
 dotnet test tests/Novashot.Mac.Tests              # CoreGraphics / NSPasteboard（部分 Manual 用例只在 mac 上跑）
 dotnet test tests/Novashot.Linux.Tests            # Fake X11
-NOVASHOT_SNAPSHOT=1 dotnet test tests/Novashot.App.Tests -f net10.0 --filter UiSnapshot   # 视觉快照 → artifacts/ui/
+NOVASHOT_SNAPSHOT=1 dotnet test tests/Novashot.App.Tests -f net10.0-windows10.0.19041.0 --filter UiSnapshot   # 视觉快照 → artifacts/ui/（Windows 宿主必须走 windows TFM；net10.0 腿在非 mac/Linux 宿主会命中 AppServices 的 mac fail-fast 装配，DI 取服务时早爆）
 dotnet run --project src/Novashot.App             # 默认 TFM 随宿主平台；-f 显式指定
 scripts/pack-windows.sh                        # Velopack Windows 包 → artifacts/pack/
 scripts/pack-macos.sh                          # .app bundle → artifacts/pack/
