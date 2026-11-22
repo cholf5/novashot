@@ -556,11 +556,51 @@ public partial class MainWindow : Window
             _vm.PinCommand.Execute(null);
             return;
         }
+        // 视口缩放键：+/−（多数布局需 Shift，放行任意修饰，Ctrl+± 顺带兼容浏览器习惯）、
+        // 0 = 回 fit、1 = 100% 物理像素。滚轮缩放在 SkiaCanvas 内部处理。
+        // 空格 = 临时平移模式（按住 + 左键）。画布有焦点时画布自己吃掉（Handled 到不了这）；
+        // 焦点在窗口/其他控件时在此转发，滚轮缩放后直接空格拖拽也能用。
+        // 编辑文本的 guard 在上面已返回；工具 chip 聚焦时 Avalonia 按钮自吃空格（键盘激活语义优先）。
+        if (_canvas is not null && e.Key == Key.Space)
+        {
+            e.Handled = true;
+            _canvas.SetSpacePan(true);
+            return;
+        }
+        if (_canvas is not null && e.Key is Key.OemPlus or Key.Add or Key.OemMinus or Key.Subtract)
+        {
+            e.Handled = true;
+            if (e.Key is Key.OemPlus or Key.Add) _canvas.ZoomInCenter();
+            else _canvas.ZoomOutCenter();
+            return;
+        }
+        if (_canvas is not null && e.KeyModifiers == KeyModifiers.None)
+        {
+            if (e.Key == Key.D0)
+            {
+                e.Handled = true;
+                _canvas.ZoomToFit();
+                return;
+            }
+            if (e.Key == Key.D1)
+            {
+                e.Handled = true;
+                _canvas.ZoomToPhysicalPixels();
+                return;
+            }
+        }
         if (e.KeyModifiers != KeyModifiers.None) return;
         var kind = MapKeyToTool(e.Key);
         if (kind is null) return;
         editor.CurrentTool = kind.Value;
         e.Handled = true;
+    }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        // 与 OnKeyDown 的空格转发配对；画布侧 OnKeyUp/OnLostFocus 也会清，三处幂等
+        if (e.Key == Key.Space) _canvas?.SetSpacePan(false);
     }
 
     private static ToolKind? MapKeyToTool(Key key) => key switch

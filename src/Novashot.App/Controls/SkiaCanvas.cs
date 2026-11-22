@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
@@ -19,7 +20,10 @@ namespace Novashot.App.Controls;
 /// 编辑器主画布：通过 <see cref="ICustomDrawOperation"/> 拿到 Avalonia Skia 后端的 <see cref="SKCanvas"/>
 /// 直接绘制源图 + 标注 + 拖拽预览 + 选中框/手柄。
 ///
-/// 坐标：内部所有 annotation 均在<b>源图像素空间</b>；控件通过 uniform fit-to-bounds 变换绘制。
+/// 坐标：内部所有 annotation 均在<b>源图像素空间</b>；控件通过 uniform fit-to-bounds 变换绘制，
+/// 用户可叠加缩放/平移（<see cref="EditorViewport"/>）：滚轮以光标为锚缩放；平移 = 中键拖拽 /
+/// 右键拖拽 / 按住空格 + 左键（临时平移模式，左键本体仍是画标注，不动），平移模式光标为手型；
+/// 键盘 +/−/0/1（MainWindow 转发，见 <see cref="ZoomInCenter"/> 等公共入口）。
 /// Pointer 事件在 DIP 空间到达，经反变换后送给 <see cref="IAnnotationTool"/>。
 /// 选中框与手柄画在 DIP 空间，保证不随视口缩放变形。
 ///
@@ -34,6 +38,9 @@ public sealed class SkiaCanvas : Control
 
     /// <summary>手柄命中半径（DIP）。M2 的 SelectionAdorner 用 8f，此处对齐。</summary>
     public const float HandleHitRadiusDip = 8f;
+
+    /// <summary>滚轮缩放步长（每 delta=1 的倍率）。连乘到 EditorViewport.MaxZoom 封顶，真机手感再调。</summary>
+    private const double ZoomWheelStep = 1.25;
 
     /// <summary>手柄可视方块边长（DIP）。</summary>
     public const float HandleVisualSizeDip = 8f;
@@ -52,6 +59,17 @@ public sealed class SkiaCanvas : Control
 
     private IAnnotationTool? _activeTool;
     private EditorViewModel? _subscribedEditor;
+    private readonly EditorViewport _viewport = new();
+
+    // 视口平移拖拽态；null = 未在平移（中键/右键/空格+左键三路共用）
+    private Point? _panLastDip;
+
+    // 空格按住 = 临时平移模式（左键从绘图切换为平移）；KeyDown 置位、KeyUp 无条件清
+    private bool _spaceHeld;
+
+    /// <summary>平移模式（空格按住或拖拽进行中）显示手型光标；其余恢复默认箭头（null = 回继承/箭头）。</summary>
+    private void UpdatePanCursor()
+        => Cursor = (_spaceHeld || _panLastDip is not null) ? new Cursor(StandardCursorType.Hand) : null;
 
     // B-4：crop reshape 拖拽态（X 工具 + 已应用裁剪框的手柄拖拽）。非 IAnnotationTool——
     // 拖拽每步实时 ApplyCrop，Esc/CaptureLost 恢复 _cropReshapeOriginal。
@@ -68,13 +86,25 @@ public sealed class SkiaCanvas : Control
     }
 
     /// <summary>
-    /// Esc 取消进行中的工具拖拽（flameshot 逐级退出链的最后一环之前）：释放预览，不产生标注。
+    /// 空格按住 = 临时平移模式（编辑文本时按键归 TextBox，不在此接）；Esc 取消进行中的工具拖拽
+    /// （flameshot 逐级退出链的最后一环之前）：释放预览，不产生标注。
     /// 画布有焦点时（拖拽中会 Capture）先于 MainWindow 的 Deselect 生效。
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Handled || e.Key != Key.Escape) return;
+        if (e.Handled) return;
+        if (e.Key == Key.Space)
+        {
+            // 拖拽进行中不接管（平移只在按下时刻起作用，拖拽中途按空格不改语义）
+            if (Editor?.EditingText is null && _activeTool is null && _cropHandleDrag is null)
+            {
+                SetSpacePan(true);
+                e.Handled = true;
+            }
+            return;
+        }
+        if (e.Key != Key.Escape) return;
         // B-4：reshape 拖拽中的 Esc——恢复拖拽起始框（画布有焦点时先于 MainWindow 的 Deselect 生效）
         if (_cropHandleDrag is not null)
         {
@@ -89,6 +119,20 @@ public sealed class SkiaCanvas : Control
         e.Handled = true;
     }
 
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        // 无条件清：KeyDown 可能在编辑态切换中被吞，配对缺失不得让平移模式卡住
+        if (e.Key == Key.Space) SetSpacePan(false);
+    }
+
+    protected override void OnLostFocus(FocusChangedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        // 焦点漂移（按住空格时点了工具 chip 等）后 KeyUp 可能落在别的控件上，按住态作废
+        SetSpacePan(false);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -98,6 +142,7 @@ public sealed class SkiaCanvas : Control
         }
         else if (change.Property == BoundsProperty)
         {
+            ClampViewport();
             ViewportInvalidated?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -117,6 +162,7 @@ public sealed class SkiaCanvas : Control
         }
         _activeTool = null;
         _cropHandleDrag = null; // B-4（review M2）：Editor 换替时 reshape 态一并失效，防旧起始框写入新 editor
+        _viewport.Reset(); // 缩放态不跨 Editor 存续：新截图总是从 fit 开始
         InvalidateVisual();
         ViewportInvalidated?.Invoke(this, EventArgs.Empty);
     }
@@ -133,9 +179,19 @@ public sealed class SkiaCanvas : Control
             or nameof(EditorViewModel.EditingText)
             or nameof(EditorViewModel.CompositionState))
         {
+            // CompositionState 变 padding/crop 时内容尺寸会变，用户平移需重夹
+            if (e.PropertyName == nameof(EditorViewModel.CompositionState)) ClampViewport();
             InvalidateVisual();
             ViewportInvalidated?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    /// <summary>视口/内容尺寸变化后重夹用户平移（resize、padding/crop 改动共用）。</summary>
+    private void ClampViewport()
+    {
+        var editor = Editor;
+        if (editor is null) return;
+        _viewport.Clamp(Bounds.Width, Bounds.Height, new SKSize(editor.ContentWidth, editor.ContentHeight));
     }
 
     // ---- Rendering ----
@@ -162,24 +218,12 @@ public sealed class SkiaCanvas : Control
     }
 
     /// <summary>
-    /// 计算 image-pixel → DIP 的仿射变换：uniform 缩放 + 居中平移。
+    /// 计算 image-pixel → DIP 的仿射变换 = fit 基础矩阵 × 用户缩放/平移（<see cref="EditorViewport"/>）。
     /// M6b：fit 的是<b>内容尺寸</b>（含 padding）；标注坐标在 image 空间，由
     /// <see cref="ImageToContent"/> / <see cref="ContentToImage"/> 换算。
     /// </summary>
-    private static SKMatrix ComputeViewportMatrix(EditorViewModel editor, Rect bounds)
-    {
-        var w = editor.ContentWidth;
-        var h = editor.ContentHeight;
-        if (w <= 0 || h <= 0) return SKMatrix.CreateIdentity();
-
-        var scale = Math.Min(bounds.Width / w, bounds.Height / h);
-        var dx = (bounds.Width - w * scale) * 0.5;
-        var dy = (bounds.Height - h * scale) * 0.5;
-
-        var m = SKMatrix.CreateScale((float)scale, (float)scale);
-        m = m.PostConcat(SKMatrix.CreateTranslation((float)dx, (float)dy));
-        return m;
-    }
+    private SKMatrix ComputeViewportMatrix(EditorViewModel editor, Rect bounds)
+        => _viewport.ComputeMatrix(bounds.Width, bounds.Height, new SKSize(editor.ContentWidth, editor.ContentHeight));
 
     /// <summary>image-pixel 空间的 slop（用于命中测试）。视口缩放会让 DIP slop 换算成像素 slop。</summary>
     private static float DipToImageDistance(SKMatrix imageToDip, float dip)
@@ -227,7 +271,23 @@ public sealed class SkiaCanvas : Control
         base.OnPointerPressed(e);
         var editor = Editor;
         if (editor is null) return;
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        var point = e.GetCurrentPoint(this);
+
+        // 平移手势：中键 / 右键拖拽、或按住空格 + 左键（临时平移模式）。
+        // 工具/reshape 拖拽中不抢；已在平移中不重锚（另一键再按下保持本次拖拽）。
+        var wantsPan = point.Properties.IsMiddleButtonPressed
+                    || point.Properties.IsRightButtonPressed
+                    || (point.Properties.IsLeftButtonPressed && _spaceHeld);
+        if (wantsPan && _panLastDip is null && _activeTool is null && _cropHandleDrag is null)
+        {
+            _panLastDip = e.GetPosition(this);
+            e.Pointer.Capture(this);
+            UpdatePanCursor();
+            e.Handled = true;
+            return;
+        }
+
+        if (!point.Properties.IsLeftButtonPressed) return;
 
         var img = DipToImage(e.GetPosition(this));
         if (img is null) return;
@@ -307,6 +367,23 @@ public sealed class SkiaCanvas : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+
+        // 中键平移：增量写回视口并 clamp
+        if (_panLastDip is { } last)
+        {
+            var p = e.GetPosition(this);
+            var editor = Editor;
+            if (editor is not null)
+            {
+                var b = Bounds;
+                _viewport.PanBy(new SKPoint((float)(p.X - last.X), (float)(p.Y - last.Y)),
+                    b.Width, b.Height, new SKSize(editor.ContentWidth, editor.ContentHeight));
+                InvalidateVisual();
+            }
+            _panLastDip = p;
+            e.Handled = true;
+            return;
+        }
 
         // B-4：reshape 拖拽——每步实时写回 CropRect（比例吸附在 Core DragTo 内）
         if (_cropHandleDrag is { } dragKind)
@@ -388,6 +465,16 @@ public sealed class SkiaCanvas : Control
         base.OnPointerReleased(e);
         var editor = Editor;
 
+        // 平移结束（只在无工具拖拽态开启，与 reshape/tool 释放互斥）
+        if (_panLastDip is not null)
+        {
+            _panLastDip = null;
+            e.Pointer.Capture(null);
+            UpdatePanCursor();
+            e.Handled = true;
+            return;
+        }
+
         // B-4：reshape 提交——move 已实时写回，up 点再精确收尾一次（笔类输入 up 可能与末次 move 不同）
         if (_cropHandleDrag is { } dragKind)
         {
@@ -448,6 +535,8 @@ public sealed class SkiaCanvas : Control
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        _panLastDip = null;
+        UpdatePanCursor();
         CancelCropReshape();
         _activeTool?.Cancel();
         _activeTool = null;
@@ -464,6 +553,7 @@ public sealed class SkiaCanvas : Control
     }
 
     /// <summary>
+    /// 无修饰滚轮 = 视口缩放（光标为锚，<see cref="ZoomWheelStep"/>^delta 连乘）；
     /// Ctrl+滚轮：
     /// - 选中 Mosaic/Blur 时调效果强度（BlockSize 4..48 / Sigma 2..40），不动 CurrentStyle；
     /// - 否则调整当前 <see cref="EditorViewModel.CurrentStyle"/> 的描边宽度（1..16），
@@ -475,7 +565,14 @@ public sealed class SkiaCanvas : Control
         base.OnPointerWheelChanged(e);
         var editor = Editor;
         if (editor is null) return;
-        if ((e.KeyModifiers & KeyModifiers.Control) == 0) return;
+
+        // 无修饰滚轮留给视口缩放；Ctrl 留给效果强度/描边宽（M5/G-3），两个语义不混
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+        {
+            ZoomAt(e.GetPosition(this), Math.Pow(ZoomWheelStep, e.Delta.Y));
+            e.Handled = true;
+            return;
+        }
 
         // M5：效果标注优先——调强度而非描边宽
         if (editor.Selection is MosaicAnnotation mosaic)
@@ -535,6 +632,61 @@ public sealed class SkiaCanvas : Control
 
     /// <summary>拖拽预览（image 空间）；Crop 工具的预览矩形不走标注渲染，overlay 分支用。</summary>
     private SKRect? CropPreviewRect => _activeTool as CropTool is { } t ? t.PreviewRect : null;
+
+    // ---- 视口缩放公共入口（滚轮内部走 ZoomAt；键盘由 MainWindow.OnKeyDown 转发） ----
+
+    /// <summary>以视口锚点缩放 factor 倍，并经 <see cref="ViewportInvalidated"/> 通知 TextBox 重定位。</summary>
+    private void ZoomAt(Point anchorDip, double factor)
+    {
+        var editor = Editor;
+        if (editor is null) return;
+        var b = Bounds;
+        _viewport.ZoomAt(new SKPoint((float)anchorDip.X, (float)anchorDip.Y), factor,
+            b.Width, b.Height, new SKSize(editor.ContentWidth, editor.ContentHeight));
+        InvalidateVisual();
+        ViewportInvalidated?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>键盘 +：视口中心放大。</summary>
+    public void ZoomInCenter() => ZoomAt(new Point(Bounds.Width / 2, Bounds.Height / 2), ZoomWheelStep);
+
+    /// <summary>
+    /// 空格按住态的唯一变更入口：画布聚焦时自己吃 KeyDown/KeyUp 走这，MainWindow
+    /// 在焦点不在画布时也走这（窗口级转发）。光标随状态刷新。
+    /// </summary>
+    public void SetSpacePan(bool held)
+    {
+        _spaceHeld = held;
+        UpdatePanCursor();
+    }
+
+    /// <summary>键盘 −：视口中心缩小。</summary>
+    public void ZoomOutCenter() => ZoomAt(new Point(Bounds.Width / 2, Bounds.Height / 2), 1 / ZoomWheelStep);
+
+    /// <summary>键盘 0：回 fit（zoom = 1、pan 归零）。</summary>
+    public void ZoomToFit()
+    {
+        _viewport.Reset();
+        InvalidateVisual();
+        ViewportInvalidated?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 键盘 1：100% 物理像素——1 源像素 = 1 物理像素 = RenderScaling DIP。
+    /// 目标低于 fit 时被 clamp 回 fit（小图 fit 即最大）。
+    /// </summary>
+    public void ZoomToPhysicalPixels()
+    {
+        var editor = Editor;
+        if (editor is null) return;
+        var b = Bounds;
+        // Avalonia 12 的 RenderScaling 挂在 TopLevel；脱离窗口（测试）时 1.0 与 headless 一致
+        var renderScaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+        _viewport.ZoomToAbsolute(renderScaling, b.Width, b.Height,
+            new SKSize(editor.ContentWidth, editor.ContentHeight));
+        InvalidateVisual();
+        ViewportInvalidated?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>
     /// 计算 TextBox 需要覆盖的 DIP 矩形并请求 EditorViewModel 进入编辑态。
