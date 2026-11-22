@@ -13,6 +13,8 @@
 
   <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) == 'windows'">
     <OutputType>WinExe</OutputType>
+    <!-- exe 内嵌图标：Explorer/任务栏/快捷方式用；安装器图标由 pack-windows.sh 传给 vpk -->
+    <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
     <DefineConstants>$(DefineConstants);WIN_PLATFORM</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'">
@@ -23,6 +25,8 @@
   <ItemGroup>
     <!-- IBM Plex（OFL）随包分发：Assets/Fonts/OFL.txt -->
     <AvaloniaResource Include="Assets/Fonts/*.ttf" />
+    <!-- 运行时窗口/托盘图标（256px 管线产物），与安装器/exe 图标同一出处 -->
+    <EmbeddedResource Include="..\..\assets\app-icon-runtime.png" LogicalName="Novashot.App.app-icon.png" />
   </ItemGroup>
 
   <ItemGroup>

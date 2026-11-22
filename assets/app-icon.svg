@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Novashot">
+  <!-- 设计源：ChatGPT 独立设计、用户选定（方向名「爆发」）。
+       scripts/make-app-icon.py 是它的忠实 PIL 转译，ICO/PNG/macOS 资产以脚本产物为准。 -->
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#667EEA"/>
+      <stop offset="1" stop-color="#764BA2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#g1)"/>
+  <path d="M512 190 L586 412 L812 512 L586 586 L512 834 L438 586 L212 512 L438 412 Z" fill="#fff"/>
+  <path d="M512 342 L552 472 L682 512 L552 552 L512 682 L472 552 L342 512 L472 472 Z" fill="#667EEA"/>
+  <path d="M512 390 L541 483 L634 512 L541 541 L512 634 L483 541 L390 512 L483 483 Z" fill="#fff"/>
+  <path d="M236 300 L236 236 L300 236 M724 236 L788 236 L788 300 M788 724 L788 788 L724 788 M300 788 L236 788 L236 724"
+        fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+</svg>

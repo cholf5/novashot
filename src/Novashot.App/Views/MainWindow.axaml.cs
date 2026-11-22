@@ -57,7 +57,7 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
-        Icon = AppIconFactory.CreatePlaceholderWindowIcon();
+        Icon = AppIconFactory.CreateWindowIcon();
 
         _canvas = this.FindControl<SkiaCanvas>("Canvas");
         _textEditBox = this.FindControl<TextBox>("TextEditBox");

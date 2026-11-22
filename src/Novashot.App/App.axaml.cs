@@ -129,7 +129,7 @@ public partial class App : Application
     {
         _tray = new TrayIcon
         {
-            Icon = AppIconFactory.CreatePlaceholderWindowIcon(),
+            Icon = AppIconFactory.CreateWindowIcon(),
             // G-19（winshot）：tooltip 带版本号
             ToolTipText = $"Novashot v{GetAppVersion()}",
             IsVisible = true,
