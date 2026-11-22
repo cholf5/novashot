@@ -157,9 +157,12 @@ public class CropFlowTests : IDisposable
         var editor = vm.Editor!;
         editor.CompositionState = new EditorState(CropRect: new SKRect(10, 10, 50, 50));
 
+        // 四边全断：旧实现把 Width/Height 塞进 Right/Bottom 槽位，非原点矩形会倒置（2026-11-22 修复）
         var r = editor.ImageRectToContent(new SKRect(10, 10, 30, 30));
         Assert.Equal(0, r.Left);
         Assert.Equal(0, r.Top);
+        Assert.Equal(20, r.Right);
+        Assert.Equal(20, r.Bottom);
     }
 
     public void Dispose()

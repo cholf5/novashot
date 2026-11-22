@@ -185,11 +185,12 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         return new SKPoint(contentPoint.X - s.Padding + o.X, contentPoint.Y - s.Padding + o.Y);
     }
 
-    /// <summary>image 空间矩形 → 内容空间矩形。</summary>
+    /// <summary>image 空间矩形 → 内容空间矩形（四角各自映射；旧实现把 Width/Height 塞进 Right/Bottom 槽位，非原点矩形会倒置）。</summary>
     public SKRect ImageRectToContent(SKRect imageRect)
     {
         var tl = ImageToContent(new SKPoint(imageRect.Left, imageRect.Top));
-        return new SKRect(tl.X, tl.Y, imageRect.Width, imageRect.Height);
+        var br = ImageToContent(new SKPoint(imageRect.Right, imageRect.Bottom));
+        return new SKRect(tl.X, tl.Y, br.X, br.Y);
     }
 
     /// <summary>当前工具每次拖拽用完即弃（每次 pointer down 新建）。</summary>
