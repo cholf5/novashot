@@ -4,6 +4,7 @@ using Novashot.Platform.Windows.Interop;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
+using WinRT;
 using Windows.Graphics.DirectX.Direct3D11;
 
 namespace Novashot.Platform.Windows.Capture;
@@ -72,6 +73,10 @@ internal sealed class WgcCaptureContext : IDisposable
         WinRTInterop.CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.NativePointer, out var inspectable);
         try
         {
+            // 必须用 CsWinRT 运行时的 MarshalInterface（产生真正的投影包装）；手写
+            // GetObjectForIUnknown 拿到的是 RCW，后续 CreateFreeThreaded 的 ABI 编组
+            // 无法为 RCW 建 CCW（InvalidCastException: Failed to create a CCW）。
+            // FromAbi 会 AddRef，finally 里 Release 原指针平衡。
             WinRTDevice = MarshalInterface<IDirect3DDevice>.FromAbi(inspectable);
         }
         finally
@@ -87,19 +92,5 @@ internal sealed class WgcCaptureContext : IDisposable
         try { WinRTDevice?.Dispose(); } catch { }
         try { ImmediateContext?.Dispose(); } catch { }
         try { Device?.Dispose(); } catch { }
-    }
-}
-
-/// <summary>
-/// CsWinRT projections 的 IntPtr ↔ 托管对象桥接（简化版）。
-/// 复用运行时的 IUnknown 表：<see cref="Marshal.GetObjectForIUnknown"/> 对 <c>IInspectable</c> 也能识别。
-/// </summary>
-internal static class MarshalInterface<T> where T : class
-{
-    public static T FromAbi(nint ptr)
-    {
-        if (ptr == 0) throw new ArgumentException("null IUnknown", nameof(ptr));
-        var obj = Marshal.GetObjectForIUnknown(ptr);
-        return (T)obj;
     }
 }

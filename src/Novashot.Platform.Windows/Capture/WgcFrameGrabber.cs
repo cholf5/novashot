@@ -4,6 +4,7 @@ using Novashot.Platform.Windows.Interop;
 using SkiaSharp;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
+using WinRT;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
 using Windows.Graphics.DirectX.Direct3D11;
@@ -89,9 +90,10 @@ internal sealed class WgcFrameGrabber
 
     private SKBitmap FrameToSkBitmap(Direct3D11CaptureFrame frame, int width, int height)
     {
-        // IDirect3DSurface -> ID3D11Texture2D
+        // IDirect3DSurface -> ID3D11Texture2D：CsWinRT 投影对象不是 RCW，直接强转到
+        // ComImport 接口不会 QI，必须走 CastExtensions.As<T>（对原生指针 QueryInterface）
         var surface = frame.Surface;
-        var access = (WinRTInterop.IDirect3DDxgiInterfaceAccess)(object)surface;
+        var access = surface.As<WinRTInterop.IDirect3DDxgiInterfaceAccess>();
         var iid = WinRTInterop.ID3D11Texture2DIID;
         var hr = access.GetInterface(in iid, out var texPtr);
         Marshal.ThrowExceptionForHR(hr);

@@ -217,8 +217,10 @@ public sealed class WgcCaptureService : ICaptureService, IDisposable
                 var itemPtr = factoryCall(interop);
                 try
                 {
-                    var obj = Marshal.GetObjectForIUnknown(itemPtr);
-                    return (GraphicsCaptureItem)obj;
+                    // .NET Core/CsWinRT 下 RCW 强转到投影类必然 InvalidCastException（只能 QI 到接口），
+                    // 必须走投影类自带的 FromAbi；FromAbi 会 AddRef，finally 里 Release 原指针平衡
+                    // （CsWinRT interop 文档口径：ObjectReference.FromAbi = 新引用）。
+                    return GraphicsCaptureItem.FromAbi(itemPtr);
                 }
                 finally
                 {
