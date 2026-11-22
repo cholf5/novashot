@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""R-1/E-14: 生成 Prtsc 品牌图标 —— assets/app.ico（vpk --icon）与 assets/app-icon.png（macOS icns）。
+"""R-1/E-14: 生成 Novashot 品牌图标 —— assets/app.ico（vpk --icon）与 assets/app-icon.png（macOS icns）。
 
 品牌语言对齐截图编辑器默认背景渐变（EditorConfig.BackgroundColor 默认值
 linear-gradient(135deg, #667eea 0%, #764ba2 100%)）：靛蓝→紫渐变圆角方块 + 白色相机剪影。

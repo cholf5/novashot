@@ -10,7 +10,7 @@
 
 ## 子任务
 
-1. ~~`vpk` 打包流程~~ ✅ **完成（2026-11-10）**：`scripts/pack-windows.sh`——dotnet publish（**裁决：self-contained** win-x64，截图工具不给终端用户添 .NET 运行时依赖）→ `vpk '[win]' pack`（`[win]` 是 vpk 的目标平台 **directive 语法**，非文档占位符；缺了在 macOS 上会误走 osx 打包器并拒收 .ico）。产物 `Prtsc-win-Setup.exe` + `Prtsc-win-Portable.zip` + `Prtsc-{v}-full.nupkg` + `releases.win.json`/`RELEASES`（feed 索引）。**本机 macOS 实跑成功**（vpk 1.2.161 交叉打包，产物为 PE32+ x86-64；vpk 同时自动验证了 `VelopackApp.Run()` 已在 Main 中）。
+1. ~~`vpk` 打包流程~~ ✅ **完成（2026-11-10）**：`scripts/pack-windows.sh`——dotnet publish（**裁决：self-contained** win-x64，截图工具不给终端用户添 .NET 运行时依赖）→ `vpk '[win]' pack`（`[win]` 是 vpk 的目标平台 **directive 语法**，非文档占位符；缺了在 macOS 上会误走 osx 打包器并拒收 .ico）。产物 `Novashot-win-Setup.exe` + `Novashot-win-Portable.zip` + `Novashot-{v}-full.nupkg` + `releases.win.json`/`RELEASES`（feed 索引）。**本机 macOS 实跑成功**（vpk 1.2.161 交叉打包，产物为 PE32+ x86-64；vpk 同时自动验证了 `VelopackApp.Run()` 已在 Main 中）。
 2. ~~与 C-1 协调~~ ✅ 采用 vpk UpdateManager；`UpdateConfig.CheckOnStartup/SkippedVersion/FeedUrl` 全部接通（见 C-1 卡）。
 3. ~~CI~~ ✅ `.github/workflows/ci.yml`：push/PR 三平台测试矩阵（windows=Core+App windows-TFM 腿 / ubuntu=Core+Linux+App net10.0 腿 / macos=Mac+App net10.0 腿）；tag `v*` 追加 release job——版本断言（tag == Directory.Build.props `<Version>`）→ pack 脚本 → Setup.exe/Portable.zip/nupkg/feed/SHA256SUMS.txt 传 GitHub Release（gh release create/upload --clobber 幂等）。
 4. ~~安装器元数据~~ ✅ 图标 `assets/app.ico`（`scripts/make-app-icon.py` 生成，品牌渐变 #667eea→#764ba2 对齐编辑器默认背景；ICO 含 16/32/48/64/128/256 六档）；开始菜单/桌面快捷方式与卸载项由 vpk 默认处理（日志确认 Shortcuts: Desktop,StartMenuRoot）；**自启用既有 `RegistryAutostartService`——安装器不写 Run 注册表，装完由用户在设置里开**（决定记录）。

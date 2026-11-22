@@ -2,7 +2,7 @@
 
 - **优先级**: P1 ｜ **复杂度**: L ｜ **开发者**: agent（2026-11-02）｜ **状态**: Done（2026-11-02；真机项在 QA-1 §I/§J 与 `docs/qa/261102-smoke-checklist.md` ⚑ 段）
 - **依赖**: 无（与 C-1 可并行）
-- **关联**: `src/Prtsc.Core/Config/PrtscConfig.cs`（字段全部就位）、`JsonConfigStore.cs`、winshot `internal/config`、flameshot `src/config/`
+- **关联**: `src/Novashot.Core/Config/NovashotConfig.cs`（字段全部就位）、`JsonConfigStore.cs`、winshot `internal/config`、flameshot `src/config/`
 
 ## 目标
 
@@ -18,7 +18,7 @@
 6. 保存走 `IConfigStore`，schema 向后兼容。
 ## 验收标准
 
-- 所有 `PrtscConfig` 用户可感字段都有 UI 入口，改动即存（或显式保存）并即时生效（热键重注册、托盘行为切换）。
+- 所有 `NovashotConfig` 用户可感字段都有 UI 入口，改动即存（或显式保存）并即时生效（热键重注册、托盘行为切换）。
 - 热键冲突有提示，非法组合不可保存。
 - 旧版本 JSON 无迁移损失，新增字段有默认值。
 
@@ -44,5 +44,5 @@
 
 ## Verification
 
-- Related files: `src/Prtsc.App/Views/SettingsWindow.axaml(.cs)`、`src/Prtsc.App/ViewModels/SettingsViewModel.cs`、`src/Prtsc.Core/Config/PrtscConfig.cs`
+- Related files: `src/Novashot.App/Views/SettingsWindow.axaml(.cs)`、`src/Novashot.App/ViewModels/SettingsViewModel.cs`、`src/Novashot.Core/Config/NovashotConfig.cs`
 - Results: 交付时全量 635 + 91 绿；本卡真机验收并入 QA-1（未清零）。

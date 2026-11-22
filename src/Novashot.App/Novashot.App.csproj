@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- 双目标：windows TFM 出 Windows 产物；net10.0 出 macOS/Linux 可执行（平台层按 TFM 条件引用） -->
+    <TargetFrameworks>net10.0-windows10.0.19041.0;net10.0</TargetFrameworks>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace>Novashot.App</RootNamespace>
+    <AssemblyName>Novashot</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <UseAppHost>true</UseAppHost>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) == 'windows'">
+    <OutputType>WinExe</OutputType>
+    <DefineConstants>$(DefineConstants);WIN_PLATFORM</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'">
+    <OutputType>Exe</OutputType>
+    <DefineConstants>$(DefineConstants);MAC_PLATFORM</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- IBM Plex（OFL）随包分发：Assets/Fonts/OFL.txt -->
+    <AvaloniaResource Include="Assets/Fonts/*.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.0" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <!-- R-1：Velopack 更新器运行时（双 TFM 都引用，交叉平台包）。打包侧 vpk 见 scripts/pack-windows.sh -->
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Novashot.Core\Novashot.Core.csproj" />
+    <ProjectReference Include="..\Novashot.Platform.Windows\Novashot.Platform.Windows.csproj"
+                     Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) == 'windows'" />
+    <ProjectReference Include="..\Novashot.Platform.Mac\Novashot.Platform.Mac.csproj"
+                     Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'" />
+    <ProjectReference Include="..\Novashot.Platform.Linux\Novashot.Platform.Linux.csproj"
+                     Condition="$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework))) != 'windows'" />
+  </ItemGroup>
+
+  <!-- L-2 key 一致性单测：测试工程直接操作 internal Strings 双语表（同 Mac/Linux 平台工程约定） -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Novashot.App.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,7 +1,7 @@
 # B-9 Windows 深色标题栏（DWM 沉浸式深色 + FRAMECHANGED）
 
 - **优先级**: P2 ｜ **复杂度**: S ｜ **状态**: Done（真机项 QA-1 §Q 留人工冒烟）｜ **来源**: 用户反馈「本项目在 Windows 上标题栏是白的」，2026-11-11
-- **关联**: `src/Prtsc.Platform.Windows/Windowing/WindowsCaptionTheme.cs`、`src/Prtsc.Platform.Windows/Interop/{DwmApi,User32}.cs`、`src/Prtsc.App/Windowing/CaptionTheme.cs`、`App.axaml.cs`
+- **关联**: `src/Novashot.Platform.Windows/Windowing/WindowsCaptionTheme.cs`、`src/Novashot.Platform.Windows/Interop/{DwmApi,User32}.cs`、`src/Novashot.App/Windowing/CaptionTheme.cs`、`App.axaml.cs`
 
 ## 目标
 

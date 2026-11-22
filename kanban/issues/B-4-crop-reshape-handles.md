@@ -1,7 +1,7 @@
 # B-4 crop 后 reshape 手柄
 
 - **优先级**: P3 ｜ **复杂度**: S ｜ **状态**: Done（2026-11-11） ｜ **来源**: M6d 交接遗留 backlog
-- **关联**: `src/Prtsc.Core/Annotation/Editing/BoxHandles.cs`（现成）、`EditorState.CropRect`、`src/Prtsc.App/Controls/SkiaCanvas.cs`
+- **关联**: `src/Novashot.Core/Annotation/Editing/BoxHandles.cs`（现成）、`EditorState.CropRect`、`src/Novashot.App/Controls/SkiaCanvas.cs`
 
 ## 目标
 

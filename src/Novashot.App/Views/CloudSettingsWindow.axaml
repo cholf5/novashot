@@ -1,0 +1,138 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Novashot.App.ViewModels"
+        mc:Ignorable="d"
+        x:Class="Novashot.App.Views.CloudSettingsWindow"
+        x:DataType="vm:CloudSettingsViewModel"
+        Title="{DynamicResource L.Cloud.Title}"
+        Width="540" Height="660"
+        MinWidth="460" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Bg.Window}">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.flabel">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink.2}" />
+      <Setter Property="Margin" Value="0,0,0,5" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto">
+
+    <!-- header -->
+    <Border Grid.Row="0" Padding="18,16" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="h2" Text="{DynamicResource L.Cloud.Title}" />
+        <TextBlock Classes="hint" TextWrapping="Wrap" MaxWidth="480"
+                   Text="{DynamicResource L.Cloud.Lede}" />
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Margin="18,16" Spacing="20">
+
+        <!-- provider -->
+        <StackPanel Spacing="6">
+          <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.Provider}" />
+          <ComboBox Name="ProviderCombo" MinWidth="230" HorizontalAlignment="Left"
+                    SelectedIndex="{Binding ProviderIndex}">
+            <ComboBoxItem Content="{DynamicResource L.Cloud.ProviderNone}" />
+            <ComboBoxItem Content="Cloudflare R2" />
+            <ComboBoxItem Content="Google Drive" />
+          </ComboBox>
+          <CheckBox Margin="0,4,0,0" IsChecked="{Binding AutoUpload}"
+                    Content="{DynamicResource L.Cloud.AutoUpload}" />
+        </StackPanel>
+
+        <!-- None 空状态 -->
+        <Border IsVisible="{Binding IsNoneVisible}" CornerRadius="8" Padding="14"
+                BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                Background="{DynamicResource Bg.Panel}">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="{DynamicResource L.Cloud.NoneTitle}" />
+            <TextBlock Classes="hint" TextWrapping="Wrap" Text="{DynamicResource L.Cloud.NoneHint}" />
+          </StackPanel>
+        </Border>
+
+        <!-- R2 -->
+        <StackPanel IsVisible="{Binding IsR2Visible}" Spacing="12">
+          <Border Height="1" Background="{DynamicResource Line}" />
+          <TextBlock Classes="h2" Text="Cloudflare R2" FontSize="12.5" />
+          <TextBlock Classes="hint" TextWrapping="Wrap" Text="{DynamicResource L.Cloud.R2Hint}" />
+
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.AccountId}" />
+            <TextBox Text="{Binding R2AccountId}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.Bucket}" />
+            <TextBox Text="{Binding R2Bucket}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.AccessKey}" />
+            <TextBox Text="{Binding R2AccessKeyId}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.SecretKey}" />
+            <TextBox Text="{Binding R2SecretAccessKey}" PasswordChar="●" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.PublicUrl}" />
+            <TextBox Text="{Binding R2PublicUrl}" PlaceholderText="{DynamicResource L.Cloud.PublicUrlHint}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.Directory}" />
+            <TextBox Text="{Binding R2Directory}" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- GDrive -->
+        <StackPanel IsVisible="{Binding IsGDriveVisible}" Spacing="12">
+          <Border Height="1" Background="{DynamicResource Line}" />
+          <TextBlock Classes="h2" Text="Google Drive" FontSize="12.5" />
+          <TextBlock Classes="hint" TextWrapping="Wrap" Text="{DynamicResource L.Cloud.GDriveHint}" />
+
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.ClientId}" />
+            <TextBox Text="{Binding GDriveClientId}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.ClientSecret}" />
+            <TextBox Text="{Binding GDriveClientSecret}" PasswordChar="●" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.RefreshToken}" />
+            <TextBox Text="{Binding GDriveRefreshToken}" PasswordChar="●" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="flabel" Text="{DynamicResource L.Cloud.FolderId}" />
+            <TextBox Text="{Binding GDriveFolderId}" PlaceholderText="{DynamicResource L.Cloud.FolderIdHint}" />
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock Classes="hint" TextWrapping="Wrap" Text="{Binding SaveHint}" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- footer -->
+    <Border Grid.Row="2" Padding="18,12" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Button Name="TestConnectionButton" Classes="ghost" Click="OnTestConnectionClick"
+                ToolTip.Tip="{DynamicResource L.Cloud.TestTip}"
+                Content="{DynamicResource L.Cloud.Test}" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+          <Button Name="CancelButton" Content="{DynamicResource L.Common.Cancel}" Click="OnCancelClick" />
+          <Button Name="SaveButton" Classes="primary" Content="{DynamicResource L.Common.Save}"
+                  Click="OnSaveClick" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

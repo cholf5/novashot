@@ -1,7 +1,7 @@
 # B-1 粘贴支持 PNG 剪贴板格式
 
 - **优先级**: P2 ｜ **复杂度**: S ｜ **状态**: Done ｜ **来源**: M6c 交接 §5 遗留
-- **关联**: `src/Prtsc.Platform.Windows/Clipboard/WindowsClipboardService.cs`
+- **关联**: `src/Novashot.Platform.Windows/Clipboard/WindowsClipboardService.cs`
 
 ## 目标
 
@@ -14,7 +14,7 @@
 
 ## 验收标准
 
-- Chrome 里右键复制图片 → Prtsc Ctrl+V 成功进入编辑器。
+- Chrome 里右键复制图片 → Novashot Ctrl+V 成功进入编辑器。
 
 ## 测试用例
 

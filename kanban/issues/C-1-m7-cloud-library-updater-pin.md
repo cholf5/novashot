@@ -10,9 +10,9 @@
 
 ## 子任务
 
-1. ~~`Prtsc.Core/Cloud/`：`IUploadService` + R2 实现（S3 兼容 PUT，签名用 AWS SigV4 手写或最小依赖）；GDrive REST multipart；凭据键 `Prtsc_R2_*` / `Prtsc_GDrive_*`（**不迁移 WinShot 凭据**）。~~
+1. ~~`Novashot.Core/Cloud/`：`IUploadService` + R2 实现（S3 兼容 PUT，签名用 AWS SigV4 手写或最小依赖）；GDrive REST multipart；凭据键 `Novashot_R2_*` / `Novashot_GDrive_*`（**不迁移 WinShot 凭据**）。~~
    ✅ **M7a 完成（2026-11-01）**：`Cloud/SigV4Signer`（python 独立预计算向量锁定）+ `R2Uploader`（path-style PUT + SigV4 头 host;x-amz-content-sha256;x-amz-date，region=auto）+ `GDriveTokenClient`（refresh_token→access_token，缓存至过期前 60s）+ `GDriveUploader`（multipart/related metadata+bytes，可选 permissions anyone/reader → webViewLink）+ `ConfigUploadService`（按 Provider 每次分发，共享静态 HttpClient）+ `NullUploadService`。凭据改存 config.json `cloud` 节点（`r2.accessKeyId/secretAccessKey`、`gdrive.clientId/clientSecret/refreshToken`，camelCase；GDrive 节点钉为 `gdrive` 而非默认的 `gDrive`）——不迁移 WinShot 凭据。测试 402/402。
-2. Library：~~`%AppData%\Prtsc\library.json` + 缩略图目录~~ ✅ **完成**（数据层 M7a + `LibraryWindow` UI M7b：缩略图列表/复制链接/打开/删除）；导出与上传均自动入历史。
+2. Library：~~`%AppData%\Novashot\library.json` + 缩略图目录~~ ✅ **完成**（数据层 M7a + `LibraryWindow` UI M7b：缩略图列表/复制链接/打开/删除）；导出与上传均自动入历史。
 3. Updater：~~参考 `UpdateConfig.CheckOnStartup / SkippedVersion`；若与 R-1 Velopack 打包协调，改用 vpk UpdateManager（见 R-1 卡，先沟通再动手）。~~
    ✅ **完成（2026-11-10，与 R-1 合并执行）**：方案按裁决接入 **Velopack 1.2.161 vpk UpdateManager**。
    - config：`UpdateConfig` 加 `FeedUrl`（string 默认空；JSON roundtrip + 未知字段容忍有测试）。

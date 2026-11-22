@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# R-1: Prtsc Windows 打包（Velopack/vpk）。
+# R-1: Novashot Windows 打包（Velopack/vpk）。
 #
 # 流程：dotnet publish (win-x64, self-contained) → vpk pack（安装器 Setup.exe + 便携包 + nupkg feed）。
 # 裁决：self-contained——截图工具不给终端用户添 .NET 运行时依赖，体积代价可接受（~150MB）。
 # 交叉打包：vpk 支持在 macOS/Linux 上打 Windows 产物（CI windows-latest 上同样可跑本脚本）。
-# 更新通道：vpk feed 文件（releases.win.json / RELEASES）与 Prtsc-win-Setup.exe / Prtsc-win-portable.zip
+# 更新通道：vpk feed 文件（releases.win.json / RELEASES）与 Novashot-win-Setup.exe / Novashot-win-portable.zip
 #           落在输出目录，C-1 Updater 用 UpdateManager(feedUrl) 直连该目录的 http 托管（如 GitHub Releases）。
 #
 # 用法：scripts/pack-windows.sh [--version 0.1.0]   （缺省取 Directory.Build.props 的 <Version>）
@@ -14,8 +14,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TFM="net10.0-windows10.0.19041.0"
 RID="win-x64"
-PACK_ID="Prtsc"
-PACK_TITLE="Prtsc"
+PACK_ID="Novashot"
+PACK_TITLE="Novashot"
 PACK_AUTHORS="cholf5"
 CHANNEL="win"   # vpk 在 macOS 上 channel 默认 osx，必须显式钉成 win（决定 releases.{channel}.json 文件名）
 PACK_DIR="$ROOT/artifacts/pack/publish"
@@ -56,12 +56,12 @@ fi
 # 先清空 publish 目录：上次残留/已从项目移除的文件不清理会被 vpk 整目录打进包（review M6）
 rm -rf "$PACK_DIR"
 mkdir -p "$PACK_DIR"
-dotnet publish "$ROOT/src/Prtsc.App" \
+dotnet publish "$ROOT/src/Novashot.App" \
   -c Release -f "$TFM" -r "$RID" --self-contained true \
   -o "$PACK_DIR"
 
-if [[ ! -f "$PACK_DIR/Prtsc.exe" ]]; then
-  echo "ERROR: publish output missing Prtsc.exe at $PACK_DIR" >&2
+if [[ ! -f "$PACK_DIR/Novashot.exe" ]]; then
+  echo "ERROR: publish output missing Novashot.exe at $PACK_DIR" >&2
   exit 2
 fi
 
@@ -80,7 +80,7 @@ fi
   -u "$PACK_ID" \
   -v "$VERSION" \
   -p "$PACK_DIR" \
-  -e "Prtsc.exe" \
+  -e "Novashot.exe" \
   --packTitle "$PACK_TITLE" \
   --packAuthors "$PACK_AUTHORS" \
   -c "$CHANNEL" \

@@ -29,7 +29,7 @@
 
 | 项 | 说明 |
 |---|---|
-| 保存文件夹 | `Ctrl+Q` 的目标目录；留空 = `~/Pictures/Prtsc`（自动创建） |
+| 保存文件夹 | `Ctrl+Q` 的目标目录；留空 = `~/Pictures/Novashot`（自动创建） |
 | 文件名 | 三种模式：时间戳 / 按天 / 递增序号（示例见界面提示） |
 
 ## 导出
@@ -61,10 +61,10 @@
 
 ## 托盘菜单一览
 
-显示 Prtsc ｜ 全屏截图 / 区域截图 / 窗口截图 ｜ 延时截图（3s / 5s）｜ 截图启动器… ｜ 截图历史… / 云上传设置… ｜ 设置… ｜ 退出
+显示 Novashot ｜ 全屏截图 / 区域截图 / 窗口截图 ｜ 延时截图（3s / 5s）｜ 截图启动器… ｜ 截图历史… / 云上传设置… ｜ 设置… ｜ 退出
 
 托盘图标悬浮提示里带版本号，方便确认装的是哪一版。
 
 ## 配置文件
 
-设置项几乎都能在 GUI 里改；需要批量部署或排查时直接编辑 `config.json`（Windows `%AppData%\Prtsc\`，macOS `~/Library/Application Support/Prtsc/`，Linux `~/.config/Prtsc/`），保存后重启生效。字段与界面的对应关系见 [README 的配置一节](../../README.md#配置文件与数据目录)。
+设置项几乎都能在 GUI 里改；需要批量部署或排查时直接编辑 `config.json`（Windows `%AppData%\Novashot\`，macOS `~/Library/Application Support/Novashot/`，Linux `~/.config/Novashot/`），保存后重启生效。字段与界面的对应关系见 [README 的配置一节](../../README.md#配置文件与数据目录)。

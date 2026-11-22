@@ -2,7 +2,7 @@
 
 - **优先级**: P2 ｜ **复杂度**: S ｜ **开发者**: cholf5 ｜ **状态**: Done（2026-11-03）
 - **依赖**: 无（G-13/G-14 编辑器默认值已就位，本卡是它的回写方向补全）
-- **关联**: `PrtscConfig.EditorConfig`（config.json `editor` 段）、`MainWindowViewModel.ApplyEditorDefaults`、`CompositionPanelViewModel`
+- **关联**: `NovashotConfig.EditorConfig`（config.json `editor` 段）、`MainWindowViewModel.ApplyEditorDefaults`、`CompositionPanelViewModel`
 
 ## 目标
 

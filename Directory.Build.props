@@ -13,7 +13,7 @@
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <FileVersion>0.1.0.0</FileVersion>
     <Company>cholf5</Company>
-    <Product>Prtsc</Product>
+    <Product>Novashot</Product>
     <Copyright>Copyright (c) $([System.DateTime]::Now.Year) cholf5</Copyright>
 
     <!-- 许可证元数据唯一出处：全解决方案（src + tests）统一继承，勿在各 csproj 重复声明。
@@ -30,7 +30,7 @@
   </PropertyGroup>
 
   <!-- Linux 平台层：全部 P/Invoke 仅在 Linux 语义下可达（运行时按 OS 分流装配），交叉编译时告警无意义 -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Prtsc.Platform.Linux'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Novashot.Platform.Linux'">
     <NoWarn>$(NoWarn);CA1416;CA2014;CS0067</NoWarn>
   </PropertyGroup>
 

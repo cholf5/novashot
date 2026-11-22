@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Novashot.App/Novashot.App.csproj" />
+    <Project Path="src/Novashot.Core/Novashot.Core.csproj" />
+    <Project Path="src/Novashot.Platform.Linux/Novashot.Platform.Linux.csproj" />
+    <Project Path="src/Novashot.Platform.Mac/Novashot.Platform.Mac.csproj" />
+    <Project Path="src/Novashot.Platform.Windows/Novashot.Platform.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Novashot.App.Tests/Novashot.App.Tests.csproj" />
+    <Project Path="tests/Novashot.Core.Tests/Novashot.Core.Tests.csproj" />
+    <Project Path="tests/Novashot.Linux.Tests/Novashot.Linux.Tests.csproj" />
+    <Project Path="tests/Novashot.Mac.Tests/Novashot.Mac.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -2,11 +2,11 @@
 
 - **优先级**: P1 ｜ **复杂度**: S ｜ **开发者**: cholf5 ｜ **状态**: Done（2026-11-10）
 - **依赖**: 无
-- **关联**: flameshot `flameshot gui -d <ms>` / capture launcher；winshot capture launcher 延时选项；`PrtscConfig.Hotkeys`；G-26 Capture Launcher（同批合并实现）
+- **关联**: flameshot `flameshot gui -d <ms>` / capture launcher；winshot capture launcher 延时选项；`NovashotConfig.Hotkeys`；G-26 Capture Launcher（同批合并实现）
 
 ## 目标
 
-抓悬浮提示、下拉菜单、右键菜单这类「点别处就消失」的场景——winshot 与 flameshot 都有、prtsc 完全没有的能力。
+抓悬浮提示、下拉菜单、右键菜单这类「点别处就消失」的场景——winshot 与 flameshot 都有、novashot 完全没有的能力。
 
 ## 子任务
 
@@ -29,7 +29,7 @@
 
 ## Verification（2026-11-10）
 
-- TDD 先 RED 后 GREEN：Core 新增 32 用例（`DelayedCaptureCountdownTests` 8 + `CaptureDelayOptionsTests` 14 + `RegionRectSpecTests` 10，G-26 区域解析/钳制见该卡）。全量 `dotnet test` 708/708 全绿（Core 483 + App 100×2TFM + Mac 80 + Linux 45）；`dotnet build Prtsc.slnx` 双平台腿编译通过。
+- TDD 先 RED 后 GREEN：Core 新增 32 用例（`DelayedCaptureCountdownTests` 8 + `CaptureDelayOptionsTests` 14 + `RegionRectSpecTests` 10，G-26 区域解析/钳制见该卡）。全量 `dotnet test` 708/708 全绿（Core 483 + App 100×2TFM + Mac 80 + Linux 45）；`dotnet build Novashot.slnx` 双平台腿编译通过。
 - 关键设计：倒计时事件全部 marshal 回 UI 线程（App 层订阅处 `Dispatcher.UIThread.Post`，Core 保持单线程语义不做线程同步）；热键在倒计时期间 = 取消本轮（唯一明确取消手段），托盘/启动器再触发 = 取消旧轮按新意图处理（重启倒计时）——裁决写入 handoff。
 - 快照：`artifacts/ui/40-launcher.png`（G-26）。
 - **Review pass（同日独立审查后修复）**：C-1（250ms settle 间隙内新延时触发被旧 finisher 提前抓帧、角标入快照）以 Core `CountdownOrchestrator` 轮次裁决修复（pending 绑定轮次号，完成轮次不匹配即作废）；I-1（状态机 Start/Cancel 与线程池回调的并发契约）内部加 Monitor 锁。两处修复都有「去实现必挂、恢复即绿」的确定性回归用例（`CountdownOrchestratorTests` 7 + `DelayedCaptureCountdownConcurrencyTests` 3 + 轮次用例 4 + `Resolve` 纯函数用例，Core 共 +19）。修复后 727/727 全绿（Core 502 + App 100×2TFM + Mac 80 + Linux 45）。详见 handoff §5。

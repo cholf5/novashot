@@ -69,12 +69,12 @@ CUR=$(read_version)
 # 在 Windows 上跑 windows TFM 腿；直接把两条腿都在本机跑会在另一条腿上挂（WinRT / macOS P/Invoke）。
 # Linux.Tests 用 Fake X11，不碰真实 X server，mac 上也能跑。
 run_tests() {
-  dotnet test tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj --nologo -v q
-  dotnet test tests/Prtsc.Linux.Tests/Prtsc.Linux.Tests.csproj --nologo -v q
+  dotnet test tests/Novashot.Core.Tests/Novashot.Core.Tests.csproj --nologo -v q
+  dotnet test tests/Novashot.Linux.Tests/Novashot.Linux.Tests.csproj --nologo -v q
   case "$OS" in
-    Darwin) dotnet test tests/Prtsc.Mac.Tests/Prtsc.Mac.Tests.csproj --nologo -v q
-            dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0 --nologo -v q ;;
-    *)      dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0-windows10.0.19041.0 --nologo -v q ;;
+    Darwin) dotnet test tests/Novashot.Mac.Tests/Novashot.Mac.Tests.csproj --nologo -v q
+            dotnet test tests/Novashot.App.Tests/Novashot.App.Tests.csproj -f net10.0 --nologo -v q ;;
+    *)      dotnet test tests/Novashot.App.Tests/Novashot.App.Tests.csproj -f net10.0-windows10.0.19041.0 --nologo -v q ;;
   esac
 }
 
@@ -102,7 +102,7 @@ else
   echo "<Version> 已是 ${VERSION}，跳过 bump 提交，直接打 tag"
 fi
 
-git tag -a "$TAG" -m "Prtsc $TAG"
+git tag -a "$TAG" -m "Novashot $TAG"
 git push origin main "$TAG"
 
 SLUG=$(git remote get-url origin | sed -E 's#.*github\.com[:/]##; s#\.git$##')
@@ -202,9 +202,9 @@ has_asset() {
 }
 
 MISSING=
-for want in "Prtsc-win-Setup.exe" "Prtsc-win-Portable.zip" "Prtsc-*-full.nupkg" \
+for want in "Novashot-win-Setup.exe" "Novashot-win-Portable.zip" "Novashot-*-full.nupkg" \
   "releases.win.json" "RELEASES" "SHA256SUMS.txt" \
-  "Prtsc-${VERSION}-osx-arm64.zip" "Prtsc-${VERSION}-osx-x64.zip"; do
+  "Novashot-${VERSION}-osx-arm64.zip" "Novashot-${VERSION}-osx-x64.zip"; do
   has_asset "$want" || MISSING="${MISSING} ${want}"
 done
 if [ -n "$MISSING" ]; then

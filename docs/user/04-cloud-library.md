@@ -7,7 +7,7 @@
 ### Cloudflare R2（S3 兼容）
 
 1. Cloudflare → R2 → Manage API Tokens，建一个可写该桶的 Token，记下 **Account ID**
-2. 在 Prtsc 里填：Account ID、Bucket、Access Key ID、Secret Access Key
+2. 在 Novashot 里填：Account ID、Bucket、Access Key ID、Secret Access Key
 3. 可选：**公开访问地址**（如 `https://img.example.com`）——填了才会生成可分享链接；不填则上传成功但没有 URL
 4. 可选：**上传目录**——对象 key 前缀，用来按目录归档
 
@@ -15,7 +15,7 @@
 
 1. Google Cloud Console 建 OAuth「桌面应用」客户端
 2. 用离线授权换一个 `refresh_token`
-3. 在 Prtsc 里填：Client ID、Client Secret、Refresh Token
+3. 在 Novashot 里填：Client ID、Client Secret、Refresh Token
 4. 可选：目标文件夹 ID（留空 = 我的云端硬盘根目录）
 
 ### 测试连接
@@ -61,7 +61,7 @@
 
 ## 数据保存在哪
 
-Windows `%AppData%\Prtsc\`、macOS `~/Library/Application Support/Prtsc/`、Linux `~/.config/Prtsc/`：
+Windows `%AppData%\Novashot\`、macOS `~/Library/Application Support/Novashot/`、Linux `~/.config/Novashot/`：
 
 - `library.json`：历史索引
 - `Thumbs/thumb_<id>.png`：缩略图

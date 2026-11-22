@@ -10,7 +10,7 @@
 
 ## 子任务
 
-1. Windows Toast/气球通知封装进 `Prtsc.Platform.Windows`（Core 定义 `INotificationService` + Fake）。
+1. Windows Toast/气球通知封装进 `Novashot.Platform.Windows`（Core 定义 `INotificationService` + Fake）。
 2. 触发点：导出成功、QuickSave 落盘、复制到剪贴板、上传成功（含 URL）。
 3. 受 `ShowNotification` 开关控制；通知点击可打开文件所在目录（做得到的话）。
 
@@ -26,10 +26,10 @@
 
 按 PM 裁决执行（简报 batch5）：
 
-1. **平台范围**：Windows 实弹（WinRT `Windows.UI.Notifications.ToastNotificationManager`，AUMID=`Prtsc`）；
+1. **平台范围**：Windows 实弹（WinRT `Windows.UI.Notifications.ToastNotificationManager`，AUMID=`Novashot`）；
    **mac/Linux 本卡只装配 Core 的 `NullNotificationService`（静默）**，不做
    UNUserNotificationCenter / AppIndicator 通知（handoff 记录，未排期）。
-2. **未打包降级**：`CreateToastNotifier("Prtsc")` 在无快捷方式机器上可能抛 → `ToastNotificationService.Show`
+2. **未打包降级**：`CreateToastNotifier("Novashot")` 在无快捷方式机器上可能抛 → `ToastNotificationService.Show`
    内 try-catch 降级为 Warning 日志，fire-and-forget 契约（绝不影响导出/复制/上传）；真机验证路径进 QA-1 §K。
 3. **触发面四处**：导出（`MainWindow.ExportCurrentAsync` → `vm.NotifyExported(path)`）、
    QuickSave 落盘（VM 成功分支，通知带落盘路径）、复制（`Copy` 成功分支——手动 Ctrl+C / 工具栏；

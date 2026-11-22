@@ -14,15 +14,15 @@ flameshot 的小工具，选区内反色。基建齐全，实现成本低，随�
 
 ## 测试用例
 
-- [x] 反色像素语义单测（`tests/Prtsc.Core.Tests/InvertAnnotationTests.cs`：区域内外像素语义 + 退化区域）。
+- [x] 反色像素语义单测（`tests/Novashot.Core.Tests/InvertAnnotationTests.cs`：区域内外像素语义 + 退化区域）。
 
 ## 落点
 
-- `src/Prtsc.Core/Annotation/Model/InvertAnnotation.cs`（先把选区内源像素画回原位再反色，区域外像素零改动）
-- `src/Prtsc.App/ViewModels/EditorViewModel.cs`（`RegionEffectTool` 工厂）、`MainWindow.axaml`（工具坞按钮 + 图标）、`Loc.cs`（`Tool.Invert` / `Kind.Invert` 双语）
+- `src/Novashot.Core/Annotation/Model/InvertAnnotation.cs`（先把选区内源像素画回原位再反色，区域外像素零改动）
+- `src/Novashot.App/ViewModels/EditorViewModel.cs`（`RegionEffectTool` 工厂）、`MainWindow.axaml`（工具坞按钮 + 图标）、`Loc.cs`（`Tool.Invert` / `Kind.Invert` 双语）
 
 ## Verification
 
-- How to run/verify: `dotnet test tests/Prtsc.Core.Tests --filter InvertAnnotationTests`
+- How to run/verify: `dotnet test tests/Novashot.Core.Tests --filter InvertAnnotationTests`
 - Results: Core 全量绿（并入 GAP-1 的 553/553 基线之后历次全量跑通过）
 - 真机项：QA-1 §D（工具坞 15 工具各画一笔）

@@ -1,10 +1,10 @@
 # 07 故障排查
 
-先看日志：Windows `%AppData%\Prtsc\logs\`、macOS `~/Library/Application Support/Prtsc/logs/`、Linux `~/.config/Prtsc/logs/`，按天滚动、保留 14 天（`prtsc-YYYYMMDD.log`）。报问题时带上最后一段日志与系统版本最省时间。
+先看日志：Windows `%AppData%\Novashot\logs\`、macOS `~/Library/Application Support/Novashot/logs/`、Linux `~/.config/Novashot/logs/`，按天滚动、保留 14 天（`novashot-YYYYMMDD.log`）。报问题时带上最后一段日志与系统版本最省时间。
 
 ## 截图是黑的 / 抓不到内容
 
-- **macOS**：没给「屏幕录制」权限。系统设置 → 隐私与安全性 → 屏幕录制 → 勾上 Prtsc 后**重启 Prtsc**（授权后必须重开进程）。未授权时日志与界面都会给出这条指引。
+- **macOS**：没给「屏幕录制」权限。系统设置 → 隐私与安全性 → 屏幕录制 → 勾上 Novashot 后**重启 Novashot**（授权后必须重开进程）。未授权时日志与界面都会给出这条指引。
 - **Linux**：没有 `DISPLAY`（纯 Wayland 会话）或 `DISPLAY` 指向不可用的 X server。见下方「Wayland」。
 - **Wayland（GNOME/KDE 原生会话）**：当前只支持 XWayland。检查 `echo $XDG_SESSION_TYPE`，若为 `wayland`，登录界面改用「Xorg / X11 会话」，或暂时用系统自带截图工具。原生 Wayland 支持见看板 LINUX-2。
 - **Windows**：受 DRM 保护的内容（部分播放器、Netflix）系统层面禁止抓取，任何截图工具都拿不到。
@@ -18,13 +18,13 @@
 
 ## Linux 剪贴板不通
 
-Prtsc 的 X11 剪贴板依赖 `xclip`。没装时所有剪贴板操作会安全降级（静默失败、日志 warning）：
+Novashot 的 X11 剪贴板依赖 `xclip`。没装时所有剪贴板操作会安全降级（静默失败、日志 warning）：
 
 ```bash
 which xclip || sudo apt install xclip     # 或 dnf install xclip
 ```
 
-另外 X11 剪贴板由 Prtsc 进程持有：**退出程序会清掉剪贴板里的图**（X11 固有语义）。需要长期保存请落盘或上传。
+另外 X11 剪贴板由 Novashot 进程持有：**退出程序会清掉剪贴板里的图**（X11 固有语义）。需要长期保存请落盘或上传。
 
 ## Windows 首次运行被 SmartScreen 拦
 
@@ -35,7 +35,7 @@ which xclip || sudo apt install xclip     # 或 dnf install xclip
 - 只看 Windows：macOS/Linux 目前装配的是空实现（静默），这是已知限制
 - 检查 设置 → 常规 → 截图完成通知 是否被关
 - 系统侧：专注助手 / 勿扰 / 通知权限关闭时 toast 会被系统吞掉
-- 安装版才用 AUMID `Prtsc`；源码 `dotnet run` 场景下 AUMID 未注册 → 只记日志不弹窗（预期降级）。排查可跑 `Get-StartApps | findstr Prtsc` 看 AUMID 是否存在
+- 安装版才用 AUMID `Novashot`；源码 `dotnet run` 场景下 AUMID 未注册 → 只记日志不弹窗（预期降级）。排查可跑 `Get-StartApps | findstr Novashot` 看 AUMID 是否存在
 
 ## 应用内更新一直没提示
 
@@ -58,7 +58,7 @@ which xclip || sudo apt install xclip     # 或 dnf install xclip
 ## 托盘图标消失 / 双击没反应
 
 - Windows：图标被折叠进溢出区，拖回收纳栏或改系统设置
-- 关窗隐藏到托盘的语义下，「退出」只在托盘菜单里；找不到图标时任务管理器结束 `Prtsc.exe` 后重启
+- 关窗隐藏到托盘的语义下，「退出」只在托盘菜单里；找不到图标时任务管理器结束 `Novashot.exe` 后重启
 
 ## 配置被写坏 / 想重置
 
@@ -67,6 +67,6 @@ which xclip || sudo apt install xclip     # 或 dnf install xclip
 ## 反馈问题时请提供
 
 1. 系统与版本（Windows 11 23H2 / macOS 14.5 / Ubuntu 24.04 + X11 或 Wayland）
-2. Prtsc 版本（托盘悬浮提示或设置页）
+2. Novashot 版本（托盘悬浮提示或设置页）
 3. 复现步骤（越短越好）
 4. 对应时间段的日志片段

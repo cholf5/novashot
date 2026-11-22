@@ -24,14 +24,14 @@ flameshot 式能力：用户可配置哪些工具/按钮出现在工具环与面
 ## 测试用例
 
 - [x] 可见性过滤纯函数单测（Core `ToolVisibilityTests` 13 例：空/未知/去重/大小写/Select 强制/规范序/ToConfig 全选空表/dock 决策表 4 例含中间组坍缩）。
-- [x] config 往返序列化（PrtscConfig JSON round-trip + 缺省 `{}` 空表）。
+- [x] config 往返序列化（NovashotConfig JSON round-trip + 缺省 `{}` 空表）。
 - [x] App 接线（`ToolDockVisibilityWiringTests` 5 例：默认全可见/部分过滤+孤线/Changed 重算/当前工具隐藏回落 Select/隐藏工具热键仍可用）。
 - [x] 设置页（`SettingsViewModelTests` +4 例：默认全勾 Select 禁改/部分 config 加载/部分保存/全选保存空表；`SettingsWindowXamlTests` +1 例：编辑器分区 15 勾选框且 1 个禁用）。
 - [ ] 真机冒烟（设置页勾选 UI 视觉/保存即时生效）记入 QA-1 §P。
 
 ## 关联文档
 
-- `docs/roadmap.md`（flameshot 差距来源）；实现：`src/Prtsc.Core/Annotation/Tools/ToolVisibility.cs`、`MainWindow.axaml(.cs)` ApplyToolVisibility、`SettingsViewModel` ToolItems、`SettingsWindow.axaml` 编辑器分区
+- `docs/roadmap.md`（flameshot 差距来源）；实现：`src/Novashot.Core/Annotation/Tools/ToolVisibility.cs`、`MainWindow.axaml(.cs)` ApplyToolVisibility、`SettingsViewModel` ToolItems、`SettingsWindow.axaml` 编辑器分区
 
 ## Development Log
 
@@ -46,6 +46,6 @@ flameshot 式能力：用户可配置哪些工具/按钮出现在工具环与面
 
 ## Verification
 
-- Related files: `src/Prtsc.Core/Annotation/Tools/ToolVisibility.cs`, `src/Prtsc.Core/Config/PrtscConfig.cs`, `src/Prtsc.App/Views/MainWindow.axaml(.cs)`, `src/Prtsc.App/ViewModels/SettingsViewModel.cs`, `src/Prtsc.App/Views/SettingsWindow.axaml`, `src/Prtsc.App/Localization/Loc.cs`
-- How to run/verify: `dotnet test tests/Prtsc.Core.Tests --filter ToolVisibilityTests`；`dotnet test tests/Prtsc.App.Tests -f net10.0`；`PRTSC_SNAPSHOT=1 dotnet test tests/Prtsc.App.Tests -f net10.0 --filter UiSnapshot` → `artifacts/ui/06-editor-dock-filtered.png`
+- Related files: `src/Novashot.Core/Annotation/Tools/ToolVisibility.cs`, `src/Novashot.Core/Config/NovashotConfig.cs`, `src/Novashot.App/Views/MainWindow.axaml(.cs)`, `src/Novashot.App/ViewModels/SettingsViewModel.cs`, `src/Novashot.App/Views/SettingsWindow.axaml`, `src/Novashot.App/Localization/Loc.cs`
+- How to run/verify: `dotnet test tests/Novashot.Core.Tests --filter ToolVisibilityTests`；`dotnet test tests/Novashot.App.Tests -f net10.0`；`NOVASHOT_SNAPSHOT=1 dotnet test tests/Novashot.App.Tests -f net10.0 --filter UiSnapshot` → `artifacts/ui/06-editor-dock-filtered.png`
 - Results: Core 773/773；App 203/203（net10.0，windows TFM 单独跑同样绿）；Mac 91/91；Linux 46/46

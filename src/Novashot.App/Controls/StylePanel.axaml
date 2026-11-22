@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Novashot.App.ViewModels"
+             xmlns:controls="using:Novashot.App.Controls"
+             mc:Ignorable="d"
+             d:DesignWidth="264" d:DesignHeight="420"
+             x:Class="Novashot.App.Controls.StylePanel"
+             x:DataType="vm:StylePanelViewModel">
+
+  <StackPanel Margin="12,14,12,4" Spacing="16">
+
+    <!-- Colour：界面里唯一鲜艳的东西 -->
+    <StackPanel>
+      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,9">
+        <TextBlock Classes="sec" Text="{DynamicResource L.Panel.Colour}" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Classes="val" Text="{Binding StrokeHex}" />
+      </Grid>
+      <ItemsControl x:Name="ColorSwatches" ItemsSource="{Binding PresetColors}" Margin="-2,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="4" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <!-- 颜色切换走 code-behind（Tag 承载 SKColor） -->
+            <ToggleButton Classes="swatch" Click="OnSwatchClick" Tag="{Binding}">
+              <ToggleButton.Background>
+                <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}" />
+              </ToggleButton.Background>
+            </ToggleButton>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- E-1 M9：取色历史行（会话级最近 10 色，最新在前；点历史色 = 设为描边色）。空则整行隐藏 -->
+      <StackPanel IsVisible="{Binding HasColorHistory}" Margin="0,6,0,0">
+        <TextBlock Classes="label" Text="{DynamicResource L.Panel.History}" Margin="0,0,0,4" />
+        <ItemsControl x:Name="HistorySwatches" ItemsSource="{Binding HistoryColors}" Margin="-2,0">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="5" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <ToggleButton Classes="swatch small" Click="OnSwatchClick" Tag="{Binding}"
+                             ToolTip.Tip="{Binding}">
+                <ToggleButton.Background>
+                  <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}" />
+                </ToggleButton.Background>
+              </ToggleButton>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+
+    <!-- Stroke -->
+    <StackPanel>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="label" Text="{DynamicResource L.Panel.Stroke}" />
+        <TextBlock Grid.Column="1" Classes="val" Text="{Binding StrokeWidth, StringFormat='{}{0:0} px'}" />
+      </Grid>
+      <Slider Minimum="1" Maximum="16" TickFrequency="1" IsSnapToTickEnabled="True"
+              Value="{Binding StrokeWidth, Mode=TwoWay}" Margin="0,3,0,0" />
+      <Grid ColumnDefinitions="*,*,*">
+        <TextBlock Classes="mono hint" FontSize="9.5" Text="1" />
+        <TextBlock Grid.Column="1" Classes="mono hint" FontSize="9.5" Text="8" HorizontalAlignment="Center" />
+        <TextBlock Grid.Column="2" Classes="mono hint" FontSize="9.5" Text="16" HorizontalAlignment="Right" />
+      </Grid>
+    </StackPanel>
+
+    <!-- Font size（仅文字工具） -->
+    <StackPanel IsVisible="{Binding IsFontSizeAvailable}">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="label" Text="{DynamicResource L.Panel.TextSize}" />
+        <TextBlock Grid.Column="1" Classes="val" Text="{Binding FontSize, StringFormat='{}{0:0}'}" />
+      </Grid>
+      <Slider Minimum="12" Maximum="72" TickFrequency="2" IsSnapToTickEnabled="True"
+              Value="{Binding FontSize, Mode=TwoWay}" Margin="0,3,0,0" />
+      <Grid ColumnDefinitions="*,*,*">
+        <TextBlock Classes="mono hint" FontSize="9.5" Text="12" />
+        <TextBlock Grid.Column="1" Classes="mono hint" FontSize="9.5" Text="42" HorizontalAlignment="Center" />
+        <TextBlock Grid.Column="2" Classes="mono hint" FontSize="9.5" Text="72" HorizontalAlignment="Right" />
+      </Grid>
+    </StackPanel>
+
+    <Border Height="1" Background="{DynamicResource Line}" Margin="0,2" />
+
+    <!-- 当前选中 -->
+    <StackPanel>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="sec" Text="{DynamicResource L.Panel.Selection}" />
+        <TextBlock Grid.Column="1" Classes="val" Text="{Binding SelectionKindLabel}" />
+      </Grid>
+    </StackPanel>
+
+  </StackPanel>
+</UserControl>

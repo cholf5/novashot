@@ -22,11 +22,11 @@
   终端抹掉隔离标记，之后双击直接过，不分系统版本：
 
   ```bash
-  xattr -cr /Applications/Prtsc.app
+  xattr -cr /Applications/Novashot.app
   ```
 
   图形界面路线：系统设置 → 隐私与安全性 → 滚到最下面 →「仍要打开」→ 输开机密码 → 再双击确认一次。
-- 不想碰 Gatekeeper：直接从源码跑 `dotnet run --project src/Prtsc.App`。
+- 不想碰 Gatekeeper：直接从源码跑 `dotnet run --project src/Novashot.App`。
 
 **后续**：买证书后接进 `pack-windows.sh` / `pack-macos.sh`（macOS 还需公证 + staple）。付费前提，不是代码问题。
 
@@ -37,7 +37,7 @@
 **原因**：macOS 的屏幕录制是 TCC 权限，按「可执行文件的签名身份 + 路径」记账；未签名的副本换路径/换版本
 会被当成新应用重新询问。授权状态的变更也要进程重启才生效。
 
-**现在怎么绕**：系统设置 → 隐私与安全性 → 屏幕录制 → 勾选 Prtsc → **退出并重启 Prtsc**。
+**现在怎么绕**：系统设置 → 隐私与安全性 → 屏幕录制 → 勾选 Novashot → **退出并重启 Novashot**。
 换了 `.app` 位置之后可能再问一次。
 
 ### 3. macOS / Linux 没有安装器，也没有应用内更新
@@ -48,8 +48,8 @@
 （`IsInstalled` 为真）。macOS 腿为了让下载件能过 Gatekeeper 只做 ad-hoc 封签，不产 Velopack 包；
 Linux 本版不发预编译包。详见 [`ci-release.md`](ci-release.md) 的「macOS 为什么要自己组 .app」。
 
-**现在怎么绕**：macOS 下新 zip → 退出 Prtsc → 替换 `/Applications/Prtsc.app` → 重新打开。
-配置文件在 `~/Library/Application Support/Prtsc/`，不受替换影响。
+**现在怎么绕**：macOS 下新 zip → 退出 Novashot → 替换 `/Applications/Novashot.app` → 重新打开。
+配置文件在 `~/Library/Application Support/Novashot/`，不受替换影响。
 
 ### 4. Linux 只发源码构建，且依赖 `xclip`
 
@@ -63,7 +63,7 @@ Linux 本版不发预编译包。详见 [`ci-release.md`](ci-release.md) 的「m
 ```bash
 sudo apt install xclip                # Debian/Ubuntu
 sudo dnf install xclip                # Fedora
-dotnet publish src/Prtsc.App -c Release -f net10.0 -r linux-x64 --self-contained true -o out
+dotnet publish src/Novashot.App -c Release -f net10.0 -r linux-x64 --self-contained true -o out
 ```
 
 ### 5. Wayland 只支持 XWayland
@@ -95,7 +95,7 @@ dotnet publish src/Prtsc.App -c Release -f net10.0 -r linux-x64 --self-contained
 **原因**：Windows 剪贴板会同时放 DIBV5 + DIB + PNG 三种格式。PNG 编码是 UI 线程同步做的，
 实测 1080p ~72ms、4K ~278ms、4K 噪声 ~992ms，所以超过 4MP 就跳过 PNG，只留 DIBV5/DIB。
 
-**现在怎么绕**：需要 PNG 时用 `Ctrl+S` 导出文件，或用 `Ctrl+Q` 快存到 `~/Pictures/Prtsc`。
+**现在怎么绕**：需要 PNG 时用 `Ctrl+S` 导出文件，或用 `Ctrl+Q` 快存到 `~/Pictures/Novashot`。
 
 ## 三、验证覆盖（诚实清单）
 

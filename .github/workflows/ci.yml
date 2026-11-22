@@ -1,4 +1,4 @@
-# Prtsc CI（R-1）。
+# Novashot CI（R-1）。
 #
 # 测试矩阵 = 三个 runner 各跑自己平台能跑的腿（划分对齐本地基线口径
 # Core 785 / App 209×2TFM / Mac 91 / Linux 46）：
@@ -62,8 +62,8 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Core + App (windows TFM)
         run: |
-          dotnet test tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj
-          dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0-windows10.0.19041.0
+          dotnet test tests/Novashot.Core.Tests/Novashot.Core.Tests.csproj
+          dotnet test tests/Novashot.App.Tests/Novashot.App.Tests.csproj -f net10.0-windows10.0.19041.0
 
   test-linux:
     runs-on: ubuntu-latest
@@ -80,9 +80,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libfontconfig1 fonts-noto-cjk
       - name: Core + Linux + App (net10.0 leg)
         run: |
-          dotnet test tests/Prtsc.Core.Tests/Prtsc.Core.Tests.csproj
-          dotnet test tests/Prtsc.Linux.Tests/Prtsc.Linux.Tests.csproj
-          dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0
+          dotnet test tests/Novashot.Core.Tests/Novashot.Core.Tests.csproj
+          dotnet test tests/Novashot.Linux.Tests/Novashot.Linux.Tests.csproj
+          dotnet test tests/Novashot.App.Tests/Novashot.App.Tests.csproj -f net10.0
 
       # Linux 启动冒烟：没人双击过 Linux 版本，这是 CI 能做的最近似的事。
       # 走 CLI（L-1 的捕获命令不进 Avalonia、不弹窗），在虚拟 X 上真抓一帧落盘——
@@ -92,8 +92,8 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb x11-utils >/dev/null
-          dotnet publish src/Prtsc.App -c Release -f net10.0 -r linux-x64 --self-contained true -o smoke/app
-          chmod +x smoke/app/Prtsc
+          dotnet publish src/Novashot.App -c Release -f net10.0 -r linux-x64 --self-contained true -o smoke/app
+          chmod +x smoke/app/Novashot
 
           Xvfb :99 -screen 0 1280x1024x24 >/dev/null 2>&1 &
           export DISPLAY=:99
@@ -106,8 +106,8 @@ jobs:
           xdpyinfo -display :99 >/dev/null 2>&1 || { echo "::error::Xvfb did not become ready"; exit 1; }
 
           mkdir -p smoke/out
-          ./smoke/app/Prtsc full --path "$PWD/smoke/out" > smoke/cli.log 2>&1 || {
-            echo "::error::prtsc full exited non-zero"; cat smoke/cli.log; exit 1; }
+          ./smoke/app/Novashot full --path "$PWD/smoke/out" > smoke/cli.log 2>&1 || {
+            echo "::error::novashot full exited non-zero"; cat smoke/cli.log; exit 1; }
           cat smoke/cli.log
 
           PNG=$(find smoke/out -type f -name '*.png' | head -1)
@@ -126,8 +126,8 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Mac + App (net10.0 leg)
         run: |
-          dotnet test tests/Prtsc.Mac.Tests/Prtsc.Mac.Tests.csproj
-          dotnet test tests/Prtsc.App.Tests/Prtsc.App.Tests.csproj -f net10.0
+          dotnet test tests/Novashot.Mac.Tests/Novashot.Mac.Tests.csproj
+          dotnet test tests/Novashot.App.Tests/Novashot.App.Tests.csproj -f net10.0
 
   # Windows 打包腿。tag push 与手动 dispatch 都跑；只是「上传 Release」那一步只在 tag 上，
   # 所以 dispatch 就是一次实弹 dry-run（打包 + 冒烟 + 校验和，产物留在 run 的 artifacts 里）。
@@ -180,9 +180,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $setup = (Resolve-Path "artifacts/pack/Prtsc-win-Setup.exe").Path
-          $dir = Join-Path $env:LOCALAPPDATA "Prtsc"
-          $exe = Join-Path $dir "Prtsc.exe"
+          $setup = (Resolve-Path "artifacts/pack/Novashot-win-Setup.exe").Path
+          $dir = Join-Path $env:LOCALAPPDATA "Novashot"
+          $exe = Join-Path $dir "Novashot.exe"
 
           function Invoke-Bounded([string]$file, [string[]]$arguments, [int]$timeoutMs) {
             Write-Host "run: $file $($arguments -join ' ')"
@@ -210,7 +210,7 @@ jobs:
             Get-ChildItem $dir | Select-Object Name, Length | Format-Table | Out-String | Write-Host
 
             # 安装器可能已经把应用拉起来（postinstall）。先杀掉，免得卸载撞文件锁。
-            Get-Process -Name Prtsc -ErrorAction SilentlyContinue | Stop-Process -Force
+            Get-Process -Name Novashot -ErrorAction SilentlyContinue | Stop-Process -Force
             Start-Sleep -Seconds 2
 
             $uninstaller = Join-Path $dir "Update.exe"
@@ -221,7 +221,7 @@ jobs:
             } else {
               Invoke-Bounded $setup @("--uninstall") 300000
             }
-            Get-Process -Name Prtsc -ErrorAction SilentlyContinue | Stop-Process -Force
+            Get-Process -Name Novashot -ErrorAction SilentlyContinue | Stop-Process -Force
             Wait-ForFile $exe $false 60
             Write-Host "uninstalled cleanly"
           } catch {
@@ -238,15 +238,15 @@ jobs:
         shell: bash
         run: |
           cd artifacts/pack
-          shasum -a 256 Prtsc-win-Setup.exe Prtsc-win-Portable.zip Prtsc-*.full.nupkg > SHA256SUMS.txt
+          shasum -a 256 Novashot-win-Setup.exe Novashot-win-Portable.zip Novashot-*.full.nupkg > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: pack-win
           path: |
-            artifacts/pack/Prtsc-win-Setup.exe
-            artifacts/pack/Prtsc-win-Portable.zip
+            artifacts/pack/Novashot-win-Setup.exe
+            artifacts/pack/Novashot-win-Portable.zip
             artifacts/pack/*.full.nupkg
             artifacts/pack/releases.win.json
             artifacts/pack/RELEASES
@@ -291,7 +291,7 @@ jobs:
           for zip in artifacts/pack/*osx-*.zip; do
             rm -rf /tmp/verify && mkdir -p /tmp/verify
             ditto -x -k "$zip" /tmp/verify
-            codesign --verify --strict /tmp/verify/Prtsc.app
+            codesign --verify --strict /tmp/verify/Novashot.app
             echo "ok: $zip"
           done
 
@@ -326,7 +326,7 @@ jobs:
           rm -f SHA256SUMS.txt
           for f in *; do [ -f "$f" ] && sha256sum "$f" >> SHA256SUMS.txt; done
           cat SHA256SUMS.txt
-      # 不给 --title 时 Release 标题是空串，一律给「Prtsc vX.Y.Z」。
+      # 不给 --title 时 Release 标题是空串，一律给「Novashot vX.Y.Z」。
       # --verify-tag：tag 不在远端就早点炸，而不是建一个指向默认分支的空 Release。
       - name: Create release and upload assets
         env:
@@ -338,6 +338,6 @@ jobs:
           if [ -f "$NOTES_FILE" ]; then NOTES_ARG="--notes-file $NOTES_FILE"; else NOTES_ARG="--generate-notes"; fi
           # 重复 push 同一 tag 时幂等：Release 已存在就不再 create（--clobber 覆盖上传）。
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Prtsc ${GITHUB_REF_NAME}" $NOTES_ARG
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Novashot ${GITHUB_REF_NAME}" $NOTES_ARG
           gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name'

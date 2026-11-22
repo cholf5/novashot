@@ -2,7 +2,7 @@
 
 - **优先级**: P3 ｜ **复杂度**: S ｜ **状态**: Done（真机项 QA-1 §P 留人工冒烟）｜ **来源**: M6c 交接遗留 backlog
 - **Development Log 补充（2026-11-11）**：headless 玩法两坑——① `await Dispatcher.UIThread.InvokeAsync` 把任务完成绑在 UI 循环泵上，改 `Post` fire-and-forget 后加载任务在后台线程即可完成；② 测试方法体跑在 session 循环线程上，多段 Dispatch/Show 组合会在 `session.Dispose()` 自等挂死（dotnet-stack 实证 MoveNext→Dispose），改单 Dispatch 内联 `GetResult + RunJobs` 后 3 例 260ms 全绿。多段 Dispatch 模式对同套件其余测试保持不变（它们单 Dispatch 内无 UI 依赖）。
-- **关联**: `src/Prtsc.App/Views/WindowPickerDialog.axaml(.cs)`
+- **关联**: `src/Novashot.App/Views/WindowPickerDialog.axaml(.cs)`
 
 ## 目标
 
@@ -37,6 +37,6 @@
 
 ## Verification
 
-- Related files: `src/Prtsc.Core/Windows/PickerThumbnails.cs`, `src/Prtsc.App/Views/WindowPickerDialog.axaml(.cs)`, `src/Prtsc.App/Views/MainWindow.axaml.cs`
-- How to run/verify: `dotnet test tests/Prtsc.Core.Tests --filter PickerThumbnailsTests`；`dotnet test tests/Prtsc.App.Tests -f net10.0 --filter WindowPickerThumbnailTests`；真机开窗口捕获 picker 目视
+- Related files: `src/Novashot.Core/Windows/PickerThumbnails.cs`, `src/Novashot.App/Views/WindowPickerDialog.axaml(.cs)`, `src/Novashot.App/Views/MainWindow.axaml.cs`
+- How to run/verify: `dotnet test tests/Novashot.Core.Tests --filter PickerThumbnailsTests`；`dotnet test tests/Novashot.App.Tests -f net10.0 --filter WindowPickerThumbnailTests`；真机开窗口捕获 picker 目视
 - Results: Core 785/785；App 206/206（net10.0 与 net10.0-windows 均实测）；Mac 91/91；Linux 46/46；真机冒烟入 QA-1 §P

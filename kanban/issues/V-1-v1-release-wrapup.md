@@ -11,7 +11,7 @@
 1. **版本号**：`Directory.Build.props` `<Version>` 从 `0.1.0` 改成首个发布版本；`ci.yml` 的 release job 会断言 `tag == Version`，两边必须同步改。
 2. **CI 首跑**：推远端后看 `test-windows / test-linux / test-macos` 三 job 是否绿（本地只验过 YAML 语法）。风险点：runner 上 `dotnet-version: '10.0.x'` 可用性、Windows 宿主 bash（Git Bash）跑 `scripts/pack-windows.sh`。
 3. **tag + release**：打 `v*` tag → release job 出 Setup.exe / Portable.zip / nupkg + sha256 清单 + feed 文件（`releases.win.json`）。打之前先把 Q-1 的栈溢出清掉，否则 release job 的测试门可能随机挂。
-4. **README**：仓库根目录**没有 README**。至少要覆盖：这是什么（flameshot 式截图/标注工具，三平台）、平台支持矩阵（Windows 全功能 / macOS / Linux X11，Wayland 仅 XWayland）、安装（Setup / Portable / 源码构建）、首次使用（热键、托盘、QuickSave 目录）、CLI 用法（`prtsc --help` 摘录）、配置位置、已知限制（未签名 SmartScreen、Wayland、mac/Linux 无系统通知）。
+4. **README**：仓库根目录**没有 README**。至少要覆盖：这是什么（flameshot 式截图/标注工具，三平台）、平台支持矩阵（Windows 全功能 / macOS / Linux X11，Wayland 仅 XWayland）、安装（Setup / Portable / 源码构建）、首次使用（热键、托盘、QuickSave 目录）、CLI 用法（`novashot --help` 摘录）、配置位置、已知限制（未签名 SmartScreen、Wayland、mac/Linux 无系统通知）。
 5. **用户文档**：roadmap M11 明写「用户文档」。可先 README + `docs/user/`（截图/标注/导出/云上传/Library/设置/CLI 各一页），不必等站点。
 6. **签名方案拍板**：产物未签名 → SmartScreen 拦。选项：EV 证书 / Azure Trusted Signing / 明确「不签」并写进 README 的已知限制。
 7. **macOS 分发渠道**：vpk osx 腿 / .app bundle / Homebrew，三选一或明确「本版不发 mac 包」。
@@ -20,14 +20,14 @@
 
 - [x] 4. README：仓库根 `README.md` 已写（特性 / 平台矩阵与已知限制 / 安装 / 快速上手 / 快捷键 / CLI / 配置与数据目录 / 构建与打包 / 测试 / 项目结构 / 文档索引）。
 - [x] 5. 用户文档：`docs/user/` 八页（索引、捕获、标注、合成导出、云与历史、设置、CLI、故障排查），README 已互链。
-- 顺手修正：设置页 QuickSave 三种命名模式的示例文案与实现不一致（`prtsc-20261102-094213` → 实际 `prtsc_2026-11-02_09-42-13` / `prtsc_001`），双语同步。
+- 顺手修正：设置页 QuickSave 三种命名模式的示例文案与实现不一致（`novashot-20261102-094213` → 实际 `novashot_2026-11-02_09-42-13` / `novashot_001`），双语同步。
 - [x] 6. 签名方案：**明确不签**，理由与用户绕法写进 README + `docs/release/known-limitations.md`（2026-11-20）。
 - [x] 7. mac 分发：`scripts/pack-macos.sh`（`.app` + ad-hoc 封签 + zip）+ CI `pack-macos` 腿（2026-11-20）。
 - [ ] 1/2/3 待远端或真机：版本号、CI 首跑、tag+release、签名、mac 分发。另需拍板 **LICENSE**（仓库当前没有，README 已如实标注）。
 
 **进度（2026-11-20）—— 工程侧收口，剩下的是发版动作与真机**
 
-按 Tokenmetry 已发七个版本的成熟做法搬过来（不搬 Inno Setup / Native AOT / 测试工程拆分：prtsc 已投
+按 Tokenmetry 已发七个版本的成熟做法搬过来（不搬 Inno Setup / Native AOT / 测试工程拆分：novashot 已投
 Velopack，AOT 与 WGC+双 TFM 无关，headless session 已踩平 Q-1）：
 
 - **LICENSE 拍板**：AGPL-3.0-or-later（仓库根 `LICENSE` 全文；`Directory.Build.props` 加
@@ -44,7 +44,7 @@ Velopack，AOT 与 WGC+双 TFM 无关，headless session 已踩平 Q-1）：
   release 正文优先 `--notes-file`。**版本号仍未改**：`0.1.0` 的 bump 由 `release.sh 1.0.0` 在打 tag 时完成。
 - **CI 打包 dry-run + 两处冒烟**：`workflow_dispatch` 触发时会实弹跑打包与冒烟、但不建 Release；
   Windows 侧静默装/卸冒烟（不用 `Start-Process -Wait`，卸载是延迟清理要轮询），Linux 侧 Xvfb +
-  `prtsc full --path` 真抓一帧（断言退出码 0 且 PNG >1KB）。
+  `novashot full --path` 真抓一帧（断言退出码 0 且 PNG >1KB）。
 - **签名（子任务 6）拍板 = 明确不签**：无 EV 证书与 Apple 开发者账号。结论写进 README 与
   `docs/release/known-limitations.md`（含 macOS 26 上「右键打开」已失效、首推 `xattr -cr`）。
 - **mac 分发（子任务 7）落地**：`scripts/pack-macos.sh` —— self-contained publish → `.app` bundle

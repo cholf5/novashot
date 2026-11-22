@@ -1,4 +1,4 @@
-# Prtsc
+# Novashot
 
 > flameshot 式的跨平台截图 / 标注 / 分享工具：**截图 → 就地标注 → 一步合成落盘、进剪贴板或上传**，常驻托盘、全局热键随叫随到。
 >
@@ -33,7 +33,7 @@
 **合成与输出**
 - 24 套渐变背景 + 纯色 / 无背景（透明预览显示棋盘格）+ 自动取边缘色
 - Padding、圆角、阴影、内衬、边框（外/中/内）、输出比例、开箱即用的编辑器默认值记忆
-- 导出 PNG / JPEG / WebP；`Ctrl+S` 导出、`Ctrl+Q` 快存（默认 `~/Pictures/Prtsc`）、`Ctrl+C` 复制
+- 导出 PNG / JPEG / WebP；`Ctrl+S` 导出、`Ctrl+Q` 快存（默认 `~/Pictures/Novashot`）、`Ctrl+C` 复制
 - 剪贴板双向：读 DIBV5 / DIB / PNG，写 DIBV5 + DIB + PNG（>4MP 跳过大图 PNG 编码），透明背景不拍平
 - `Ctrl+P` 贴图窗（置顶、可拖动/滚轮缩放）
 
@@ -42,7 +42,7 @@
 - Library 截图历史：缩略图、打开、复制链接、删除（可选连磁盘文件一起删）
 
 **其他**
-- CLI：`prtsc full|region|window|gui --delay --path --clipboard --format`，单实例自动转发给已运行实例
+- CLI：`novashot full|region|window|gui --delay --path --clipboard --format`，单实例自动转发给已运行实例
 - 设置中心 GUI：热键录制、自启、托盘行为、QuickSave、导出默认值、编辑器默认值、捕获开关、语言、更新检查
 - 简体中文 / English 双语，跟随系统或手动切换
 - 桌面通知（Windows toast）、Velopack 应用内更新
@@ -61,7 +61,7 @@
 
 **已知限制**（完整清单与绕法见 [`docs/release/known-limitations.md`](docs/release/known-limitations.md)）
 - **产物没有代码签名**：Windows SmartScreen 提示「未知发布者」→「更多信息 → 仍要运行」；macOS 提示
-  「无法验证开发者」，最省事是 `xattr -cr /Applications/Prtsc.app`（macOS 26 上右键「打开」已失效）
+  「无法验证开发者」，最省事是 `xattr -cr /Applications/Novashot.app`（macOS 26 上右键「打开」已失效）
 - **Wayland**：仅在 XWayland 会话下可用，原生 Wayland 截图协议未支持（看板 LINUX-2）
 - **macOS 需要屏幕录制权限**：系统设置 → 隐私与安全性 → 屏幕录制，勾选后重启应用
 - **只有 Windows 有系统级通知与应用内更新**；macOS / Linux 换版本要手动替换，Linux 本版只发源码构建
@@ -70,7 +70,7 @@
 
 **Windows**
 
-1. 从 Releases 下载 `Prtsc-win-Setup.exe`（安装版）或 `Prtsc-win-Portable.zip`（便携版）
+1. 从 Releases 下载 `Novashot-win-Setup.exe`（安装版）或 `Novashot-win-Portable.zip`（便携版）
 2. 安装后从开始菜单启动，程序常驻托盘
 3. 需要更新时在「设置 → 常规 → 更新 feed 地址」填入 feed 根地址（形如 `https://github.com/<owner>/<repo>/releases/latest/download/`），之后启动时自动检查
 
@@ -78,14 +78,14 @@
 
 **macOS**
 
-从 Releases 下载 `Prtsc-<版本>-osx-arm64.zip`（Apple Silicon）或 `-osx-x64.zip`（Intel），解压得到
-`Prtsc.app`，拖进「应用程序」。产物是 ad-hoc 签名、未公证，首次打开会被 Gatekeeper 拦一次：
+从 Releases 下载 `Novashot-<版本>-osx-arm64.zip`（Apple Silicon）或 `-osx-x64.zip`（Intel），解压得到
+`Novashot.app`，拖进「应用程序」。产物是 ad-hoc 签名、未公证，首次打开会被 Gatekeeper 拦一次：
 
 ```bash
-xattr -cr /Applications/Prtsc.app     # 抹掉隔离标记，之后双击直接开
+xattr -cr /Applications/Novashot.app     # 抹掉隔离标记，之后双击直接开
 ```
 
-然后授权「屏幕录制」（系统设置 → 隐私与安全性 → 屏幕录制 → 勾选 Prtsc），重启应用即可按热键截图。
+然后授权「屏幕录制」（系统设置 → 隐私与安全性 → 屏幕录制 → 勾选 Novashot），重启应用即可按热键截图。
 macOS 版不参与应用内更新：换版本 = 退出 → 替换 `.app` → 重开。
 
 **Linux**
@@ -130,15 +130,15 @@ sudo dnf install xclip        # Fedora
 CLI 与 GUI 共用同一份配置和平台层；已有实例在跑时，命令会整条转发给该实例（不启新进程）。
 
 ```bash
-prtsc                                  # 无参数 = 启动 GUI（已有实例则前置窗口）
-prtsc gui                              # 同上
-prtsc full                             # 全屏截图（无 GUI 也可 headless 执行）
-prtsc full --path ~/Pictures           # 存到指定目录（文件名按配置的命名模式）
-prtsc full --clipboard                # 复制到剪贴板
-prtsc region --geometry 0,0,1280,720  # 区域截图（物理像素，虚拟桌面坐标）
-prtsc window                           # 窗口截图（需要已运行的 GUI 实例弹选择器）
-prtsc full --delay 3 -f jpeg -p /tmp   # 延时 3 秒 + JPEG
-prtsc --help                           # 完整用法
+novashot                                  # 无参数 = 启动 GUI（已有实例则前置窗口）
+novashot gui                              # 同上
+novashot full                             # 全屏截图（无 GUI 也可 headless 执行）
+novashot full --path ~/Pictures           # 存到指定目录（文件名按配置的命名模式）
+novashot full --clipboard                # 复制到剪贴板
+novashot region --geometry 0,0,1280,720  # 区域截图（物理像素，虚拟桌面坐标）
+novashot window                           # 窗口截图（需要已运行的 GUI 实例弹选择器）
+novashot full --delay 3 -f jpeg -p /tmp   # 延时 3 秒 + JPEG
+novashot --help                           # 完整用法
 ```
 
 | 选项 | 说明 |
@@ -154,14 +154,14 @@ prtsc --help                           # 完整用法
 
 ## 配置文件与数据目录
 
-Windows 在 `%AppData%\Prtsc\`，macOS 在 `~/Library/Application Support/Prtsc/`，Linux 在 `~/.config/Prtsc/`：
+Windows 在 `%AppData%\Novashot\`，macOS 在 `~/Library/Application Support/Novashot/`，Linux 在 `~/.config/Novashot/`：
 
 | 文件/目录 | 内容 |
 |---|---|
 | `config.json` | 全部设置（热键、启动、QuickSave、导出、捕获、编辑器默认值、云凭据、更新、语言） |
 | `library.json` | Library 历史索引 |
 | `Thumbs/` | Library 缩略图 |
-| `logs/prtsc-YYYYMMDD.log` | 运行日志（按天滚动，保留 14 天） |
+| `logs/novashot-YYYYMMDD.log` | 运行日志（按天滚动，保留 14 天） |
 
 设置中心覆盖了几乎全部字段，改 JSON 只在前置配置或排查时用；手改后重启生效。云凭据明文存在 `config.json` 中，请自行注意文件权限。
 
@@ -170,16 +170,16 @@ Windows 在 `%AppData%\Prtsc\`，macOS 在 `~/Library/Application Support/Prtsc/
 需要 [.NET SDK 10](https://dotnet.microsoft.com/)；UI 为 Avalonia 12。
 
 ```bash
-git clone <repo> && cd prtsc
-dotnet build Prtsc.slnx                 # 全解决方案
-dotnet run --project src/Prtsc.App      # 启动（默认 TFM 随宿主平台）
+git clone <repo> && cd novashot
+dotnet build Novashot.slnx                 # 全解决方案
+dotnet run --project src/Novashot.App      # 启动（默认 TFM 随宿主平台）
 ```
 
 按平台显式指定目标：
 
 ```bash
-dotnet run --project src/Prtsc.App -f net10.0-windows10.0.19041.0   # Windows
-dotnet run --project src/Prtsc.App -f net10.0                        # macOS / Linux
+dotnet run --project src/Novashot.App -f net10.0-windows10.0.19041.0   # Windows
+dotnet run --project src/Novashot.App -f net10.0                        # macOS / Linux
 ```
 
 **打包**
@@ -191,23 +191,23 @@ scripts/pack-windows.sh --version 1.0.0 # 或显式指定
 scripts/pack-macos.sh                   # macOS .app（本机架构）；--rids "osx-arm64 osx-x64" 两个架构
 ```
 
-Windows 产物在 `artifacts/pack/`：`Prtsc-win-Setup.exe`、`Prtsc-win-Portable.zip`、`*.nupkg`、
-`releases.win.json` / `RELEASES`（更新 feed）。macOS 产物是同目录的 `Prtsc-<版本>-osx-<arch>.zip`
+Windows 产物在 `artifacts/pack/`：`Novashot-win-Setup.exe`、`Novashot-win-Portable.zip`、`*.nupkg`、
+`releases.win.json` / `RELEASES`（更新 feed）。macOS 产物是同目录的 `Novashot-<版本>-osx-<arch>.zip`
 （`.app` bundle + ad-hoc 封签）。发版流程与资产契约见 [`docs/release/ci-release.md`](docs/release/ci-release.md)。
 
 ## 测试
 
 ```bash
-dotnet test tests/Prtsc.Core.Tests       # 785 例（纯逻辑：几何/合成/导出/配置/CLI 协议…）
-dotnet test tests/Prtsc.App.Tests -f net10.0   # 212 例（headless UI 接线；windows TFM 腿 218 例）
-dotnet test tests/Prtsc.Mac.Tests        # 91 例（含真粘贴板 Manual 用例）
-dotnet test tests/Prtsc.Linux.Tests      # 46 例（Fake X11）
+dotnet test tests/Novashot.Core.Tests       # 785 例（纯逻辑：几何/合成/导出/配置/CLI 协议…）
+dotnet test tests/Novashot.App.Tests -f net10.0   # 212 例（headless UI 接线；windows TFM 腿 218 例）
+dotnet test tests/Novashot.Mac.Tests        # 91 例（含真粘贴板 Manual 用例）
+dotnet test tests/Novashot.Linux.Tests      # 46 例（Fake X11）
 ```
 
 视觉快照（把真实窗口渲染成 PNG 到 `artifacts/ui/`，供人工核对主题）：
 
 ```bash
-PRTSC_SNAPSHOT=1 dotnet test tests/Prtsc.App.Tests -f net10.0 --filter UiSnapshot
+NOVASHOT_SNAPSHOT=1 dotnet test tests/Novashot.App.Tests -f net10.0 --filter UiSnapshot
 ```
 
 CI（`.github/workflows/ci.yml`）在 Windows / Linux / macOS 三平台跑对应测试腿，test-linux 末尾还会在 Xvfb
@@ -222,11 +222,11 @@ gh workflow run ci.yml                  # 或者先做一次打包 dry-run（不
 ## 项目结构
 
 ```
-src/Prtsc.Core             纯逻辑：标注模型、合成、导出、配置、Library、云上传、CLI 协议与执行器
-src/Prtsc.App              Avalonia UI：主窗口、overlay、编辑器、设置中心、托盘、CLI 编排
-src/Prtsc.Platform.Windows  WGC/GDI 抓帧、窗口枚举、热键、剪贴板、自启、toast
-src/Prtsc.Platform.Mac      CoreGraphics/CGWindowList、Carbon 热键、NSPasteboard、launchd
-src/Prtsc.Platform.Linux    X11 抓帧、EWMH、XGrabKey、xclip、XDG Autostart
+src/Novashot.Core             纯逻辑：标注模型、合成、导出、配置、Library、云上传、CLI 协议与执行器
+src/Novashot.App              Avalonia UI：主窗口、overlay、编辑器、设置中心、托盘、CLI 编排
+src/Novashot.Platform.Windows  WGC/GDI 抓帧、窗口枚举、热键、剪贴板、自启、toast
+src/Novashot.Platform.Mac      CoreGraphics/CGWindowList、Carbon 热键、NSPasteboard、launchd
+src/Novashot.Platform.Linux    X11 抓帧、EWMH、XGrabKey、xclip、XDG Autostart
 tests/                     Core / App（headless）/ Mac / Linux 四套测试
 docs/                      设计、handoff、QA 清单、用户手册
 kanban/                    看板与卡（board.md + issues/）
@@ -245,4 +245,4 @@ kanban/                    看板与卡（board.md + issues/）
 
 [AGPL-3.0-or-later](LICENSE)。改名再分发请更换品牌标识。
 
-随包分发的 IBM Plex 字体按 SIL OFL 授权，见 `src/Prtsc.App/Assets/Fonts/OFL.txt`。
+随包分发的 IBM Plex 字体按 SIL OFL 授权，见 `src/Novashot.App/Assets/Fonts/OFL.txt`。

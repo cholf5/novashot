@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Novashot.App.Update"
+        mc:Ignorable="d"
+        x:Class="Novashot.App.Views.UpdatePromptWindow"
+        x:DataType="vm:UpdatePromptViewModel"
+        Title="{DynamicResource L.Update.Prompt.Title}"
+        Width="420" MinWidth="380" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        CanResize="False"
+        Background="{DynamicResource Bg.Window}">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.flabel">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink.2}" />
+    </Style>
+  </Window.Styles>
+
+  <StackPanel Margin="20,18" Spacing="16">
+
+    <TextBlock Classes="h2" Text="{DynamicResource L.Update.Prompt.Title}" />
+    <TextBlock Classes="hint" TextWrapping="Wrap" Text="{Binding Lede}" />
+
+    <TextBlock Classes="flabel" TextWrapping="Wrap" Text="{Binding BusyText}"
+               IsVisible="{Binding IsBusy}" />
+
+    <TextBlock Classes="hint" TextWrapping="Wrap" Text="{Binding Hint}" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"
+                IsVisible="{Binding IsActionVisible}">
+      <Button Name="LaterButton" Content="{DynamicResource L.Update.Prompt.Later}"
+              Click="OnLaterClick" />
+      <Button Name="SkipButton" Content="{DynamicResource L.Update.Prompt.Skip}"
+              Click="OnSkipClick" />
+      <Button Name="InstallButton" Classes="primary"
+              Content="{DynamicResource L.Update.Prompt.Install}" Click="OnInstallClick" />
+    </StackPanel>
+  </StackPanel>
+</Window>

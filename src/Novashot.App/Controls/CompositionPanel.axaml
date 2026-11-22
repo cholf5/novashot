@@ -1,0 +1,179 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Novashot.App.ViewModels"
+             xmlns:conv="using:Novashot.App.Converters"
+             xmlns:controls="using:Novashot.App.Controls"
+             mc:Ignorable="d"
+             d:DesignWidth="264" d:DesignHeight="640"
+             x:Class="Novashot.App.Controls.CompositionPanel"
+             x:DataType="vm:CompositionPanelViewModel">
+
+  <UserControl.Resources>
+    <conv:CssGradientToBrushConverter x:Key="CssGradient" />
+  </UserControl.Resources>
+
+  <StackPanel Margin="12,14,12,16" Spacing="16">
+
+    <!-- Background -->
+    <StackPanel>
+      <TextBlock Classes="sec" Text="{DynamicResource L.Panel.Background}" Margin="0,0,0,9" />
+
+      <Border Background="#26000000" CornerRadius="8" Padding="3" Margin="0,0,0,9">
+        <Grid ColumnDefinitions="*,*,*">
+          <RadioButton Name="BgNoneChip" Classes="chip" GroupName="BgKind" Tag="None" Content="{DynamicResource L.Common.None}"
+                       ToolTip.Tip="{DynamicResource L.Panel.BackgroundNoneTip}"
+                       Click="OnBgKindClick"
+                       IsChecked="{Binding IsBgNone, Mode=OneWay}" />
+          <RadioButton Name="BgSolidChip" Grid.Column="1" Classes="chip" GroupName="BgKind" Tag="Solid" Content="{DynamicResource L.Common.Solid}"
+                       Click="OnBgKindClick"
+                       IsChecked="{Binding IsBgSolid, Mode=OneWay}" />
+          <RadioButton Name="BgGradientChip" Grid.Column="2" Classes="chip" GroupName="BgKind" Tag="Gradient" Content="{DynamicResource L.Common.Gradient}"
+                       Click="OnBgKindClick"
+                       IsChecked="{Binding IsBgGradient, Mode=OneWay}" />
+        </Grid>
+      </Border>
+
+      <!-- 自动取边缘色 + 纯色板 -->
+      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,5">
+        <TextBlock Classes="hint" FontSize="10.5" Text="{DynamicResource L.Panel.BackgroundAuto}"
+                   VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="quiet" Height="20" Padding="7,0" FontSize="10.5"
+                Content="A" Click="OnAutoEdgeColorClick"
+                ToolTip.Tip="{DynamicResource L.Panel.BackgroundAutoTip}" />
+      </Grid>
+
+      <ItemsControl ItemsSource="{Binding PresetColors}" Margin="-2,0,0,8">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="4" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ToggleButton Classes="swatch" Click="OnSolidColorClick" Tag="{Binding}">
+              <ToggleButton.Background>
+                <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}" />
+              </ToggleButton.Background>
+            </ToggleButton>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Classes="hint" FontSize="10.5" Text="{DynamicResource L.Common.Gradient}" Margin="0,0,0,5" />
+      <ItemsControl x:Name="GradientPresets" ItemsSource="{Binding Gradients}" Margin="-2,0,0,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="6" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <!-- 单值转换器：CssGradientToBrushConverter 只接 Binding（MultiBinding 会炸，见 MAC 冒烟回归） -->
+            <ToggleButton Classes="grad" Height="20" Click="OnGradientClick" Tag="{Binding Value}"
+                          ToolTip.Tip="{Binding Name}">
+              <ToggleButton.Background>
+                <Binding Path="Value" Converter="{StaticResource CssGradient}" />
+              </ToggleButton.Background>
+            </ToggleButton>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <Border Height="1" Background="{DynamicResource Line}" />
+
+    <!-- Frame -->
+    <StackPanel>
+      <TextBlock Classes="sec" Text="{DynamicResource L.Panel.Frame}" Margin="0,0,0,10" />
+
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="label" Text="{DynamicResource L.Panel.Padding}" />
+        <TextBlock Grid.Column="1" Classes="val" Text="{Binding Padding, StringFormat='{}{0:0}'}" />
+      </Grid>
+      <Slider Minimum="0" Maximum="96" TickFrequency="4" IsSnapToTickEnabled="True"
+              Value="{Binding Padding, Mode=TwoWay}" Margin="0,3,0,0" />
+      <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,12">
+        <TextBlock Classes="mono hint" FontSize="9.5" Text="0" />
+        <TextBlock Grid.Column="1" Classes="mono hint" FontSize="9.5" Text="48" HorizontalAlignment="Center" />
+        <TextBlock Grid.Column="2" Classes="mono hint" FontSize="9.5" Text="96" HorizontalAlignment="Right" />
+      </Grid>
+
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="label" Text="{DynamicResource L.Panel.Radius}" />
+        <TextBlock Grid.Column="1" Classes="val" Text="{Binding CornerRadius, StringFormat='{}{0:0}'}" />
+      </Grid>
+      <Slider Minimum="0" Maximum="48" TickFrequency="2" IsSnapToTickEnabled="True"
+              Value="{Binding CornerRadius, Mode=TwoWay}" Margin="0,3,0,0" />
+      <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,12">
+        <TextBlock Classes="mono hint" FontSize="9.5" Text="0" />
+        <TextBlock Grid.Column="1" Classes="mono hint" FontSize="9.5" Text="24" HorizontalAlignment="Center" />
+        <TextBlock Grid.Column="2" Classes="mono hint" FontSize="9.5" Text="48" HorizontalAlignment="Right" />
+      </Grid>
+
+      <!-- Shadow -->
+      <CheckBox IsChecked="{Binding ShadowOn, Mode=TwoWay}" Content="{DynamicResource L.Panel.Shadow}" />
+      <Slider Minimum="4" Maximum="48" TickFrequency="2" IsSnapToTickEnabled="True" Margin="0,2,0,10"
+              IsEnabled="{Binding ShadowOn}" Value="{Binding ShadowSize, Mode=TwoWay}" />
+
+      <!-- Border -->
+      <CheckBox IsChecked="{Binding BorderOn, Mode=TwoWay}" Content="{DynamicResource L.Panel.Border}" />
+      <Slider Minimum="1" Maximum="12" TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,2,0,6"
+              IsEnabled="{Binding BorderOn}" Value="{Binding BorderWidth, Mode=TwoWay}" />
+      <ComboBox SelectedIndex="{Binding BorderStyleIndex, Mode=TwoWay}" IsEnabled="{Binding BorderOn}"
+                HorizontalAlignment="Stretch" Margin="0,0,0,6" FontSize="12">
+        <ComboBoxItem Content="{DynamicResource L.Panel.Outside}" />
+        <ComboBoxItem Content="{DynamicResource L.Panel.Center}" />
+        <ComboBoxItem Content="{DynamicResource L.Panel.Inside}" />
+      </ComboBox>
+      <ItemsControl ItemsSource="{Binding PresetColors}" IsEnabled="{Binding BorderOn}" Margin="-2,0,0,10">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="4" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ToggleButton Classes="swatch" Height="22" Click="OnBorderColorClick" Tag="{Binding}">
+              <ToggleButton.Background>
+                <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}" />
+              </ToggleButton.Background>
+            </ToggleButton>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- Inset -->
+      <CheckBox IsChecked="{Binding InsetOn, Mode=TwoWay}" Content="{DynamicResource L.Panel.Inset}" />
+      <Slider Minimum="2" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,2,0,6"
+              IsEnabled="{Binding InsetOn}" Value="{Binding InsetSize, Mode=TwoWay}" />
+      <ItemsControl ItemsSource="{Binding PresetColors}" IsEnabled="{Binding InsetOn}" Margin="-2,0,0,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="4" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ToggleButton Classes="swatch" Height="22" Click="OnInsetColorClick" Tag="{Binding}">
+              <ToggleButton.Background>
+                <SolidColorBrush Color="{Binding Converter={x:Static controls:SKColorToAvaloniaColorConverter.Instance}}" />
+              </ToggleButton.Background>
+            </ToggleButton>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <Border Height="1" Background="{DynamicResource Line}" />
+
+    <!-- Crop ratio -->
+    <StackPanel>
+      <TextBlock Classes="label" Text="{DynamicResource L.Panel.CropRatio}" Margin="0,0,0,6" />
+      <ComboBox ItemsSource="{Binding CropRatioLabels}" SelectedIndex="{Binding CropRatioIndex, Mode=TwoWay}"
+                HorizontalAlignment="Stretch" FontSize="12" />
+    </StackPanel>
+
+  </StackPanel>
+</UserControl>

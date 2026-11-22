@@ -4,9 +4,9 @@
 
 | 方式 | 默认热键 | 入口 |
 |---|---|---|
-| 全屏（整个虚拟桌面） | `PrintScreen` | 主窗口命令列表 / 托盘「全屏截图」 / CLI `prtsc full` |
-| 区域 | `Ctrl+PrintScreen` | 主窗口 / 托盘 / CLI `prtsc region` |
-| 窗口 | `Ctrl+Shift+PrintScreen` | 主窗口 / 托盘 / CLI `prtsc window` |
+| 全屏（整个虚拟桌面） | `PrintScreen` | 主窗口命令列表 / 托盘「全屏截图」 / CLI `novashot full` |
+| 区域 | `Ctrl+PrintScreen` | 主窗口 / 托盘 / CLI `novashot region` |
+| 窗口 | `Ctrl+Shift+PrintScreen` | 主窗口 / 托盘 / CLI `novashot window` |
 
 > 多屏时「全屏」= 所有显示器拼成的虚拟桌面（含负坐标区域），不是光标所在那一个屏。
 

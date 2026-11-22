@@ -1,7 +1,7 @@
 # B-8 Mac 剪贴板解码畸形载荷防护
 
 - **优先级**: P2 ｜ **复杂度**: S ｜ **状态**: Done（2026-11-10） ｜ **来源**: B-1 独立审查 M-4 发现（越卡界未动，实证属实）
-- **关联**: `src/Prtsc.Platform.Mac/Clipboard/MacClipboardService.cs`（TryGetImage）、`src/Prtsc.Core/Clipboard/PngCodec.cs`（B-1 新建，现成可复用）
+- **关联**: `src/Novashot.Platform.Mac/Clipboard/MacClipboardService.cs`（TryGetImage）、`src/Novashot.Core/Clipboard/PngCodec.cs`（B-1 新建，现成可复用）
 
 ## 目标
 

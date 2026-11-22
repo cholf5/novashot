@@ -29,7 +29,7 @@ logs/
 # Publish
 publish/
 
-# Reference upstream projects (kept alongside for design reference only; not part of Prtsc)
+# Reference upstream projects (kept alongside for design reference only; not part of Novashot)
 flameshot/
 winshot/
 

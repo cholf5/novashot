@@ -32,11 +32,11 @@
 
 **QuickSave 目录与命名**
 
-- 目录：设置 → 快速保存 → 文件夹；留空 = `~/Pictures/Prtsc`（自动创建）
+- 目录：设置 → 快速保存 → 文件夹；留空 = `~/Pictures/Novashot`（自动创建）
 - 命名模式：与导出/CLI 共用同一套
-  - `timestamp`：`prtsc_2026-11-10_18-25-30.png`
-  - `date`：`prtsc_2026-11-10.png`，同一天多张自动加 `_1`、`_2`…
-  - `increment`：`prtsc_001.png`、`prtsc_002.png`…（扫描目录取最大号 +1）
+  - `timestamp`：`novashot_2026-11-10_18-25-30.png`
+  - `date`：`novashot_2026-11-10.png`，同一天多张自动加 `_1`、`_2`…
+  - `increment`：`novashot_001.png`、`novashot_002.png`…（扫描目录取最大号 +1）
 
 导出成功后按设置弹系统通知（Windows）；「设置 → 常规 → 截图完成通知」可关。
 

@@ -2,7 +2,7 @@
 
 - **优先级**: P1 ｜ **复杂度**: S ｜ **开发者**: cholf5 ｜ **状态**: Done（2026-11-03）
 - **依赖**: 无（M6b 合成管线 / E-2 画布参数持久化之后暴露的可见性问题）
-- **关联**: `Prtsc.Core.Editor.TransparencyChecker`、`SkiaCanvas.DrawOp`、`CompositionPanel.axaml`（None 项 ToolTip）
+- **关联**: `Novashot.Core.Editor.TransparencyChecker`、`SkiaCanvas.DrawOp`、`CompositionPanel.axaml`（None 项 ToolTip）
 
 ## 现象（用户报告）
 
@@ -32,13 +32,13 @@
 ## 测试用例
 
 - Core：`TransparencyCheckerTests`（6 例）——深浅交替、矩形外不落色、图案原点对齐矩形左上角、格宽生效、空矩形 no-op、默认配色相对衬底的亮度下限。
-- App：`UiSnapshotTests` 新增 `05-editor-transparent-bg.png`（headless 快照，`PRTSC_SNAPSHOT=1`）供人工核对棋盘格观感。
+- App：`UiSnapshotTests` 新增 `05-editor-transparent-bg.png`（headless 快照，`NOVASHOT_SNAPSHOT=1`）供人工核对棋盘格观感。
 
 ## Verification（2026-11-03）
 
-- TDD：先 RED（`TransparencyChecker` 不存在）→ 实现 → GREEN；`dotnet test tests/Prtsc.Core.Tests --filter TransparencyChecker` 6/6。
+- TDD：先 RED（`TransparencyChecker` 不存在）→ 实现 → GREEN；`dotnet test tests/Novashot.Core.Tests --filter TransparencyChecker` 6/6。
 - 全量：Core 438/438、App 97/97 ×2TFM、Mac 80/80（单跑）、Linux 45/45。
-- 快照核对：`PRTSC_SNAPSHOT=1 dotnet test --filter UiSnapshot`（net10.0），`artifacts/ui/05-editor-transparent-bg.png` 中 padding 环与圆角外角呈棋盘格，正文区域不受影响。
+- 快照核对：`NOVASHOT_SNAPSHOT=1 dotnet test --filter UiSnapshot`（net10.0），`artifacts/ui/05-editor-transparent-bg.png` 中 padding 环与圆角外角呈棋盘格，正文区域不受影响。
 - 配色定稿过程：先 `#2E2E33 / #222226`，3× 放大后对比度偏低（用户原话是"什么都看不见"，淡纹理等于没修），改 `#38383F / #232329` 后 1:1 观感清晰且不抢画面；亮度下限用单测钉死。
 - 存量 flake（与本卡无关）：`SettingsWindowXamlTests` 在全解决方案并行跑时偶发失败（单跑恒绿）；`MacClipboardServiceTests+ManualRoundtrip.Image_Roundtrip` 并行时偶发失败（单跑恒绿，真粘贴板争用）。
 - 待真机冒烟：截图 → Canvas 页选 None → 确认 padding 环/圆角外角出现棋盘格 → Save 出 PNG 后仍是透明（无格子）→ Padding 拖到 0 后透明边框消失。

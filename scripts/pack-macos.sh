@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# E-14: Prtsc macOS 打包 —— self-contained publish → .app bundle → ad-hoc 封签 → zip。
+# E-14: Novashot macOS 打包 —— self-contained publish → .app bundle → ad-hoc 封签 → zip。
 #
 # 用法：scripts/pack-macos.sh [--version 1.0.0] [--rids "osx-arm64 osx-x64"]
 #   --rids 缺省 osx-arm64（本机快速试跑）；CI 的 pack-macos 腿传两个。
-# 产物：artifacts/pack/Prtsc-<版本>-osx-<arch>.zip（gitignore，不入库）
+# 产物：artifacts/pack/Novashot-<版本>-osx-<arch>.zip（gitignore，不入库）
 #
 # 为什么不用 `vpk [osx] pack`：vpk 的 osx 通道产出的是 .pkg 安装器（或带 UpdateMac 助手的
 # bundle），要么需要 Apple 开发者证书 + 公证（我们没有），要么封签在加壳之后失效——没有证书时
@@ -16,8 +16,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TFM="net10.0"
-PACK_ID="Prtsc"
-BUNDLE_ID="com.cholf5.prtsc"
+PACK_ID="Novashot"
+BUNDLE_ID="com.cholf5.novashot"
 MIN_MACOS="12.0"
 OUT_DIR="$ROOT/artifacts/pack"
 ICON_PNG="$ROOT/assets/app-icon-macos.png"
@@ -136,7 +136,7 @@ for rid in $RIDS; do
   # 先清空 publish 目录：上一轮的残留会被整目录打进 bundle
   rm -rf "$PUBLISH_DIR" "$STAGE_DIR"
   mkdir -p "$PUBLISH_DIR"
-  dotnet publish "$ROOT/src/Prtsc.App" \
+  dotnet publish "$ROOT/src/Novashot.App" \
     -c Release -f "$TFM" -r "$rid" --self-contained true \
     -o "$PUBLISH_DIR"
 
@@ -147,9 +147,9 @@ for rid in $RIDS; do
 
   mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
   # 整个 publish 目录搬进 Contents/MacOS，不猜哪些文件必需：
-  # self-contained 的 apphost 不是单文件（没有 PublishSingleFile），宿主会在同目录找 `Prtsc.dll`
+  # self-contained 的 apphost 不是单文件（没有 PublishSingleFile），宿主会在同目录找 `Novashot.dll`
   # 与全部托管程序集；只拷可执行文件 + *.dylib 的后果是启动即报
-  # 「The application to execute does not exist: .../Prtsc.dll」。原生依赖也因平台/库版本而异，
+  # 「The application to execute does not exist: .../Novashot.dll」。原生依赖也因平台/库版本而异，
   # 漏一个就是启动即崩。
   cp -R "$PUBLISH_DIR"/. "$APP/Contents/MacOS"/
   rm -f "$APP/Contents/MacOS/"*.pdb
@@ -176,7 +176,7 @@ cat <<'NEXT'
 
 === 分发提示 ===
 - 产物未公证（ad-hoc 签名）。用户首次打开会看到「无法验证开发者」；macOS 26 上右键「打开」已不再能绕过：
-    xattr -cr /Applications/Prtsc.app
+    xattr -cr /Applications/Novashot.app
   或 系统设置 → 隐私与安全性 → 仍要打开 → 输开机密码。
-- 首次截图要授权「屏幕录制」：系统设置 → 隐私与安全性 → 屏幕录制 → 勾选 Prtsc → 重启应用。
+- 首次截图要授权「屏幕录制」：系统设置 → 隐私与安全性 → 屏幕录制 → 勾选 Novashot → 重启应用。
 NEXT

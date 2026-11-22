@@ -8,7 +8,7 @@
 
 ## 现象
 
-- `dotnet test tests/Prtsc.App.Tests -f net10.0` 偶发整进程崩溃：`Test host process crashed : Stack overflow`，退出前已跑过的用例全绿（观察到 186 / 187 / 188 / 192，总数 206）。
+- `dotnet test tests/Novashot.App.Tests -f net10.0` 偶发整进程崩溃：`Test host process crashed : Stack overflow`，退出前已跑过的用例全绿（观察到 186 / 187 / 188 / 192，总数 206）。
 - 崩溃栈稳定落在同一条链上：
 
 ```
@@ -24,7 +24,7 @@ RadioButtonGroupManager.OnCheckedChanged
 
 ## 根因
 
-- 位置：`src/Prtsc.App/Controls/CompositionPanel.axaml` 背景三态 chip —— 共用 `GroupName="BgKind"`，`IsChecked` 各自 `Mode=TwoWay` 绑 VM 的 `IsBgNone` / `IsBgSolid` / `IsBgGradient`。
+- 位置：`src/Novashot.App/Controls/CompositionPanel.axaml` 背景三态 chip —— 共用 `GroupName="BgKind"`，`IsChecked` 各自 `Mode=TwoWay` 绑 VM 的 `IsBgNone` / `IsBgSolid` / `IsBgGradient`。
 - 机制：组管理器取消兄弟 → 兄弟的 TwoWay 回写 VM → VM 属性变更通知（`OnStateChanged` 用 `OnPropertyChanged(string.Empty)` 整表刷新，发布面最大）→ 绑定重新发布 → 再次进入 `IsCheckedChanged`，直到栈耗尽。栈溢出是**进程级崩溃**，xunit 的 try/catch 兜不住，所以表现为 abort 而不是失败。
 - 为什么偶发：环能否被打破取决于通知是否被调度器批次边界切断（`RunJobs` 分批、UI 线程调度）。headless 下高频开关 CompositionPanel（快照 / 设置页 / XAML 测试）概率放大。
 - 已知基线：B-6 审查轮用 `git stash` 干净树复现过同样 abort（4 跑 1 abort）——**不是新代码引入的**。
@@ -42,13 +42,13 @@ RadioButtonGroupManager.OnCheckedChanged
 
 ## 验收（全部实测）
 
-- [x] 新增回归 `tests/Prtsc.App.Tests/BackgroundKindChipTests.cs`（3 例）：
+- [x] 新增回归 `tests/Novashot.App.Tests/BackgroundKindChipTests.cs`（3 例）：
   - `ChipsAreDisplayOnly_TargetChange_DoesNotWriteBackToVm` —— 直接改目标侧不回写 VM（修复前会递归爆栈）；
   - `Click_SwitchesBackground_KeepsSingleSelection_AndAppliesOnce` —— 点击切态 + 三态互斥回显 + `CanvasStateChanged` 每次点击恰一次（E-2 契约）；
   - `RapidStateFlips_DoNotRecurse_AndStayConsistent` —— 100 次点选 + 程序侧 `SetGradient` 回显。
 - [x] A/B 压测（同机同命令，`-f net10.0` 全量）：**修前 15 跑 3 abort（各停在 186/187/187）；修后 15 跑 0 abort + 另 10 跑 0 abort**（共 25 连跑无 abort）。
 - [x] 全量：Core 785 + App 209（206+3）×net10.0 + Mac 91 + Linux 46 全绿；`dotnet build` 0 warning / 0 error。
-- [x] 快照回归：`PRTSC_SNAPSHOT=1 … --filter UiSnapshot` 通过，`03-editor-canvas-tab-en.png` 目检面板 Gradient 选中态正常（选中环/互斥正确）。
+- [x] 快照回归：`NOVASHOT_SNAPSHOT=1 … --filter UiSnapshot` 通过，`03-editor-canvas-tab-en.png` 目检面板 Gradient 选中态正常（选中环/互斥正确）。
 
 ## 踩坑记录（测试侧，值得记住）
 
@@ -57,4 +57,4 @@ RadioButtonGroupManager.OnCheckedChanged
 ## 关联
 
 - `kanban/issues/B-6-toolbar-customization.md`（首次记录，含 stash 基线复现）、`kanban/issues/U-1-transparent-preview-checker.md`（同源孤例）
-- 代码：`src/Prtsc.App/Controls/CompositionPanel.axaml(.cs)`、`src/Prtsc.App/ViewModels/CompositionPanelViewModel.cs`（`Apply` 咽喉点 / `OnStateChanged`）
+- 代码：`src/Novashot.App/Controls/CompositionPanel.axaml(.cs)`、`src/Novashot.App/ViewModels/CompositionPanelViewModel.cs`（`Apply` 咽喉点 / `OnStateChanged`）
