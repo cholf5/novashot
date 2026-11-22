@@ -1,8 +1,25 @@
+<div align="center">
+
+<img src="assets/app-icon.png" alt="Novashot" width="120"/>
+
 # Novashot
 
-> flameshot 式的跨平台截图 / 标注 / 分享工具：**截图 → 就地标注 → 一步合成落盘、进剪贴板或上传**，常驻托盘、全局热键随叫随到。
->
-> *A flameshot-style screenshot and annotation tool for Windows, macOS and Linux (X11).*
+**flameshot 式的跨平台截图 / 标注 / 分享工具**
+
+截图 → 就地标注 → 一步合成落盘、进剪贴板或上传
+常驻托盘 · 全局热键随叫随到
+
+*A flameshot-style screenshot and annotation tool for Windows, macOS and Linux (X11).*
+
+[![CI](https://github.com/cholf5/novashot/actions/workflows/ci.yml/badge.svg)](https://github.com/cholf5/novashot/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-6b5eed)
+![.NET](https://img.shields.io/badge/.NET-10-512BD4)
+![Avalonia](https://img.shields.io/badge/Avalonia-12-9b4ee8)
+
+[下载安装包](https://github.com/cholf5/novashot/releases/latest) · [用户手册](docs/user/README.md) · [路线图](docs/roadmap.md)
+
+</div>
 
 ## 特性
 
@@ -67,6 +84,9 @@
 - **只有 Windows 有系统级通知与应用内更新**；macOS / Linux 换版本要手动替换，Linux 本版只发源码构建
 
 ## 安装
+
+> [!TIP]
+> 到 [Releases](https://github.com/cholf5/novashot/releases/latest) 页下载对应平台的安装包。
 
 **Windows**
 
