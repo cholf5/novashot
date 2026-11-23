@@ -86,6 +86,23 @@ public class UiSnapshotTests
             Pump(window);
         }
 
+        // M-Inspector：画三笔 → 左元素列表 + 右 Inspector 几何/层序组 + Select 下完整选中框
+        if (window.DataContext is MainWindowViewModel vmElems && vmElems.Editor is { } edElems)
+        {
+            edElems.ExecuteAdd(new Novashot.Core.Annotation.Model.RectangleAnnotation(
+                new SKRect(120, 90, 560, 380), edElems.CurrentStyle));
+            edElems.ExecuteAdd(new Novashot.Core.Annotation.Model.MosaicAnnotation(
+                new SKRect(720, 140, 1160, 480), edElems.Document.Source, edElems.CurrentStyle));
+            edElems.ExecuteAdd(new Novashot.Core.Annotation.Model.TextAnnotation(
+                new SKPoint(200, 620), "selected text", 36f, edElems.CurrentStyle));
+            Pump(window);
+            Save(window, "07-editor-elements.png");
+            // 切到 Rectangle 工具展示「绘制工具下的淡选中框」形态
+            edElems.CurrentTool = Novashot.Core.Annotation.Tools.ToolKind.Rectangle;
+            Pump(window);
+            Save(window, "08-editor-soft-selection.png");
+        }
+
         Novashot.App.Localization.Loc.SetPreference("zh-CN", Application.Current!);
         if (window.DataContext is MainWindowViewModel vm2) vm2.ReturnToCapture();
         Pump(window);

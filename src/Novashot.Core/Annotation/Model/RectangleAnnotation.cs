@@ -78,6 +78,8 @@ public sealed class RectangleAnnotation : AnnotationBase
 
     public override IReadOnlyList<AnnotationHandle> GetHandles() => BoxHandles.GetHandles(_rect);
 
+    public override SKRect GeometryRect => _rect;
+
     public override bool HitTestBody(SKPoint point, float slop)
     {
         // Select 工具下，闭合矩形整个 body 都算命中。

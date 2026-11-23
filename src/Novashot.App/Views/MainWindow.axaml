@@ -197,11 +197,19 @@
         </StackPanel>
       </Grid>
 
-      <!-- 编辑态 -->
-      <Grid IsVisible="{Binding IsInEditorMode}" ColumnDefinitions="*,264">
+      <!-- 编辑态：左 = 元素列表（空文档时整栏隐藏、Auto 列归零），中 = 画布，右 = Inspector -->
+      <Grid IsVisible="{Binding IsInEditorMode}" ColumnDefinitions="Auto,*,264">
+
+        <!-- 左：元素列表（M-Inspector） -->
+        <Border Grid.Column="0" IsVisible="{Binding Editor.HasElements}"
+                Background="{DynamicResource Bg.Panel}"
+                BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0"
+                MinWidth="170" MaxWidth="220">
+          <controls:ElementListPanel DataContext="{Binding Editor}" />
+        </Border>
 
         <!-- 画布 + 悬浮工具栏 -->
-        <Grid Grid.Column="0" Background="{DynamicResource Bg.Mat}">
+        <Grid Grid.Column="1" Background="{DynamicResource Bg.Mat}">
           <Grid Margin="12,12,12,78" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
             <controls:SkiaCanvas x:Name="Canvas" Editor="{Binding Editor}" />
             <Canvas x:Name="TextEditLayer"
@@ -419,7 +427,7 @@
         </Grid>
 
         <!-- 右侧面板：样式与画布单页直排（docs/design/2026-11-22-merge-style-canvas-panel.md） -->
-        <Border Grid.Column="1" Background="{DynamicResource Bg.Panel}"
+        <Border Grid.Column="2" Background="{DynamicResource Bg.Panel}"
                 BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <StackPanel>

@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Novashot.Core.Annotation.Model;
 
 namespace Novashot.App.Localization;
 
@@ -54,6 +55,29 @@ public static class Loc
 
     /// <summary>带参数的文案（string.Format）。</summary>
     public static string T(string key, params object?[] args) => string.Format(T(key), args);
+
+    /// <summary>
+    /// 标注类型的本地化名称（Kind.* key 映射）。StylePanel 的选中标题与元素列表的行摘要共用，
+    /// 未列出的类型退回类名（漏映射在界面上一眼可见）。
+    /// </summary>
+    public static string KindLabel(AnnotationBase? a) => a switch
+    {
+        null                      => T("Kind.None"),
+        RectangleAnnotation       => T("Kind.Rectangle"),
+        EllipseAnnotation         => T("Kind.Ellipse"),
+        ArrowCurvedAnnotation     => T("Kind.ArrowCurved"),
+        ArrowStraightAnnotation   => T("Kind.ArrowStraight"),
+        LineAnnotation            => T("Kind.Line"),
+        TextAnnotation            => T("Kind.Text"),
+        NumberAnnotation          => T("Kind.Number"),
+        SpotlightAnnotation       => T("Kind.Spotlight"),
+        PencilAnnotation          => T("Kind.Pencil"),
+        HighlighterAnnotation     => T("Kind.Highlighter"),
+        MosaicAnnotation          => T("Kind.Mosaic"),
+        BlurAnnotation            => T("Kind.Blur"),
+        InvertAnnotation          => T("Kind.Invert"),
+        _                         => a.GetType().Name,
+    };
 
     /// <summary>启动时调用：解析偏好并写入资源字典。</summary>
     public static void Initialize(string? preference, Application app)
@@ -215,6 +239,19 @@ internal static class Strings
         ["Panel.Stroke"] = "Stroke",
         ["Panel.TextSize"] = "Text size",
         ["Panel.Selection"] = "Selection",
+        ["Panel.Elements"] = "Elements",
+        ["Panel.Layer"] = "Order",
+        ["Panel.Up"] = "Move up",
+        ["Panel.Down"] = "Move down",
+        ["Panel.ToTop"] = "Bring to front",
+        ["Panel.ToBottom"] = "Send to back",
+        ["Panel.Geometry"] = "Geometry",
+        ["Panel.Width"] = "W",
+        ["Panel.Height"] = "H",
+        ["Panel.Effects"] = "Effects",
+        ["Panel.BlockSize"] = "Pixel size",
+        ["Panel.Strength"] = "Strength",
+        ["Panel.GeometryReadonlyHint"] = "Size editing not available for this shape",
         ["Panel.Opacity"] = "Opacity",
         ["Panel.Position"] = "Position",
         ["Panel.Background"] = "Background",
@@ -537,6 +574,19 @@ internal static class Strings
         ["Panel.Stroke"] = "粗细",
         ["Panel.TextSize"] = "字号",
         ["Panel.Selection"] = "选中",
+        ["Panel.Elements"] = "元素",
+        ["Panel.Layer"] = "层序",
+        ["Panel.Up"] = "上移",
+        ["Panel.Down"] = "下移",
+        ["Panel.ToTop"] = "置顶",
+        ["Panel.ToBottom"] = "置底",
+        ["Panel.Geometry"] = "几何",
+        ["Panel.Width"] = "宽",
+        ["Panel.Height"] = "高",
+        ["Panel.Effects"] = "效果",
+        ["Panel.BlockSize"] = "颗粒度",
+        ["Panel.Strength"] = "强度",
+        ["Panel.GeometryReadonlyHint"] = "此类型不支持宽高编辑",
         ["Panel.Opacity"] = "不透明度",
         ["Panel.Position"] = "位置",
         ["Panel.Background"] = "背景",

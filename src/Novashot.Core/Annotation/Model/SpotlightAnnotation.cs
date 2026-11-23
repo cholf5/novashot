@@ -67,6 +67,8 @@ public sealed class SpotlightAnnotation : AnnotationBase
 
     public override IReadOnlyList<AnnotationHandle> GetHandles() => BoxHandles.GetHandles(_region);
 
+    public override SKRect GeometryRect => _region;
+
     public override bool HitTestBody(SKPoint point, float slop)
     {
         // Select 工具下，聚光灯覆盖整张图，任意位置都算命中。

@@ -5,13 +5,20 @@
              xmlns:vm="using:Novashot.App.ViewModels"
              xmlns:controls="using:Novashot.App.Controls"
              mc:Ignorable="d"
-             d:DesignWidth="264" d:DesignHeight="420"
+             d:DesignWidth="264" d:DesignHeight="620"
              x:Class="Novashot.App.Controls.StylePanel"
              x:DataType="vm:StylePanelViewModel">
 
+  <!--
+  Inspector 双态（M-Inspector）：
+  - 未选中 = 默认样式态：只有公共组（颜色 / 描边宽）
+  - 选中   = 对象态：公共组 + 几何组（X/Y/宽/高，开放形状宽高禁用）+ 效果组（Mosaic/Blur）+ 层序组
+  样式与效果改动不进 Undo；几何写值走既有 Move/Resize 命令（进 Undo）。
+  -->
+
   <StackPanel Margin="12,14,12,4" Spacing="16">
 
-    <!-- Colour：界面里唯一鲜艳的东西 -->
+    <!-- 公共组 · Colour：界面里唯一鲜艳的东西 -->
     <StackPanel>
       <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,9">
         <TextBlock Classes="sec" Text="{DynamicResource L.Panel.Colour}" VerticalAlignment="Center" />
@@ -58,7 +65,7 @@
       </StackPanel>
     </StackPanel>
 
-    <!-- Stroke -->
+    <!-- 公共组 · Stroke -->
     <StackPanel>
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Classes="label" Text="{DynamicResource L.Panel.Stroke}" />
@@ -73,7 +80,48 @@
       </Grid>
     </StackPanel>
 
-    <!-- Font size（仅文字工具） -->
+    <!-- 几何组（选中时显示；X/Y 全类型可编辑，宽高仅盒状族） -->
+    <StackPanel IsVisible="{Binding IsGeometryVisible}">
+      <TextBlock Classes="label" Text="{DynamicResource L.Panel.Geometry}" Margin="0,0,0,4" />
+      <UniformGrid Columns="2">
+        <StackPanel Margin="0,0,6,4">
+          <TextBlock Classes="hint" FontSize="9.5" Text="X" Margin="1,0,0,2" />
+          <NumericUpDown Value="{Binding SelX, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                         Increment="1" FormatString="0" Height="30" />
+        </StackPanel>
+        <StackPanel Margin="6,0,0,4">
+          <TextBlock Classes="hint" FontSize="9.5" Text="Y" Margin="1,0,0,2" />
+          <NumericUpDown Value="{Binding SelY, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                         Increment="1" FormatString="0" Height="30" />
+        </StackPanel>
+        <StackPanel Margin="0,0,6,0">
+          <TextBlock Classes="hint" FontSize="9.5" Text="{DynamicResource L.Panel.Width}" Margin="1,0,0,2" />
+          <NumericUpDown Value="{Binding SelW, Mode=TwoWay}" Minimum="4" Maximum="10000"
+                         Increment="1" FormatString="0" Height="30"
+                         IsEnabled="{Binding IsSizeEditable}"
+                         ToolTip.Tip="{DynamicResource L.Panel.GeometryReadonlyHint}" />
+        </StackPanel>
+        <StackPanel Margin="6,0,0,0">
+          <TextBlock Classes="hint" FontSize="9.5" Text="{DynamicResource L.Panel.Height}" Margin="1,0,0,2" />
+          <NumericUpDown Value="{Binding SelH, Mode=TwoWay}" Minimum="4" Maximum="10000"
+                         Increment="1" FormatString="0" Height="30"
+                         IsEnabled="{Binding IsSizeEditable}"
+                         ToolTip.Tip="{DynamicResource L.Panel.GeometryReadonlyHint}" />
+        </StackPanel>
+      </UniformGrid>
+    </StackPanel>
+
+    <!-- 效果组（Mosaic/Blur）：颗粒度 / 强度 -->
+    <StackPanel IsVisible="{Binding IsEffectVisible}">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="label" Text="{Binding EffectLabel}" />
+        <TextBlock Grid.Column="1" Classes="val" Text="{Binding EffectStrength, StringFormat='{}{0:0}'}" />
+      </Grid>
+      <Slider Minimum="{Binding EffectMin}" Maximum="{Binding EffectMax}"
+              Value="{Binding EffectStrength, Mode=TwoWay}" Margin="0,3,0,0" />
+    </StackPanel>
+
+    <!-- Font size（仅文字） -->
     <StackPanel IsVisible="{Binding IsFontSizeAvailable}">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Classes="label" Text="{DynamicResource L.Panel.TextSize}" />
@@ -86,6 +134,24 @@
         <TextBlock Grid.Column="1" Classes="mono hint" FontSize="9.5" Text="42" HorizontalAlignment="Center" />
         <TextBlock Grid.Column="2" Classes="mono hint" FontSize="9.5" Text="72" HorizontalAlignment="Right" />
       </Grid>
+    </StackPanel>
+
+    <Border Height="1" Background="{DynamicResource Line}" Margin="0,2" />
+
+    <!-- 层序组（选中时显示；命令路径与元素列表/画布共用，进 Undo）。
+         左两枚 = 置顶/置底（跨度），右两枚 = 逐层 上移/下移。 -->
+    <StackPanel IsVisible="{Binding HasSelection}">
+      <TextBlock Classes="label" Text="{DynamicResource L.Panel.Layer}" Margin="0,0,0,4" />
+      <UniformGrid Columns="4">
+        <Button Classes="layer-btn" Command="{Binding Editor.BringToFrontCommand}"
+                ToolTip.Tip="{DynamicResource L.Panel.ToTop}" Content="⤒" />
+        <Button Classes="layer-btn" Command="{Binding Editor.SendToBackCommand}"
+                ToolTip.Tip="{DynamicResource L.Panel.ToBottom}" Content="⤓" />
+        <Button Classes="layer-btn" Command="{Binding Editor.BringForwardCommand}"
+                ToolTip.Tip="{DynamicResource L.Panel.Up}" Content="↑" />
+        <Button Classes="layer-btn" Command="{Binding Editor.SendBackwardCommand}"
+                ToolTip.Tip="{DynamicResource L.Panel.Down}" Content="↓" />
+      </UniformGrid>
     </StackPanel>
 
     <Border Height="1" Background="{DynamicResource Line}" Margin="0,2" />

@@ -24,6 +24,14 @@ public abstract class AnnotationBase
     /// <summary>该标注的紧致 AABB，像素坐标。用于 dirty / 命中前置过滤。</summary>
     public abstract SKRect BoundingBox { get; }
 
+    /// <summary>
+    /// Inspector 几何面板的「逻辑几何矩形」：<see cref="GetHandles"/> 与
+    /// <see cref="MoveHandle"/> 作用的空间，<b>不含</b>描边外扩等渲染 padding
+    /// （部分类型的 <see cref="BoundingBox"/> 会比它大半个 stroke，那是 dirty 区口径）。
+    /// 盒状族 override 返回未膨胀的形状矩形；其余类型默认等于 <see cref="BoundingBox"/>。
+    /// </summary>
+    public virtual SKRect GeometryRect => BoundingBox;
+
     /// <summary>把自己画到给定 SKCanvas。canvas 处于 image-pixel 坐标系。</summary>
     public abstract void Render(SKCanvas canvas);
 

@@ -214,7 +214,8 @@ public sealed class SkiaCanvas : Control
             ComputeViewportMatrix(editor, bounds),
             CropPreviewRect,
             new SKSize(editor.ContentWidth, editor.ContentHeight),
-            cropToolActive: editor.CurrentTool == ToolKind.Crop));
+            cropToolActive: editor.CurrentTool == ToolKind.Crop,
+            selectToolActive: editor.CurrentTool == ToolKind.Select));
     }
 
     /// <summary>
@@ -732,12 +733,13 @@ public sealed class SkiaCanvas : Control
         private readonly SKMatrix _matrix;
         private readonly SKRect? _cropPreviewRect;
         private readonly bool _cropToolActive;
+        private readonly bool _selectToolActive;
         private readonly SKSize _contentSize;
 
         public DrawOp(Rect bounds, AnnotationDocument doc, Novashot.Core.Editor.EditorState state,
                       AnnotationBase? preview, AnnotationBase? selection, AnnotationBase? editingText,
                       SKMatrix matrix, SKRect? cropPreviewRect = null, SKSize contentSize = default,
-                      bool cropToolActive = false)
+                      bool cropToolActive = false, bool selectToolActive = false)
         {
             Bounds = bounds;
             _doc = doc;
@@ -748,6 +750,7 @@ public sealed class SkiaCanvas : Control
             _matrix = matrix;
             _cropPreviewRect = cropPreviewRect;
             _cropToolActive = cropToolActive;
+            _selectToolActive = selectToolActive;
             if (contentSize.Width > 0 && contentSize.Height > 0)
             {
                 _contentSize = contentSize;
@@ -797,9 +800,16 @@ public sealed class SkiaCanvas : Control
 
             canvas.RestoreToCount(restore);
 
-            // DIP 空间：画选中框与手柄（不随视口缩放变形；编辑中的 Text 不画）
+            // DIP 空间：画选中框（不随视口缩放变形；编辑中的 Text 不画）。
+            // M-Inspector：Selection 跨工具存活——Select 工具下画完整 overlay（框+手柄）；
+            // 绘制工具下只画淡虚线框（纯视觉、不参与命中），手柄不出现以免干扰画笔落点。
             if (_selection is not null && !ReferenceEquals(_selection, _editingText))
-                DrawSelectionOverlay(canvas, _selection);
+            {
+                if (_selectToolActive)
+                    DrawSelectionOverlay(canvas, _selection);
+                else
+                    DrawSoftSelectionBox(canvas, _selection);
+            }
 
             // M6d/B-4: 裁剪 overlay——框外暗遮罩 + 白框（编辑器 chrome，永不导出）。
             // B-4：crop 工具激活且已有应用过的裁剪框（无预览拖拽）→ overlay 常驻 + 8 手柄供拖拽。
@@ -936,6 +946,24 @@ public sealed class SkiaCanvas : Control
                 canvas.DrawRect(r, fillPaint);
                 canvas.DrawRect(r, strokePaint);
             }
+        }
+
+        /// <summary>
+        /// 绘制工具下的淡选中框（M-Inspector）：选中色 ~60% 透明、1.5px 虚线、无手柄。
+        /// 纯视觉——SkiaCanvas 的指针命中不经过它，画笔落点不受影响。
+        /// </summary>
+        private void DrawSoftSelectionBox(SKCanvas canvas, AnnotationBase selection)
+        {
+            var c = selection.Style.Stroke;
+            using var outline = new SKPaint
+            {
+                Color = new SKColor(c.Red, c.Green, c.Blue, 0x99),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1.5f,
+                IsAntialias = true,
+                PathEffect = SKPathEffect.CreateDash(new float[] { 4f, 3f }, 0f),
+            };
+            canvas.DrawRect(_matrix.MapRect(ImageRectToContent(selection.BoundingBox)), outline);
         }
     }
 }

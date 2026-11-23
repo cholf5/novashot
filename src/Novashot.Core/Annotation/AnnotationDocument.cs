@@ -75,6 +75,23 @@ public sealed class AnnotationDocument
         return _annotations.IndexOf(annotation);
     }
 
+    /// <summary>
+    /// 把 <paramref name="fromIndex"/> 处的标注移到 <paramref name="toIndex"/>（其余元素依次滑动）。
+    /// ReorderAnnotationCommand 的 Do/Undo 通路；from == to 时不动也不触发 Changed。
+    /// </summary>
+    public void Move(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= _annotations.Count)
+            throw new ArgumentOutOfRangeException(nameof(fromIndex));
+        if (toIndex < 0 || toIndex >= _annotations.Count)
+            throw new ArgumentOutOfRangeException(nameof(toIndex));
+        if (fromIndex == toIndex) return;
+        var a = _annotations[fromIndex];
+        _annotations.RemoveAt(fromIndex);
+        _annotations.Insert(toIndex, a);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     public bool Remove(AnnotationBase annotation)
     {
         ArgumentNullException.ThrowIfNull(annotation);

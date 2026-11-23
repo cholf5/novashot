@@ -38,6 +38,20 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
     public RelayCommand DeselectCommand { get; }
     public RelayCommand CommitTextEditCommand { get; }
     public RelayCommand CancelTextEditCommand { get; }
+    public RelayCommand BringForwardCommand { get; }
+    public RelayCommand SendBackwardCommand { get; }
+    public RelayCommand BringToFrontCommand { get; }
+    public RelayCommand SendToBackCommand { get; }
+    public RelayCommand<ElementListItemViewModel?> SelectFromListCommand { get; }
+
+    /// <summary>
+    /// 左侧元素列表（M-Inspector，栈顶在顶）。Document.Changed 全量重建——
+    /// 截图标注量级小，简单可靠；行摘要/图标随重建刷新。
+    /// </summary>
+    public System.Collections.ObjectModel.ObservableCollection<ElementListItemViewModel> ElementList { get; } = new();
+
+    /// <summary>列表非空（左栏整栏显隐用）。</summary>
+    public bool HasElements => ElementList.Count > 0;
 
     /// <summary>右侧属性面板 VM——生命期与 EditorViewModel 一致。</summary>
     public StylePanelViewModel StylePanel { get; }
@@ -126,6 +140,26 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
             execute: () => Selection = null);
         CommitTextEditCommand = new RelayCommand(CommitTextEdit);
         CancelTextEditCommand = new RelayCommand(CancelTextEdit);
+        BringForwardCommand = new RelayCommand(
+            execute: () => ReorderSelection(step: +1),
+            canExecute: () => CanReorder(step: +1));
+        SendBackwardCommand = new RelayCommand(
+            execute: () => ReorderSelection(step: -1),
+            canExecute: () => CanReorder(step: -1));
+        BringToFrontCommand = new RelayCommand(
+            execute: () => ReorderSelection(toTop: true),
+            canExecute: () => CanReorder(toTop: true));
+        SendToBackCommand = new RelayCommand(
+            execute: () => ReorderSelection(toTop: false),
+            canExecute: () => CanReorder(toTop: false));
+        SelectFromListCommand = new RelayCommand<ElementListItemViewModel?>(
+            execute: item =>
+            {
+                if (item is null) return;
+                Selection = item.Annotation;
+                // 点列表 = 「我要操作它」的强意图：顺手切到 Select（拖手柄/Delete 才可用）
+                CurrentTool = ToolKind.Select;
+            });
 
         History.StateChanged += OnHistoryStateChanged;
         Document.Changed += OnDocumentChanged;
@@ -153,18 +187,63 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
             _editingTextIsNewlyCreated = false;
             EditingText = null;
         }
+        RebuildElementList();
     }
 
     partial void OnSelectionChanged(AnnotationBase? value)
     {
         DeleteSelectionCommand.NotifyCanExecuteChanged();
+        BringForwardCommand.NotifyCanExecuteChanged();
+        SendBackwardCommand.NotifyCanExecuteChanged();
+        BringToFrontCommand.NotifyCanExecuteChanged();
+        SendToBackCommand.NotifyCanExecuteChanged();
+        SyncListSelection();
     }
 
-    partial void OnCurrentToolChanged(ToolKind value)
+    private void RebuildElementList()
     {
-        // 切离 Select 工具时清空选中，避免非 Select 工具下手柄仍显示
-        if (value != ToolKind.Select) Selection = null;
+        ElementList.Clear();
+        // Annotations 是底→顶；列表顶 = 栈顶，故逆序填充
+        for (int i = Document.Annotations.Count - 1; i >= 0; i--)
+        {
+            var a = Document.Annotations[i];
+            ElementList.Add(new ElementListItemViewModel(a, Summarize(a), IconKeyOf(a)));
+        }
+        OnPropertyChanged(nameof(HasElements));
+        SyncListSelection();
     }
+
+    private void SyncListSelection()
+    {
+        foreach (var item in ElementList)
+            item.IsSelected = ReferenceEquals(item.Annotation, Selection);
+    }
+
+    private static string Summarize(AnnotationBase a) => a switch
+    {
+        TextAnnotation t => t.Text.Length <= 12 ? t.Text : t.Text[..12],
+        NumberAnnotation n => $"#{n.Number}",
+        _ => Localization.Loc.KindLabel(a),
+    };
+
+    private static string IconKeyOf(AnnotationBase a) => a switch
+    {
+        RectangleAnnotation       => "Icon.Rect",
+        EllipseAnnotation         => "Icon.Ellipse",
+        // 箭头继承 LineAnnotation，必须排在 Line 前才能各取各的图标
+        ArrowStraightAnnotation   => "Icon.Arrow",
+        ArrowCurvedAnnotation     => "Icon.Curve",
+        LineAnnotation            => "Icon.Line",
+        TextAnnotation            => "Icon.Text",
+        NumberAnnotation          => "Icon.Number",
+        SpotlightAnnotation       => "Icon.Spotlight",
+        PencilAnnotation          => "Icon.Pencil",
+        HighlighterAnnotation     => "Icon.Highlighter",
+        MosaicAnnotation          => "Icon.Mosaic",
+        BlurAnnotation            => "Icon.Blur",
+        InvertAnnotation          => "Icon.Invert",
+        _                         => "Icon.Rect",
+    };
 
     public bool CanUndo => History.CanUndo;
     public bool CanRedo => History.CanRedo;
@@ -222,11 +301,42 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         _ => NopTool.Instance,
     };
 
-    /// <summary>把新标注封装成 AddAnnotationCommand 提交给 <see cref="History"/>。</summary>
+    /// <summary>
+    /// 把新标注封装成 AddAnnotationCommand 提交给 <see cref="History"/>。
+    /// M-Inspector：画完即选中——新标注自动成为 Selection（工具不切走，连续绘制不受影响），
+    /// 右侧 Inspector 立即反映其属性。
+    /// </summary>
     public void ExecuteAdd(AnnotationBase annotation)
     {
         ArgumentNullException.ThrowIfNull(annotation);
         History.Execute(new AddAnnotationCommand(Document, annotation));
+        Selection = annotation;
+    }
+
+    // ---- 层序（M-Inspector）----
+
+    private bool CanReorder(int step) => CanReorderCore(Selection is null
+        ? null
+        : Document.IndexOf(Selection) + step);
+
+    private bool CanReorder(bool toTop) => CanReorderCore(toTop ? Document.Annotations.Count - 1 : 0);
+
+    private bool CanReorderCore(int? target)
+        => Selection is not null
+           && Document.IndexOf(Selection) is var from && from >= 0
+           && target is int t && t >= 0 && t < Document.Annotations.Count && t != from;
+
+    private void ReorderSelection(int step) => ReorderCore(Document.IndexOf(Selection!) + step);
+
+    private void ReorderSelection(bool toTop) => ReorderCore(toTop ? Document.Annotations.Count - 1 : 0);
+
+    private void ReorderCore(int toIndex)
+    {
+        var sel = Selection;
+        if (sel is null) return;
+        var from = Document.IndexOf(sel);
+        if (from < 0 || from == toIndex || toIndex < 0 || toIndex >= Document.Annotations.Count) return;
+        History.Execute(new ReorderAnnotationCommand(Document, sel, toIndex));
     }
 
     // ---- M6d: non-destructive crop ----

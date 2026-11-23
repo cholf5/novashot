@@ -2,6 +2,8 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Novashot.App.Localization;
 using Novashot.Core.Annotation;
+using Novashot.Core.Annotation.Editing;
+using Novashot.Core.Annotation.History;
 using Novashot.Core.Annotation.Model;
 using Novashot.Core.Editor;
 using SkiaSharp;
@@ -46,6 +48,7 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
         if (_colorHistory is not null)
             _colorHistory.Changed += OnColorHistoryChanged;
         Editor.PropertyChanged += OnEditorPropertyChanged;
+        Editor.Document.Changed += OnDocumentChanged;
     }
 
     /// <summary>E-1 M9：会话级取色历史（最新在前；无历史实例时空表）。</summary>
@@ -63,6 +66,7 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
     private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(EditorViewModel.Selection)
+            or nameof(EditorViewModel.CurrentTool)
             or nameof(EditorViewModel.CurrentStyle))
         {
             // 选中变化会影响所有派生属性：颜色/宽/字号可用性/标签
@@ -72,7 +76,27 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(FontSize));
             OnPropertyChanged(nameof(IsFontSizeAvailable));
             OnPropertyChanged(nameof(SelectionKindLabel));
+            RefreshInspector();
         }
+    }
+
+    private void OnDocumentChanged(object? sender, EventArgs e) => RefreshInspector();
+
+    /// <summary>几何/效果/双态组的状态刷新（选中变化与文档级变化共用）。</summary>
+    private void RefreshInspector()
+    {
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(IsGeometryVisible));
+        OnPropertyChanged(nameof(IsSizeEditable));
+        OnPropertyChanged(nameof(IsEffectVisible));
+        OnPropertyChanged(nameof(EffectLabel));
+        OnPropertyChanged(nameof(EffectMin));
+        OnPropertyChanged(nameof(EffectMax));
+        OnPropertyChanged(nameof(SelX));
+        OnPropertyChanged(nameof(SelY));
+        OnPropertyChanged(nameof(SelW));
+        OnPropertyChanged(nameof(SelH));
+        OnPropertyChanged(nameof(EffectStrength));
     }
 
     /// <summary>当前生效颜色：优先取选中标注的 Style，否则取 CurrentStyle。</summary>
@@ -123,24 +147,130 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string SelectionKindLabel => Editor.Selection switch
+    public string SelectionKindLabel => Loc.KindLabel(Editor.Selection);
+
+    // ---- M-Inspector：几何 / 效果 / 双态 ----
+
+    /// <summary>true = 选中态（Inspector 四组显示）；false = 默认样式态（只显示公共组）。</summary>
+    public bool HasSelection => Editor.Selection is not null;
+
+    /// <summary>几何组显隐（有选中即显示；X/Y 全类型可编辑）。</summary>
+    public bool IsGeometryVisible => Editor.Selection is not null;
+
+    /// <summary>宽/高可编辑（盒状族）；false 时对应输入框禁用（X/Y 仍可编辑）。</summary>
+    public bool IsSizeEditable => Editor.Selection is { } s && InspectorGeometry.SupportsResize(s);
+
+    /// <summary>效果组显隐（Mosaic/Blur）。</summary>
+    public bool IsEffectVisible => Editor.Selection is MosaicAnnotation or BlurAnnotation;
+
+    /// <summary>效果滑条标签：Mosaic=颗粒度、Blur=强度（语言无关引用 Loc key）。</summary>
+    public string EffectLabel => Editor.Selection is MosaicAnnotation
+        ? Loc.T("Panel.BlockSize")
+        : Loc.T("Panel.Strength");
+
+    /// <summary>效果滑条范围（随选中类型切换：Mosaic=BlockSize 4..48，Blur=Sigma 2..40）。</summary>
+    public float EffectMin => Editor.Selection is BlurAnnotation ? BlurAnnotation.MinSigma : MosaicAnnotation.MinBlockSize;
+
+    /// <summary>效果滑条上限。</summary>
+    public float EffectMax => Editor.Selection is BlurAnnotation ? BlurAnnotation.MaxSigma : MosaicAnnotation.MaxBlockSize;
+
+    /// <summary>选中标注逻辑几何左上角 X（GeometryRect 口径 = 手柄空间）。写入走 MoveAnnotationCommand（进 Undo，带画布 clamp）。</summary>
+    public float SelX
     {
-        null                    => Loc.T("Kind.None"),
-        RectangleAnnotation _   => Loc.T("Kind.Rectangle"),
-        EllipseAnnotation _     => Loc.T("Kind.Ellipse"),
-        ArrowCurvedAnnotation _ => Loc.T("Kind.ArrowCurved"),
-        ArrowStraightAnnotation _ => Loc.T("Kind.ArrowStraight"),
-        LineAnnotation _        => Loc.T("Kind.Line"),
-        TextAnnotation _        => Loc.T("Kind.Text"),
-        NumberAnnotation _      => Loc.T("Kind.Number"),
-        SpotlightAnnotation _   => Loc.T("Kind.Spotlight"),
-        PencilAnnotation _      => Loc.T("Kind.Pencil"),
-        HighlighterAnnotation _ => Loc.T("Kind.Highlighter"),
-        MosaicAnnotation _      => Loc.T("Kind.Mosaic"),
-        BlurAnnotation _        => Loc.T("Kind.Blur"),
-        InvertAnnotation _      => Loc.T("Kind.Invert"),
-        _                       => Editor.Selection!.GetType().Name,
-    };
+        get => Editor.Selection?.GeometryRect.Left ?? 0f;
+        set
+        {
+            if (Editor.Selection is not { } sel) return;
+            var geo = sel.GeometryRect;
+            var delta = InspectorGeometry.MoveDelta(geo, value, geo.Top, Editor.Document.Width, Editor.Document.Height);
+            if (delta.X != 0 || delta.Y != 0)
+                Editor.History.Execute(new MoveAnnotationCommand(sel, delta, Editor.Document));
+            RefreshInspector();
+        }
+    }
+
+    /// <summary>选中标注逻辑几何左上角 Y。语义同 <see cref="SelX"/>。</summary>
+    public float SelY
+    {
+        get => Editor.Selection?.GeometryRect.Top ?? 0f;
+        set
+        {
+            if (Editor.Selection is not { } sel) return;
+            var geo = sel.GeometryRect;
+            var delta = InspectorGeometry.MoveDelta(geo, geo.Left, value, Editor.Document.Width, Editor.Document.Height);
+            if (delta.X != 0 || delta.Y != 0)
+                Editor.History.Execute(new MoveAnnotationCommand(sel, delta, Editor.Document));
+            RefreshInspector();
+        }
+    }
+
+    /// <summary>选中标注逻辑几何宽。写入 = SE 手柄移到目标点（进 Undo）；仅盒状族可写，其余 no-op。</summary>
+    public float SelW
+    {
+        get => Editor.Selection?.GeometryRect.Width ?? 0f;
+        set
+        {
+            if (Editor.Selection is not { } sel || !IsSizeEditable) return;
+            var geo = sel.GeometryRect;
+            var target = InspectorGeometry.ResizeTarget(geo, value, geo.Height, Editor.Document.Width, Editor.Document.Height);
+            var seBefore = new SKPoint(geo.Right, geo.Bottom);
+            if (target != seBefore)
+                Editor.History.Execute(new ResizeAnnotationCommand(sel, HandleKind.BottomRight, seBefore, target, Editor.Document));
+            RefreshInspector();
+        }
+    }
+
+    /// <summary>选中标注逻辑几何高。语义同 <see cref="SelW"/>。</summary>
+    public float SelH
+    {
+        get => Editor.Selection?.GeometryRect.Height ?? 0f;
+        set
+        {
+            if (Editor.Selection is not { } sel || !IsSizeEditable) return;
+            var geo = sel.GeometryRect;
+            var target = InspectorGeometry.ResizeTarget(geo, geo.Width, value, Editor.Document.Width, Editor.Document.Height);
+            var seBefore = new SKPoint(geo.Right, geo.Bottom);
+            if (target != seBefore)
+                Editor.History.Execute(new ResizeAnnotationCommand(sel, HandleKind.BottomRight, seBefore, target, Editor.Document));
+            RefreshInspector();
+        }
+    }
+
+    /// <summary>
+    /// 效果强度：Mosaic 读 BlockSize、Blur 读 Sigma。就地改不进 Undo（与颜色/描边同策略），
+    /// NotifyMutated 触发重绘。
+    /// </summary>
+    public float EffectStrength
+    {
+        get => Editor.Selection switch
+        {
+            MosaicAnnotation m => m.BlockSize,
+            BlurAnnotation b   => b.Sigma,
+            _                  => 0f,
+        };
+        set
+        {
+            switch (Editor.Selection)
+            {
+                case MosaicAnnotation m:
+                    var nextBlock = (int)Math.Clamp(value, MosaicAnnotation.MinBlockSize, MosaicAnnotation.MaxBlockSize);
+                    if (nextBlock != m.BlockSize)
+                    {
+                        m.BlockSize = nextBlock;
+                        Editor.Document.NotifyMutated();
+                    }
+                    break;
+                case BlurAnnotation b:
+                    var nextSigma = Math.Clamp(value, BlurAnnotation.MinSigma, BlurAnnotation.MaxSigma);
+                    if (Math.Abs(nextSigma - b.Sigma) > 0.001f)
+                    {
+                        b.Sigma = nextSigma;
+                        Editor.Document.NotifyMutated();
+                    }
+                    break;
+            }
+        }
+    }
 
     /// <summary>
     /// 把 <paramref name="mutate"/> 同时应用到选中标注（若有）和 CurrentStyle——
@@ -161,6 +291,7 @@ public sealed partial class StylePanelViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         Editor.PropertyChanged -= OnEditorPropertyChanged;
+        Editor.Document.Changed -= OnDocumentChanged;
         if (_colorHistory is not null)
             _colorHistory.Changed -= OnColorHistoryChanged;
     }

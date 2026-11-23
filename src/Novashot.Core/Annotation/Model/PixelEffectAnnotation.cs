@@ -51,6 +51,8 @@ public abstract class PixelEffectAnnotation : AnnotationBase
 
     public override IReadOnlyList<AnnotationHandle> GetHandles() => BoxHandles.GetHandles(_region);
 
+    public override SKRect GeometryRect => _region;
+
     public override void MoveHandle(HandleKind kind, SKPoint newImagePos)
         => _region = BoxHandles.ApplyHandle(_region, kind, newImagePos).Standardized;
 
